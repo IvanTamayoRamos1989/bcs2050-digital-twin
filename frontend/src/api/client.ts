@@ -7,6 +7,7 @@ import type {
   GoalGapResponse,
   InspectResponse,
   LiveTelemetrySummary,
+  MetadataCatalogResponse,
   OverviewResponse,
   RecommendationsResponse,
   SimulationResponse,
@@ -83,6 +84,7 @@ export const TwinAPI = {
   chat: (payload: { query: string; scope_id: string; scenario_name: string }) =>
     apiFetch<ChatResponse>("/api/twin/chat", { method: "POST", body: JSON.stringify(payload) }),
   getArchitecture: () => apiFetch<ArchitectureResponse>("/api/twin/architecture"),
+  getMetadata: () => apiFetch<MetadataCatalogResponse>("/api/twin/metadata"),
   getLiveTelemetry: () => apiFetch<LiveTelemetrySummary>("/api/twin/live/summary"),
   getTours: () => apiFetch<{ tours: AerialTour[]; corridors: Record<string, CorridorPreset> }>("/api/twin/tours"),
   buildExportUrl: (

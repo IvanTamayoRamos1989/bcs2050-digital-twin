@@ -116,9 +116,16 @@ export const PhaseTelemetryPanel: React.FC<Props> = ({
 
   const mun = overview?.municipalities[scopeId];
   const st = overview?.state;
+  const officialPop2020 = mun
+    ? (mun.population_inegi_2020_official ?? Math.round(mun.population_2020))
+    : (st?.population_inegi_2020_official ?? 798447);
+  const aquifersOfficialCount = st?.aquifers_bcs_official_count ?? 39;
+  const aquifersNoAvailCount = st?.aquifers_bcs_no_availability_count ?? 22;
+  const aquifersStrictDeficit = st?.aquifers_strict_deficit_count ?? 21;
   const activeStats = mun
     ? {
         title: `${mun.name} (${mun.municipality_code})`,
+        popOfficial2020: officialPop2020,
         pop: mun.population_2025,
         buildings: mun.buildings_3d_count,
         infill: mun.infill_homes_potential,
@@ -134,6 +141,7 @@ export const PhaseTelemetryPanel: React.FC<Props> = ({
       }
     : {
         title: st?.name || "Baja California Sur",
+        popOfficial2020: officialPop2020,
         pop: st?.population_2025 ?? 955463,
         buildings: st?.buildings_3d_count ?? 396823,
         infill: st?.infill_homes_potential ?? 776913,
@@ -221,8 +229,11 @@ export const PhaseTelemetryPanel: React.FC<Props> = ({
                 <p className="font-mono-num mt-0.5 text-sm font-bold text-white">
                   {activeStats.buildings.toLocaleString()}
                 </p>
-                <p className="font-mono-num text-[10px] text-slate-400">
-                  {activeStats.pop.toLocaleString()} hab (2025)
+                <p className="font-mono-num text-[10px] text-emerald-300">
+                  {activeStats.popOfficial2020.toLocaleString()} hab · INEGI 2020 (OFICIAL)
+                </p>
+                <p className="font-mono-num text-[10px] text-sky-300/90">
+                  {activeStats.pop.toLocaleString()} hab · Proy. 2025 (MODELADO)
                 </p>
               </div>
               <div className="rounded-lg bg-slate-900/80 p-2.5 ring-1 ring-slate-700/70">
@@ -234,6 +245,21 @@ export const PhaseTelemetryPanel: React.FC<Props> = ({
                   Solar techos: {activeStats.solarMw.toLocaleString()} MW
                 </p>
               </div>
+            </div>
+
+            {/* Reconciled Official CONAGUA Aquifer Balance Pill */}
+            <div className="rounded-lg bg-slate-900/75 px-2.5 py-2 ring-1 ring-cyan-500/30 flex items-center justify-between gap-2 text-[10.5px]">
+              <div>
+                <span className="font-mono-num uppercase text-[9.5px] text-cyan-300 font-semibold">
+                  Acuíferos BCS (CONAGUA DOF 2023 · OFICIAL)
+                </span>
+                <p className="text-slate-200 font-mono-num mt-0.5">
+                  {aquifersNoAvailCount} / {aquifersOfficialCount} sin disponibilidad (DMA ≤ 0) · {aquifersStrictDeficit} déficit &lt; 0 (+1 compartido 0228)
+                </p>
+              </div>
+              <span className="rounded bg-cyan-500/15 px-1.5 py-0.5 font-mono-num text-[9px] font-bold text-cyan-200 ring-1 ring-cyan-400/30 shrink-0">
+                OFICIAL
+              </span>
             </div>
 
             {/* Radar Chart */}
@@ -500,6 +526,15 @@ export const PhaseTelemetryPanel: React.FC<Props> = ({
 
             {simulation && (
               <>
+                <div className="flex items-center justify-between rounded-md bg-indigo-950/50 px-2.5 py-1 ring-1 ring-indigo-400/30">
+                  <span className="font-mono-num text-[9.5px] uppercase tracking-wider text-indigo-200">
+                    {simulation.scenario_meta.title}
+                  </span>
+                  <span className="rounded bg-amber-500/20 px-1.5 py-0.5 font-mono-num text-[9px] font-bold text-amber-200 ring-1 ring-amber-400/35">
+                    MODELADO · ESCENARIO EXPLORATORIO
+                  </span>
+                </div>
+
                 {simulation.breach_warnings.length > 0 && (
                   <div className="rounded-lg bg-rose-950/60 p-2.5 ring-1 ring-rose-500/50 text-[11px] text-rose-200 flex items-start gap-2">
                     <AlertTriangle className="h-4 w-4 text-rose-400 shrink-0 mt-0.5" />

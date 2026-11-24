@@ -219,3 +219,49 @@ def test_security_cors_headers_rate_limit_and_optional_rbac(monkeypatch: pytest.
         assert auth_ok.status_code == 200
     finally:
         RATE_LIMITER.reset()
+
+
+def test_canonical_kpis_and_iso19115_metadata() -> None:
+    import json
+    from pathlib import Path
+
+    ov = client.get("/api/twin/overview")
+    assert ov.status_code == 200
+    ov_data = ov.json()
+    st = ov_data["state"]
+    assert st["population_inegi_2020_official"] == 798447
+    assert st["aquifers_bcs_official_count"] == 39
+    assert st["aquifers_bcs_no_availability_count"] == 22
+    assert st["aquifers_strict_deficit_count"] == 21
+    muns_sum = sum(m["population_inegi_2020_official"] for m in ov_data["municipalities"].values())
+    assert muns_sum == 798447
+
+    meta_resp = client.get("/api/twin/metadata")
+    assert meta_resp.status_code == 200
+    meta = meta_resp.json()
+    records = meta["records"]
+    assert len(records) >= 25
+    required_keys = (
+        "identifier",
+        "title",
+        "source_agency",
+        "source_url",
+        "reference_date",
+        "last_updated_utc",
+        "update_cadence",
+        "crs",
+        "data_nature",
+        "license_spdx",
+        "attribution_text",
+    )
+    for rec in records:
+        for k in required_keys:
+            assert rec.get(k), f"Record {rec.get('identifier')} missing required ISO 19115 field {k}"
+
+    panel_cat_path = TWIN_ROOT / "data" / "panel_v2_release" / "catalog_v2_extension.json"
+    panel_cat = json.loads(panel_cat_path.read_text(encoding="utf-8"))
+    layers = panel_cat["layers"]
+    assert len(layers) == 12
+    for lyr in layers:
+        for k in ("source_agency", "reference_date", "license_spdx", "data_nature", "attribution_text"):
+            assert lyr.get(k), f"Panel v2 layer {lyr.get('id')} missing {k}"

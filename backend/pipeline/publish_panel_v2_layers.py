@@ -19,6 +19,7 @@ if str(TWIN_ROOT) not in sys.path:
 if str(WORKSPACE_ROOT / "bcs2050_intelligence") not in sys.path:
     sys.path.insert(0, str(WORKSPACE_ROOT / "bcs2050_intelligence"))
 
+from backend.metadata_catalog import PANEL_V2_ISO19115_BY_ID  # noqa: E402
 from backend.spatial_store import load_layer_geojson, load_summary  # noqa: E402
 from ontology_engine.analyzer import analyze_territory_ontology  # noqa: E402
 from ontology_engine.scenario_simulator import compare_canonical_scenarios  # noqa: E402
@@ -69,6 +70,7 @@ def main() -> None:
         style_hint: dict[str, Any] | None = None,
     ) -> None:
         gcs_uri = f"{GCS_PREFIX}/{filename}"
+        iso = PANEL_V2_ISO19115_BY_ID[layer_id]
         layers_meta.append(
             {
                 "id": layer_id,
@@ -80,16 +82,25 @@ def main() -> None:
                 "url": gcs_uri,
                 "path": gcs_uri,
                 "sourceId": source_id,
-                "reference_date": period,
+                "source": iso["source_agency"],
+                "source_agency": iso["source_agency"],
+                "source_url": iso["source_url"],
+                "reference_date": iso["reference_date"],
+                "last_updated_utc": iso["last_updated_utc"],
+                "update_cadence": iso["update_cadence"],
                 "period": period,
-                "data_nature": data_nature,
+                "crs": iso["crs"],
+                "spatial_accuracy_note": iso["spatial_accuracy_note"],
+                "data_nature": iso["data_nature"],
                 "description": description,
                 "featureCount": feature_count,
                 "popupFields": popup_fields,
                 "color": color,
                 "style_hint": style_hint or {"color": color},
                 "defaultVisible": False,
-                "license": "BCS2050 / INEGI / CONAGUA / SENER Datos Abiertos",
+                "license_spdx": iso["license_spdx"],
+                "license": iso["license_spdx"],
+                "attribution_text": iso["attribution_text"],
             }
         )
 

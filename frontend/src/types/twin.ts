@@ -36,6 +36,7 @@ export interface MunicipalitySummary {
   name: string;
   corridor: string;
   population_2020: number;
+  population_inegi_2020_official?: number;
   population_2025: number;
   dwellings_2025: number;
   ageb_count: number;
@@ -83,12 +84,86 @@ export interface CorridorArc {
   corridor: string;
 }
 
+export interface CanonicalKpis {
+  state: {
+    scope_id: string;
+    name: string;
+    population_inegi_2020_official: number;
+    population_2020_urban_agebs: number;
+    population_2025_eic_calibrated: number;
+    aquifers_bcs_official_count: number;
+    aquifers_bcs_no_availability_count: number;
+    aquifers_strict_deficit_count: number;
+    aquifers_zero_availability_code: string;
+    aquifers_transboundary_polygons: number;
+    aquifers_transboundary_code: string;
+    bigquery_gold_views: string[];
+    reconciliation_notes: string;
+  };
+  municipalities: Record<
+    string,
+    {
+      name: string;
+      population_inegi_2020_official: number;
+      population_2025_eic_calibrated: number;
+      water_rationing_coverage: string;
+      transit_coverage: string;
+    }
+  >;
+  municipal_coverage_audit: {
+    municipality_code: string;
+    municipality_name: string;
+    water_rationing_status: string;
+    transit_inventory_status: string;
+    notes: string;
+  }[];
+}
+
+export interface MetadataCatalogRecord {
+  identifier: string;
+  title: string;
+  abstract: string;
+  source_agency: string;
+  source_url: string;
+  reference_date: string;
+  last_updated_utc: string;
+  update_cadence: string;
+  crs: string;
+  spatial_accuracy_note: string;
+  data_nature: string;
+  license_spdx: string;
+  attribution_text: string;
+  distribution_url: string;
+  dataset_scope: string;
+  feature_count: number | null;
+}
+
+export interface MetadataCatalogResponse {
+  standard: string;
+  conformsTo: string[];
+  generated_at: string;
+  basemap_attributions: string[];
+  summary: {
+    total_records: number;
+    twin_records: number;
+    panel_v2_records: number;
+    counts_by_data_nature: Record<string, number>;
+  };
+  canonical_kpis: CanonicalKpis;
+  records: MetadataCatalogRecord[];
+}
+
 export interface OverviewResponse {
   generated_at: string;
   state: {
     scope_id: string;
     name: string;
     population_2025: number;
+    population_inegi_2020_official?: number;
+    population_2020_urban_agebs?: number;
+    aquifers_bcs_official_count?: number;
+    aquifers_bcs_no_availability_count?: number;
+    aquifers_strict_deficit_count?: number;
     dwellings_2025: number;
     agebs_count: number;
     buildings_3d_count: number;

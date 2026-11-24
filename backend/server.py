@@ -22,6 +22,10 @@ from backend.cad_bim_bridge import (
 )
 from backend.config import FRONTEND_DIST_DIR, get_allowed_origins, get_runtime_capabilities
 from backend.live_feeds import get_live_telemetry_summary
+from backend.metadata_catalog import (
+    CANONICAL_KPI_RECONCILIATION,
+    build_iso19115_metadata_catalog,
+)
 from backend.security import SecurityAndRateLimitMiddleware
 from backend.simulation_bridge import (
     answer_strategist_chat,
@@ -95,11 +99,35 @@ def twin_health() -> dict[str, Any]:
 @app.get("/api/twin/overview")
 def twin_overview() -> dict[str, Any]:
     summary = load_summary()
+    state = {
+        **summary["state"],
+        "population_inegi_2020_official": CANONICAL_KPI_RECONCILIATION["state"]["population_inegi_2020_official"],
+        "population_2020_urban_agebs": CANONICAL_KPI_RECONCILIATION["state"]["population_2020_urban_agebs"],
+        "aquifers_bcs_official_count": CANONICAL_KPI_RECONCILIATION["state"]["aquifers_bcs_official_count"],
+        "aquifers_bcs_no_availability_count": CANONICAL_KPI_RECONCILIATION["state"]["aquifers_bcs_no_availability_count"],
+        "aquifers_strict_deficit_count": CANONICAL_KPI_RECONCILIATION["state"]["aquifers_strict_deficit_count"],
+    }
+    muns_out: dict[str, Any] = {}
+    mun_reconcile = CANONICAL_KPI_RECONCILIATION["municipalities"]
+    for code, mdata in summary.get("municipalities", {}).items():
+        rec = mun_reconcile.get(code) or {}
+        muns_out[code] = {
+            **mdata,
+            "population_inegi_2020_official": rec.get("population_inegi_2020_official", mdata.get("population_2020")),
+        }
     return {
         **summary,
+        "state": state,
+        "municipalities": muns_out,
+        "canonical_kpis": CANONICAL_KPI_RECONCILIATION,
         "capabilities": get_runtime_capabilities(),
         "layers_available": sorted(LAYER_FILES.keys()),
     }
+
+
+@app.get("/api/twin/metadata")
+def twin_metadata() -> dict[str, Any]:
+    return build_iso19115_metadata_catalog()
 
 
 @app.get("/api/twin/layer/{layer_id}")

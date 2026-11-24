@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
-import { Box, CheckCircle2, CircleDashed, Cpu, Download, Film, Layers, X } from "lucide-react";
+import { Box, CheckCircle2, CircleDashed, Cpu, Download, FileJson, Film, Layers, ShieldCheck, X } from "lucide-react";
 import { TwinAPI } from "../api/client";
-import type { ArchitectureResponse, CorridorPreset } from "../types/twin";
+import type { ArchitectureResponse, CorridorPreset, MetadataCatalogResponse } from "../types/twin";
 
 interface Props {
   open: boolean;
@@ -21,13 +21,17 @@ export const ArchitectureModal: React.FC<Props> = ({
   onStartTour,
 }) => {
   const [data, setData] = useState<ArchitectureResponse | null>(null);
+  const [metaCatalog, setMetaCatalog] = useState<MetadataCatalogResponse | null>(null);
   const [selectedCorridor, setSelectedCorridor] = useState<string>("el_tezal");
 
   useEffect(() => {
     if (open && !data) {
       TwinAPI.getArchitecture().then(setData).catch(() => {});
     }
-  }, [open, data]);
+    if (open && !metaCatalog) {
+      TwinAPI.getMetadata().then(setMetaCatalog).catch(() => {});
+    }
+  }, [open, data, metaCatalog]);
 
   useEffect(() => {
     if (open && currentZoom >= 12.0 && currentBbox && selectedCorridor === "el_tezal") {
@@ -278,6 +282,54 @@ export const ArchitectureModal: React.FC<Props> = ({
                   ))}
                 </div>
               </div>
+
+              {/* ISO 19115 / DCAT-AP / SPDX Metadata & KPI Reconciliation */}
+              {metaCatalog && (
+                <div className="rounded-xl bg-slate-900/85 p-4 ring-1 ring-emerald-500/30 space-y-2.5">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <ShieldCheck className="h-4 w-4 text-emerald-400" />
+                      <div>
+                        <h3 className="text-xs font-bold text-white">
+                          Catálogo ISO 19115 · Licencias SPDX &amp; Reconciliación de KPIs
+                        </h3>
+                        <p className="text-[10.5px] text-slate-300">
+                          {metaCatalog.summary.total_records} capas documentadas ({metaCatalog.summary.twin_records} Gemelo 3D +{" "}
+                          {metaCatalog.summary.panel_v2_records} Panel v2) · Oficial vs. Modelado explícito
+                        </p>
+                      </div>
+                    </div>
+                    <a
+                      href="/api/twin/metadata"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex items-center gap-1.5 rounded-lg bg-emerald-500/15 px-2.5 py-1.5 text-[11px] font-semibold text-emerald-200 ring-1 ring-emerald-400/35 hover:bg-emerald-500/25"
+                    >
+                      <FileJson className="h-3.5 w-3.5" />
+                      <span>Ver JSON ISO 19115</span>
+                    </a>
+                  </div>
+
+                  <p className="text-[10.5px] text-slate-300 leading-snug bg-slate-950/70 rounded-lg p-2.5 ring-1 ring-slate-800">
+                    <strong className="text-emerald-300">Verdad Única BigQuery (`gold_kpi_state_summary`):</strong>{" "}
+                    {metaCatalog.canonical_kpis.state.reconciliation_notes}
+                  </p>
+
+                  <div className="grid sm:grid-cols-5 gap-1.5">
+                    {metaCatalog.canonical_kpis.municipal_coverage_audit.map((aud) => (
+                      <div key={aud.municipality_code} className="rounded-lg bg-slate-950/75 p-2 ring-1 ring-slate-800 text-[10px]">
+                        <p className="font-bold text-white">{aud.municipality_name}</p>
+                        <p className="font-mono-num text-[9px] text-sky-300 mt-0.5 truncate" title={aud.water_rationing_status}>
+                          Agua: {aud.water_rationing_status}
+                        </p>
+                        <p className="font-mono-num text-[9px] text-amber-300 truncate" title={aud.transit_inventory_status}>
+                          Bus: {aud.transit_inventory_status}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </>
           ) : (
             <p className="text-slate-400">Cargando catálogo arquitectónico...</p>
