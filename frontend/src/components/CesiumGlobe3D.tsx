@@ -25,7 +25,9 @@ export const CesiumGlobe3D: React.FC<Props> = ({
 }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const viewerRef = useRef<Cesium.Viewer | null>(null);
+  const tilesetRef = useRef<Cesium.Cesium3DTileset | null>(null);
   const [tilesMode, setTilesMode] = useState<string>("Satélite Mundial + Vector 3D");
+  const [streaming3DTiles, setStreaming3DTiles] = useState<boolean>(false);
   const [buildingCount, setBuildingCount] = useState<number>(0);
 
   const googleKey = (import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "").trim();
@@ -128,12 +130,26 @@ export const CesiumGlobe3D: React.FC<Props> = ({
 
     const handler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
     handler.setInputAction((click: { position: Cesium.Cartesian2 }) => {
-      const cartesian = viewer.camera.pickEllipsoid(click.position, viewer.scene.globe.ellipsoid);
+      const picked = viewer.scene.pick(click.position);
+      let buildingPk: number | null = null;
+      let agebCvegeo: string | null = null;
+      if (picked && typeof (picked as Cesium.Cesium3DTileFeature).getProperty === "function") {
+        const feat = picked as Cesium.Cesium3DTileFeature;
+        const pkVal = Number(feat.getProperty("pk"));
+        if (Number.isFinite(pkVal) && pkVal > 0) buildingPk = pkVal;
+        const agebVal = feat.getProperty("ageb_cvegeo");
+        if (typeof agebVal === "string" && agebVal.length > 0) agebCvegeo = agebVal;
+      }
+      const cartesian =
+        (viewer.scene.pickPositionSupported ? viewer.scene.pickPosition(click.position) : undefined) ||
+        viewer.camera.pickEllipsoid(click.position, viewer.scene.globe.ellipsoid);
       if (cartesian) {
         const carto = Cesium.Cartographic.fromCartesian(cartesian);
         onInspectLocation(
           Cesium.Math.toDegrees(carto.longitude),
           Cesium.Math.toDegrees(carto.latitude),
+          buildingPk,
+          agebCvegeo,
         );
       }
     }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
@@ -142,6 +158,10 @@ export const CesiumGlobe3D: React.FC<Props> = ({
     return () => {
       handler.destroy();
       if (!viewer.isDestroyed()) {
+        if (tilesetRef.current) {
+          viewer.scene.primitives.remove(tilesetRef.current);
+          tilesetRef.current = null;
+        }
         viewer.destroy();
       }
       viewerRef.current = null;
@@ -165,44 +185,87 @@ export const CesiumGlobe3D: React.FC<Props> = ({
     });
   }, [cameraTarget]);
 
-  // Load real 3D city buildings onto Cesium Globe when a city is selected
+  // Stream all 396,823 BCS buildings across 9 cities via OGC 3D Tiles 1.1 (glTF 2.0 + EXT_structural_metadata)
   useEffect(() => {
     const viewer = viewerRef.current;
     if (!viewer || viewer.isDestroyed()) return;
-    const targetCity = activeCitySlug || "la_paz";
-    const existing = viewer.dataSources.getByName("bcs_buildings_3d");
-    existing.forEach((d) => viewer.dataSources.remove(d, true));
+    let cancelled = false;
 
-    TwinAPI.getCityBuildingsCesium(targetCity, 1800)
-      .then((res) => {
-        if (viewer.isDestroyed()) return;
-        const ds = new Cesium.CustomDataSource("bcs_buildings_3d");
-        for (const b of res.buildings) {
-          const flat: number[] = [];
-          for (const pt of b.polygon) {
-            flat.push(pt[0], pt[1]);
+    const loadFallbackCity = () => {
+      const targetCity = activeCitySlug || "la_paz";
+      const existing = viewer.dataSources.getByName("bcs_buildings_3d");
+      existing.forEach((d) => viewer.dataSources.remove(d, true));
+      TwinAPI.getCityBuildingsCesium(targetCity, 1800)
+        .then((res) => {
+          if (cancelled || viewer.isDestroyed()) return;
+          const ds = new Cesium.CustomDataSource("bcs_buildings_3d");
+          for (const b of res.buildings) {
+            const flat: number[] = [];
+            for (const pt of b.polygon) {
+              flat.push(pt[0], pt[1]);
+            }
+            if (flat.length < 6) continue;
+            const col =
+              b.surge_risk === 2
+                ? Cesium.Color.fromBytes(239, 68, 68, 220)
+                : b.height_m >= 12
+                  ? Cesium.Color.fromBytes(56, 189, 248, 230)
+                  : Cesium.Color.fromBytes(148, 163, 184, 215);
+            ds.entities.add({
+              polygon: {
+                hierarchy: Cesium.Cartesian3.fromDegreesArray(flat),
+                height: 0,
+                extrudedHeight: b.height_m * extrusionScale,
+                material: col,
+                outline: false,
+              },
+            });
           }
-          if (flat.length < 6) continue;
-          const col =
-            b.surge_risk === 2
-              ? Cesium.Color.fromBytes(239, 68, 68, 220)
-              : b.height_m >= 12
-                ? Cesium.Color.fromBytes(56, 189, 248, 230)
-                : Cesium.Color.fromBytes(148, 163, 184, 215);
-          ds.entities.add({
-            polygon: {
-              hierarchy: Cesium.Cartesian3.fromDegreesArray(flat),
-              height: 0,
-              extrudedHeight: b.height_m * extrusionScale,
-              material: col,
-              outline: false,
+          viewer.dataSources.add(ds);
+          setStreaming3DTiles(false);
+          setBuildingCount(res.buildings.length);
+        })
+        .catch(() => {});
+    };
+
+    if (tilesetRef.current) {
+      return;
+    }
+
+    TwinAPI.get3DTilesInfo()
+      .catch(() => ({
+        tileset_url: "https://storage.googleapis.com/bcs2050-3dtiles-public/bcs_buildings_v11/tileset.json",
+        buildings_count: 396823,
+      }))
+      .then(async (info) => {
+        if (cancelled || viewer.isDestroyed()) return;
+        try {
+          const tileset = await Cesium.Cesium3DTileset.fromUrl(info.tileset_url, {
+            maximumScreenSpaceError: 16,
+          });
+          if (cancelled || viewer.isDestroyed()) return;
+          tileset.style = new Cesium.Cesium3DTileStyle({
+            color: {
+              conditions: [
+                ["${surge_risk} === 2", "color('#ef4444', 0.9)"],
+                ["${height_m} >= 12", "color('#38bdf8', 0.92)"],
+                ["true", "color('#cbd5e1', 0.88)"],
+              ],
             },
           });
+          viewer.scene.primitives.add(tileset);
+          tilesetRef.current = tileset;
+          setStreaming3DTiles(true);
+          setTilesMode("OGC 3D Tiles 1.1 · glTF 2.0");
+          setBuildingCount(info.buildings_count || 396823);
+        } catch {
+          loadFallbackCity();
         }
-        viewer.dataSources.add(ds);
-        setBuildingCount(res.buildings.length);
-      })
-      .catch(() => {});
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [activeCitySlug, extrusionScale]);
 
   return (
@@ -215,7 +278,9 @@ export const CesiumGlobe3D: React.FC<Props> = ({
         </span>
         <span className="h-3 w-px bg-slate-700" />
         <span className="font-mono-num text-emerald-300">
-          {buildingCount.toLocaleString()} edificios 3D ({activeCitySlug || "la_paz"})
+          {streaming3DTiles
+            ? `OGC 3D Tiles 1.1 · ${buildingCount.toLocaleString()} edificios 3D (9 ciudades)`
+            : `${buildingCount.toLocaleString()} edificios 3D (${activeCitySlug || "la_paz"})`}
         </span>
         {!googleKey && (
           <span className="hidden md:flex items-center gap-1 text-[10px] text-amber-300">

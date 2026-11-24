@@ -12,6 +12,7 @@ import type {
   RecommendationsResponse,
   SensorThingsCollectionResponse,
   SimulationResponse,
+  Tiles3DInfoResponse,
   ZoningParcelRecord,
 } from "../types/twin";
 
@@ -85,6 +86,7 @@ export const TwinAPI = {
   chat: (payload: { query: string; scope_id: string; scenario_name: string; language?: "es" | "en" }) =>
     apiFetch<ChatResponse>("/api/twin/chat", { method: "POST", body: JSON.stringify(payload) }),
   getArchitecture: () => apiFetch<ArchitectureResponse>("/api/twin/architecture"),
+  get3DTilesInfo: () => apiFetch<Tiles3DInfoResponse>("/api/twin/3dtiles/info"),
   getMetadata: () => apiFetch<MetadataCatalogResponse>("/api/twin/metadata"),
   getLiveTelemetry: () => apiFetch<LiveTelemetrySummary>("/api/twin/live/summary"),
   getSensorThings: () =>

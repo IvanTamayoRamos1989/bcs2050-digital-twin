@@ -1,0 +1,11 @@
+.git
+.cloud_stage
+data
+frontend/node_modules
+frontend/.vite
+**/__pycache__
+*.pyc
+.pytest_cache
+*.sqlite
+*.tar.gz
+docs

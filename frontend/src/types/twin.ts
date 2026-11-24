@@ -397,10 +397,21 @@ export interface AecBimBridgeItem {
 
 export interface ArchitectureResponse {
   capabilities: Record<string, boolean>;
+  tileset_3d_url?: string;
+  ogc_endpoints?: Record<string, string>;
   benchmarks: { name: string; reference: string; metrics: string; adoption_in_bcs2050: string }[];
   commercial_tiers: { tier: string; budget_usd_yr: string; items: string[] }[];
   top_opensource_engines: { name: string; category: string; status: string }[];
   aec_bim_bridge?: AecBimBridgeItem[];
+}
+
+export interface Tiles3DInfoResponse {
+  standard: string;
+  tileset_url: string;
+  buildings_count: number;
+  cities_count: number;
+  cache_control: string;
+  ogc_endpoints: Record<string, string>;
 }
 
 export interface TelemetryFeedMeta {

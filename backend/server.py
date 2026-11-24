@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
@@ -20,12 +21,18 @@ from backend.cad_bim_bridge import (
     get_cinematic_flythrough_tours,
     resolve_export_bbox,
 )
-from backend.config import FRONTEND_DIST_DIR, get_allowed_origins, get_runtime_capabilities
+from backend.config import (
+    FRONTEND_DIST_DIR,
+    get_3dtiles_tileset_url,
+    get_allowed_origins,
+    get_runtime_capabilities,
+)
 from backend.live_feeds import get_live_telemetry_summary
 from backend.metadata_catalog import (
     CANONICAL_KPI_RECONCILIATION,
     build_iso19115_metadata_catalog,
 )
+from backend.ogc_api import router as ogc_router
 from backend.ai_strategist import answer_strategist_chat_grounded
 from backend.security import SecurityAndRateLimitMiddleware
 from backend.sensorthings import get_pilot_schemas_catalog, router as sensorthings_router
@@ -36,12 +43,26 @@ from backend.simulation_bridge import (
     get_architecture_catalog,
     run_twin_simulation,
 )
-from backend.spatial_store import LAYER_FILES, SPATIAL_STORE, load_layer_geojson, load_summary
+from backend.spatial_store import (
+    LAYER_FILES,
+    SPATIAL_STORE,
+    ensure_spatial_data_ready,
+    load_layer_geojson,
+    load_summary,
+)
+
+
+@asynccontextmanager
+async def _lifespan(_app: FastAPI):
+    ensure_spatial_data_ready()
+    yield
+
 
 app = FastAPI(
     title="BCS2050 Regional & Urban Digital Twin API",
     version="2.0.0",
     description="Aretian-grade City Science & Esri-aligned Living Digital Twin API for Baja California Sur",
+    lifespan=_lifespan,
 )
 
 # Register security/rate-limit middleware before CORSMiddleware so CORSMiddleware wraps outermost (401/429 keep CORS headers)
@@ -262,7 +283,27 @@ def twin_sensorthings_schemas() -> dict[str, Any]:
     return get_pilot_schemas_catalog()
 
 
+@app.get("/api/twin/3dtiles/info")
+def twin_3dtiles_info() -> dict[str, Any]:
+    return {
+        "standard": "OGC 3D Tiles 1.1 (glTF 2.0 + EXT_mesh_features + EXT_structural_metadata)",
+        "tileset_url": get_3dtiles_tileset_url(),
+        "buildings_count": 396823,
+        "cities_count": 9,
+        "cache_control": "public, max-age=86400",
+        "ogc_endpoints": {
+            "landing": "/ogc",
+            "features": "/ogc/collections",
+            "tiles_mvt": "/ogc/collections/{collection_id}/tiles/WebMercatorQuad/{z}/{y}/{x}.mvt",
+            "processes": "/ogc/processes",
+            "records": "/ogc/collections/records/items",
+            "sensorthings": "/FROST-Server/v1.1/Things",
+        },
+    }
+
+
 app.include_router(sensorthings_router)
+app.include_router(ogc_router)
 
 
 @app.get("/api/twin/tours")
@@ -361,7 +402,12 @@ if FRONTEND_DIST_DIR.exists():
 
     @app.get("/{full_path:path}")
     def serve_spa(full_path: str) -> FileResponse:
-        if full_path.startswith("api/") or full_path.startswith("FROST-Server/"):
+        if (
+            full_path.startswith("api/")
+            or full_path.startswith("FROST-Server/")
+            or full_path == "ogc"
+            or full_path.startswith("ogc/")
+        ):
             raise HTTPException(status_code=404, detail="API endpoint not found")
         candidate: Path = FRONTEND_DIST_DIR / full_path
         if full_path and candidate.exists() and candidate.is_file():

@@ -61,6 +61,34 @@ def get_sensor_ingest_tokens() -> set[str]:
     return {tok.strip() for tok in raw.split(",") if tok.strip()}
 
 
+def get_postgis_dsn() -> str:
+    return os.environ.get("BCS2050_POSTGIS_DSN", "").strip()
+
+
+def use_gcs_hydration() -> bool:
+    return os.environ.get("BCS2050_GCS_HYDRATE_DATA", "false").strip().lower() in {"1", "true", "yes"}
+
+
+def get_gcs_data_tar_uri() -> str:
+    return (
+        os.environ.get(
+            "BCS2050_GCS_DATA_TAR_URI",
+            "gs://bcs2050-gis-curated/digital_twin_artifacts/twin_data.tar.gz",
+        ).strip()
+        or "gs://bcs2050-gis-curated/digital_twin_artifacts/twin_data.tar.gz"
+    )
+
+
+def get_3dtiles_tileset_url() -> str:
+    return (
+        os.environ.get(
+            "BCS2050_3DTILES_URL",
+            "https://storage.googleapis.com/bcs2050-3dtiles-public/bcs_buildings_v11/tileset.json",
+        ).strip()
+        or "https://storage.googleapis.com/bcs2050-3dtiles-public/bcs_buildings_v11/tileset.json"
+    )
+
+
 DEFAULT_ALLOWED_ORIGINS: list[str] = [
     "https://bcs2050.com",
     "https://www.bcs2050.com",
@@ -125,4 +153,11 @@ def get_runtime_capabilities() -> dict[str, bool]:
         "firestore_telemetry_cache": use_firestore_cache(),
         "ogc_sensorthings_v11": True,
         "bigquery_telemetry_history": use_bigquery(),
+        "postgis_connected": bool(get_postgis_dsn()),
+        "gcs_cloud_native_hydration": use_gcs_hydration(),
+        "ogc_api_features": True,
+        "ogc_api_tiles_mvt": True,
+        "ogc_api_processes": True,
+        "ogc_api_records": True,
+        "ogc_3dtiles_v11": True,
     }

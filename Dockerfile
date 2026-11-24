@@ -16,6 +16,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     BCS2050_USE_FIRESTORE=false \
     BCS2050_FIRESTORE_DATABASE=bcs-studio \
     BCS2050_TELEMETRY_PUBSUB_TOPIC=bcs2050-telemetry-events \
+    BCS2050_GCS_HYDRATE_DATA=true \
+    BCS2050_GCS_DATA_TAR_URI=gs://bcs2050-gis-curated/digital_twin_artifacts/twin_data.tar.gz \
+    BCS2050_3DTILES_URL=https://storage.googleapis.com/bcs2050-3dtiles-public/bcs_buildings_v11/tileset.json \
     GOOGLE_CLOUD_LOCATION=global \
     BCS2050_CHAT_MODEL=gemini-4-hydrogen
 
@@ -32,12 +35,15 @@ RUN pip install --no-cache-dir \
     google-cloud-bigquery>=3.27.0 \
     google-cloud-firestore>=2.19.0 \
     google-cloud-pubsub>=2.27.0 \
+    google-cloud-storage>=2.18.0 \
+    mapbox-vector-tile>=2.1.0 \
+    mercantile>=1.2.1 \
+    psycopg2-binary>=2.9.9 \
     google-genai>=1.0.0
 
 COPY bcs2050_intelligence /app/bcs2050_intelligence
 COPY backend /app/bcs2050_digital_twin/backend
 COPY workers /app/bcs2050_digital_twin/workers
-COPY data /app/bcs2050_digital_twin/data
 COPY --from=frontend-build /app/frontend/dist /app/bcs2050_digital_twin/frontend/dist
 
 WORKDIR /app/bcs2050_digital_twin

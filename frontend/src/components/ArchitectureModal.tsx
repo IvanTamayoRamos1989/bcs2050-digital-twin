@@ -224,6 +224,71 @@ export const ArchitectureModal: React.FC<Props> = ({
                 )}
               </div>
 
+              {/* OGC API Family & OGC 3D Tiles 1.1 Cloud-Native Core */}
+              <div className="rounded-xl bg-slate-900/85 p-4 ring-1 ring-cyan-500/35 space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <h3 className="text-xs font-bold text-white">
+                      Estándares Abiertos OGC API Family &amp; 3D Tiles 1.1 (glTF 2.0)
+                    </h3>
+                    <p className="text-[10.5px] text-slate-300">
+                      Streaming espacial cloud-native sin baked-data: 396,823 edificios en 283 tiles .glb + MVT + Features + Processes + Records
+                    </p>
+                  </div>
+                  {data.tileset_3d_url && (
+                    <a
+                      href={data.tileset_3d_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex items-center gap-1.5 rounded-lg bg-cyan-500/15 px-2.5 py-1.5 text-[11px] font-semibold text-cyan-200 ring-1 ring-cyan-400/35 hover:bg-cyan-500/25"
+                    >
+                      <FileJson className="h-3.5 w-3.5" />
+                      <span>Ver tileset.json (GCS)</span>
+                    </a>
+                  )}
+                </div>
+                <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                  {[
+                    {
+                      label: "OGC API - Features",
+                      path: data.ogc_endpoints?.features || "/ogc/collections",
+                      desc: "18 colecciones vectoriales GeoJSON paginadas",
+                    },
+                    {
+                      label: "OGC API - Tiles (MVT)",
+                      path: data.ogc_endpoints?.tiles_mvt || "/ogc/collections/{collection_id}/tiles/WebMercatorQuad/{z}/{y}/{x}.mvt",
+                      desc: "Teselas vectoriales binarias Mapbox Vector Tile",
+                    },
+                    {
+                      label: "OGC API - Processes",
+                      path: data.ogc_endpoints?.processes || "/ogc/processes",
+                      desc: "Simulación 2050 y Goal-Gap síncrono/asíncrono",
+                    },
+                    {
+                      label: "OGC API - Records",
+                      path: data.ogc_endpoints?.records || "/ogc/collections/records/items",
+                      desc: "Catálogo ISO 19115 + SPDX interoperable",
+                    },
+                    {
+                      label: "OGC SensorThings v1.1",
+                      path: data.ogc_endpoints?.sensorthings || "/FROST-Server/v1.1/Things",
+                      desc: "Entidades IoT ambientales, hidrológicas y red eléctrica",
+                    },
+                    {
+                      label: "OGC 3D Tiles 1.1 Info",
+                      path: "/api/twin/3dtiles/info",
+                      desc: "EXT_mesh_features + EXT_structural_metadata (.glb)",
+                    },
+                  ].map((ep) => (
+                    <div key={ep.label} className="rounded-lg bg-slate-950/75 p-2.5 ring-1 ring-slate-800 space-y-1">
+                      <p className="font-bold text-[11px] text-cyan-300">{ep.label}</p>
+                      <p className="font-mono-num text-[9.5px] text-slate-200 break-all">{ep.path}</p>
+                      <p className="text-[10px] text-slate-400">{ep.desc}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
               {/* Benchmarks */}
               <div className="grid md:grid-cols-2 gap-3">
                 {data.benchmarks.map((b) => (

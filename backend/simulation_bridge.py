@@ -8,7 +8,7 @@ import time
 import unicodedata
 from typing import Any
 
-from backend.config import get_runtime_capabilities, use_bigquery
+from backend.config import get_3dtiles_tileset_url, get_runtime_capabilities, use_bigquery
 from backend.spatial_store import SPATIAL_STORE, load_layer_geojson, load_summary
 from ontology_engine.analyzer import analyze_territory_ontology
 from ontology_engine.decision_lenses import evaluate_all_decision_lenses
@@ -603,6 +603,14 @@ def answer_strategist_chat(
 def get_architecture_catalog() -> dict[str, Any]:
     return {
         "capabilities": get_runtime_capabilities(),
+        "tileset_3d_url": get_3dtiles_tileset_url(),
+        "ogc_endpoints": {
+            "features": "/ogc/collections",
+            "tiles_mvt": "/ogc/collections/{collection_id}/tiles/WebMercatorQuad/{z}/{y}/{x}.mvt",
+            "processes": "/ogc/processes",
+            "records": "/ogc/collections/records/items",
+            "sensorthings": "/FROST-Server/v1.1/Things",
+        },
         "benchmarks": [
             {
                 "name": "Aretian City Digital Twin (Barcelona)",

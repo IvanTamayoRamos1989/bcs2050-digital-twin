@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { MapboxOverlay } from "@deck.gl/mapbox";
+import { Tile3DLayer } from "@deck.gl/geo-layers";
 import { ArcLayer, GeoJsonLayer, PolygonLayer, ScatterplotLayer } from "@deck.gl/layers";
 import { Box, Building2, Compass, Film, Square, ZoomIn } from "lucide-react";
 import { TwinAPI } from "../api/client";
@@ -154,6 +155,8 @@ export const AnalyticsMap3D: React.FC<Props> = ({
   const activeTourRef = useRef<string | null>(activeTourId ?? null);
   const onStopTourRef = useRef(onStopTour);
   const onViewportChangeRef = useRef(onViewportChange);
+  const phaseRef = useRef<AretianPhase>(phase);
+  const tilesetErrorRef = useRef<boolean>(false);
 
   useEffect(() => {
     activeTourRef.current = activeTourId ?? null;
@@ -167,14 +170,40 @@ export const AnalyticsMap3D: React.FC<Props> = ({
     onViewportChangeRef.current = onViewportChange;
   }, [onViewportChange]);
 
+  useEffect(() => {
+    phaseRef.current = phase;
+    if (phase === "scenarios" && mapRef.current) {
+      fetchViewportFeatures(mapRef.current);
+    }
+  }, [phase]);
+
   const [zoom, setZoom] = useState<number>(6.4);
   const [buildings, setBuildings] = useState<BuildingRecord[]>([]);
   const [zoning, setZoning] = useState<ZoningParcelRecord[]>([]);
   const [loadingBuildings, setLoadingBuildings] = useState(false);
   const [tourStepTitle, setTourStepTitle] = useState<string>("");
+  const [tileset3dUrl, setTileset3dUrl] = useState<string>(
+    "https://storage.googleapis.com/bcs2050-3dtiles-public/bcs_buildings_v11/tileset.json",
+  );
+  const [tilesLoadedCount, setTilesLoadedCount] = useState<number>(0);
+  const [tilesetError, setTilesetError] = useState<boolean>(false);
 
   const [geoCache, setGeoCache] = useState<Record<string, GeoJSON.FeatureCollection>>({});
   const [hoverInfo, setHoverInfo] = useState<{ x: number; y: number; title: string; lines: string[] } | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    TwinAPI.get3DTilesInfo()
+      .then((info) => {
+        if (!cancelled && info.tileset_url) {
+          setTileset3dUrl(info.tileset_url);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Lazy-fetch static GeoJSON layers when enabled
   useEffect(() => {
@@ -224,7 +253,7 @@ export const AnalyticsMap3D: React.FC<Props> = ({
     const bbox: [number, number, number, number] = [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()];
     onViewportChangeRef.current?.(bbox, roundedZoom);
 
-    if (z >= 11.8) {
+    if (z >= 11.8 && (phaseRef.current === "scenarios" || tilesetErrorRef.current)) {
       abortBldgRef.current?.abort();
       const ctrl = new AbortController();
       abortBldgRef.current = ctrl;
@@ -236,7 +265,7 @@ export const AnalyticsMap3D: React.FC<Props> = ({
           setLoadingBuildings(false);
         })
         .catch(() => setLoadingBuildings(false));
-    } else {
+    } else if (z < 11.8) {
       setBuildings([]);
     }
 
@@ -477,7 +506,8 @@ export const AnalyticsMap3D: React.FC<Props> = ({
 
     // 6. City Science AGEBs (1,155)
     if (layers.agebs && geoCache.agebs) {
-      const buildingsVisible = layers.buildings3d && zoom >= 11.8 && buildings.length > 0;
+      const use3DTiles = layers.buildings3d && phase !== "scenarios" && Boolean(tileset3dUrl) && !tilesetError;
+      const buildingsVisible = layers.buildings3d && zoom >= 11.8 && (use3DTiles || buildings.length > 0);
       const extrudeAgebs = agebs3dMode && !buildingsVisible;
       list.push(
         new GeoJsonLayer({
@@ -567,8 +597,47 @@ export const AnalyticsMap3D: React.FC<Props> = ({
       );
     }
 
-    // 8. REAL 3D EXTRUDED BUILDINGS (from 396,823 SQLite R-Tree!)
-    if (layers.buildings3d && buildings.length > 0) {
+    // 8. REAL 3D BUILDINGS — OGC 3D Tiles 1.1 (.glb streaming from GCS) outside scenarios, or SQLite R-Tree fallback/scenarios
+    const use3DTilesStream = layers.buildings3d && phase !== "scenarios" && Boolean(tileset3dUrl) && !tilesetError;
+    if (use3DTilesStream && zoom >= 11.5) {
+      list.push(
+        new Tile3DLayer({
+          id: "buildings-3dtiles-v11",
+          data: tileset3dUrl,
+          pickable: true,
+          onTilesetLoad: () => {
+            tilesetErrorRef.current = false;
+            setTilesetError(false);
+          },
+          onTileLoad: () => {
+            setTilesLoadedCount((c) => c + 1);
+          },
+          onTileError: () => {
+            tilesetErrorRef.current = true;
+            setTilesetError(true);
+            if (mapRef.current) {
+              fetchViewportFeatures(mapRef.current);
+            }
+          },
+          onHover: ({ x, y, object }) => {
+            if (!object) return setHoverInfo(null);
+            setHoverInfo({
+              x,
+              y,
+              title: "OGC 3D Tiles 1.1 · Streaming glTF 2.0",
+              lines: [
+                `Tile: ${object.id || "bcs_buildings_v11"} · EXT_structural_metadata`,
+                "Edificación real BCS (396,823 polígonos) · Clic para inspeccionar",
+              ],
+            });
+          },
+          onClick: ({ coordinate }) => {
+            if (!coordinate) return;
+            onInspectLocation(coordinate[0], coordinate[1], null, null);
+          },
+        }),
+      );
+    } else if (layers.buildings3d && buildings.length > 0) {
       list.push(
         new PolygonLayer<BuildingRecord>({
           id: "buildings-3d-real",
@@ -902,6 +971,8 @@ export const AnalyticsMap3D: React.FC<Props> = ({
     phase,
     selectedAgebId,
     simulation,
+    tileset3dUrl,
+    tilesetError,
     zoom,
     zoning,
   ]);
@@ -951,6 +1022,13 @@ export const AnalyticsMap3D: React.FC<Props> = ({
               <span>Detener</span>
             </button>
           </div>
+        ) : zoom >= 11.5 && layers.buildings3d && phase !== "scenarios" && Boolean(tileset3dUrl) && !tilesetError ? (
+          <span className="flex items-center gap-1.5 font-mono-num text-cyan-300">
+            <Building2 className="h-3.5 w-3.5" />
+            {tilesLoadedCount > 0
+              ? `OGC 3D Tiles 1.1 · ${tilesLoadedCount} tiles .glb`
+              : "OGC 3D Tiles 1.1 · Streaming"}
+          </span>
         ) : zoom >= 11.8 ? (
           <span className="flex items-center gap-1.5 font-mono-num text-emerald-300">
             <Building2 className="h-3.5 w-3.5" />

@@ -22,6 +22,7 @@ HEAVY_PATH_PREFIXES: tuple[str, ...] = (
     "/api/twin/export/",
     "/api/twin/simulate",
     "/api/twin/chat",
+    "/ogc/processes/",
 )
 
 PROTECTED_EXPORT_PREFIX = "/api/twin/export/"
@@ -106,7 +107,7 @@ class SecurityAndRateLimitMiddleware(BaseHTTPMiddleware):
             return _apply_security_headers(resp)
 
         # Static assets & health probe skip rate limiting / RBAC
-        if not (path.startswith("/api/") or path.startswith("/FROST-Server/")) or path in EXEMPT_PATHS:
+        if not (path.startswith("/api/") or path.startswith("/FROST-Server/") or path == "/ogc" or path.startswith("/ogc/")) or path in EXEMPT_PATHS:
             resp = await call_next(request)
             return _apply_security_headers(resp)
 
