@@ -30,6 +30,7 @@ import type {
   LiveTelemetrySummary,
   OverviewResponse,
   RecommendationsResponse,
+  SensorThingRecord,
   SimulationResponse,
 } from "./types/twin";
 
@@ -52,6 +53,7 @@ const INITIAL_LAYERS: LayerVisibility = {
 export const App: React.FC = () => {
   const [overview, setOverview] = useState<OverviewResponse | null>(null);
   const [liveTelemetry, setLiveTelemetry] = useState<LiveTelemetrySummary | null>(null);
+  const [sensorThings, setSensorThings] = useState<SensorThingRecord[]>([]);
   const [phase, setPhase] = useState<AretianPhase>("diagnostics");
   const [scopeId, setScopeId] = useState<string>("03");
   const [activeCitySlug, setActiveCitySlug] = useState<string>("");
@@ -116,9 +118,12 @@ export const App: React.FC = () => {
       .catch(() => {});
     const fetchLive = () => {
       TwinAPI.getLiveTelemetry().then(setLiveTelemetry).catch(() => {});
+      TwinAPI.getSensorThings()
+        .then((res) => setSensorThings(res.value || []))
+        .catch(() => {});
     };
     fetchLive();
-    const timer = window.setInterval(fetchLive, 45000);
+    const timer = window.setInterval(fetchLive, 60000);
     return () => window.clearInterval(timer);
   }, []);
 
@@ -239,6 +244,7 @@ export const App: React.FC = () => {
         <TopCommandBar
           overview={overview}
           liveTelemetry={liveTelemetry}
+          sensorThings={sensorThings}
           liveActive={layers.liveTelemetry}
           onToggleLive={() => handleToggleLayer("liveTelemetry")}
           phase={phase}
@@ -280,6 +286,7 @@ export const App: React.FC = () => {
               simulation={simulation}
               corridorArcs={overview?.corridor_arcs || []}
               liveTelemetry={liveTelemetry}
+              sensorThings={sensorThings}
               selectedAgebId={selectedAgebId}
               tours={tours}
               activeTourId={activeTourId}

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   Activity,
   Bot,
@@ -11,6 +11,7 @@ import {
   SlidersHorizontal,
   Sparkles,
   Target,
+  X,
 } from "lucide-react";
 import type {
   AretianPhase,
@@ -19,11 +20,13 @@ import type {
   EngineMode,
   LiveTelemetrySummary,
   OverviewResponse,
+  SensorThingRecord,
 } from "../types/twin";
 
 interface Props {
   overview: OverviewResponse | null;
   liveTelemetry: LiveTelemetrySummary | null;
+  sensorThings?: SensorThingRecord[];
   liveActive: boolean;
   onToggleLive: () => void;
   phase: AretianPhase;
@@ -53,6 +56,7 @@ const PHASES: { id: AretianPhase; num: string; labelEs: string; labelEn: string;
 export const TopCommandBar: React.FC<Props> = ({
   overview,
   liveTelemetry,
+  sensorThings = [],
   liveActive,
   onToggleLive,
   phase,
@@ -71,8 +75,24 @@ export const TopCommandBar: React.FC<Props> = ({
   language,
   onLanguageChange,
 }) => {
+  const [livePopoverOpen, setLivePopoverOpen] = useState(false);
   const cities = overview ? Object.values(overview.cities) : [];
   const totalBuildings = overview?.state.buildings_3d_count ?? 396823;
+  const isEn = language === "en";
+  const weatherFeed = liveTelemetry?.feeds?.weather;
+  const overallStatus = liveTelemetry?.overall_status || weatherFeed?.status || "CACHED";
+  const statusDotClass =
+    overallStatus === "LIVE"
+      ? "bg-emerald-400"
+      : overallStatus === "OFFLINE"
+        ? "bg-rose-400"
+        : "bg-amber-400";
+  const freshnessPillText = weatherFeed
+    ? isEn
+      ? weatherFeed.freshness_en
+      : weatherFeed.freshness_es
+    : overallStatus;
+  const sensorCount = sensorThings.length || 14;
 
   return (
     <header className="glass-panel pointer-events-auto relative z-30 flex flex-wrap items-center justify-between gap-2 px-3 py-2 border-b border-sky-400/20">
@@ -162,15 +182,17 @@ export const TopCommandBar: React.FC<Props> = ({
         <div className="flex items-center gap-1 rounded-lg bg-slate-900/90 px-2 py-1 ring-1 ring-slate-700/70">
           <MapPin className="h-3.5 w-3.5 text-emerald-400" />
           <select
-            aria-label="Vuelo rápido a Ciudad 3D"
+            aria-label={isEn ? "Fly to 3D City" : "Vuelo rápido a Ciudad 3D"}
             value={activeCitySlug}
             onChange={(e) => onCityJump(e.target.value)}
             className="bg-transparent text-[11px] font-medium text-slate-200 focus:outline-none cursor-pointer"
           >
-            <option value="" className="bg-slate-900">Vuelo a Ciudad 3D...</option>
+            <option value="" className="bg-slate-900">
+              {isEn ? "Fly to 3D City..." : "Vuelo a Ciudad 3D..."}
+            </option>
             {cities.map((c) => (
               <option key={c.slug} value={c.slug} className="bg-slate-900">
-                {c.name} ({c.buildings_count.toLocaleString()} edif.)
+                {c.name} ({c.buildings_count.toLocaleString()} {isEn ? "bldgs" : "edif."})
               </option>
             ))}
           </select>
@@ -186,7 +208,7 @@ export const TopCommandBar: React.FC<Props> = ({
             }`}
           >
             <Layers className="h-3 w-3" />
-            <span>3D Analítico</span>
+            <span>{isEn ? "Analytical 3D" : "3D Analítico"}</span>
           </button>
           <button
             type="button"
@@ -196,42 +218,135 @@ export const TopCommandBar: React.FC<Props> = ({
             }`}
           >
             <Globe2 className="h-3 w-3" />
-            <span>Globo Cesium</span>
+            <span>{isEn ? "Cesium Globe" : "Globo Cesium"}</span>
           </button>
         </div>
 
         {/* Basemap Mode */}
         {engineMode === "deck3d" && (
           <select
-            aria-label="Estilo de mapa base"
+            aria-label={isEn ? "Basemap style" : "Estilo de mapa base"}
             value={basemapMode}
             onChange={(e) => onBasemapModeChange(e.target.value as BasemapMode)}
             className="rounded-lg bg-slate-900/90 px-2 py-1 text-[11px] font-medium text-slate-200 ring-1 ring-slate-700/70 focus:outline-none cursor-pointer"
           >
-            <option value="obsidian" className="bg-slate-900">Mapa Obsidian</option>
-            <option value="satellite" className="bg-slate-900">Satélite HD</option>
-            <option value="terrain" className="bg-slate-900">Relieve 3D</option>
+            <option value="obsidian" className="bg-slate-900">
+              {isEn ? "Obsidian Map" : "Mapa Obsidian"}
+            </option>
+            <option value="satellite" className="bg-slate-900">
+              {isEn ? "HD Satellite" : "Satélite HD"}
+            </option>
+            <option value="terrain" className="bg-slate-900">
+              {isEn ? "3D Relief" : "Relieve 3D"}
+            </option>
           </select>
         )}
 
-        <button
-          type="button"
-          onClick={onToggleLive}
-          title="Monitoreo en vivo (Clima Open-Meteo, Vuelos OpenSky, Barcos AIS, Ciclones NHC)"
-          className={`hidden md:flex items-center gap-1.5 rounded-lg px-2 py-1 font-mono-num text-[10.5px] transition-all cursor-pointer ${
-            liveActive
-              ? "bg-cyan-500/20 text-cyan-200 ring-1 ring-cyan-400/50"
-              : "bg-slate-800/90 text-slate-300 ring-1 ring-slate-600/60 hover:bg-slate-700"
-          }`}
-        >
-          <Radio className={`h-3 w-3 ${liveActive ? "text-cyan-400 animate-pulse" : "text-slate-400"}`} />
-          <span>
-            {liveTelemetry?.weather?.la_paz?.temp_c != null
-              ? `${Math.round(liveTelemetry.weather.la_paz.temp_c)}°C`
-              : "BCS"}{" "}
-            · {liveTelemetry?.aircraft?.count ?? 0}✈ · {liveTelemetry?.marine?.count ?? 0}⛵
-          </span>
-        </button>
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setLivePopoverOpen((o) => !o)}
+            aria-expanded={livePopoverOpen}
+            title={
+              isEn
+                ? "Asynchronous telemetry cache + OGC SensorThings v1.1 status"
+                : "Estado de telemetría en caché + OGC SensorThings v1.1"
+            }
+            className={`hidden md:flex items-center gap-1.5 rounded-lg px-2 py-1 font-mono-num text-[10.5px] transition-all cursor-pointer ${
+              liveActive
+                ? "bg-cyan-500/20 text-cyan-100 ring-1 ring-cyan-400/50"
+                : "bg-slate-800/90 text-slate-300 ring-1 ring-slate-600/60 hover:bg-slate-700"
+            }`}
+          >
+            <span className={`h-2 w-2 rounded-full ${statusDotClass} ${overallStatus === "LIVE" ? "animate-pulse" : ""}`} />
+            <Radio className="h-3 w-3 text-cyan-300" />
+            <span>
+              {liveTelemetry?.weather?.la_paz?.temp_c != null
+                ? `${Math.round(liveTelemetry.weather.la_paz.temp_c)}°C`
+                : "BCS"}{" "}
+              · {freshnessPillText} · {sensorCount} OGC
+            </span>
+          </button>
+
+          {livePopoverOpen && (
+            <div className="glass-panel absolute right-0 top-10 z-50 w-80 rounded-xl border border-slate-700/80 bg-slate-950/95 p-3 text-left shadow-2xl">
+              <div className="mb-2 flex items-center justify-between border-b border-slate-800 pb-2">
+                <div>
+                  <p className="text-[11px] font-bold text-white">
+                    {isEn ? "Live Telemetry & OGC SensorThings" : "Telemetría en Vivo & OGC SensorThings"}
+                  </p>
+                  <p className="font-mono-num text-[9.5px] text-slate-400">
+                    {liveTelemetry?.cache_backend || "firestore:bcs-studio"} ·{" "}
+                    {liveTelemetry?.ingested_at ? `${liveTelemetry.ingested_at.slice(11, 19)} UTC` : "--"}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setLivePopoverOpen(false)}
+                  aria-label="Cerrar detalle telemetría"
+                  className="rounded p-0.5 text-slate-400 hover:bg-slate-800 hover:text-white cursor-pointer"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+
+              <div className="space-y-1.5">
+                {[
+                  { key: "weather", labelEs: "Clima 5 Municipios (Open-Meteo)", labelEn: "5-Mun Weather (Open-Meteo)", feed: liveTelemetry?.feeds?.weather },
+                  { key: "aircraft", labelEs: "Tráfico Aéreo (OpenSky)", labelEn: "Aircraft ADS-B (OpenSky)", feed: liveTelemetry?.feeds?.aircraft },
+                  { key: "marine", labelEs: "Buques Marítimos (AIS Proxy)", labelEn: "Marine Vessels (AIS Proxy)", feed: liveTelemetry?.feeds?.marine },
+                  { key: "cyclones", labelEs: "Ciclones Pacífico (NOAA NHC)", labelEn: "Pacific Cyclones (NOAA NHC)", feed: liveTelemetry?.feeds?.cyclones },
+                ].map(({ key, labelEs, labelEn, feed }) => {
+                  const st = feed?.status || "OFFLINE";
+                  const badgeCls =
+                    st === "LIVE"
+                      ? "bg-emerald-500/15 text-emerald-300 ring-emerald-400/30"
+                      : st === "CACHED"
+                        ? "bg-amber-500/15 text-amber-300 ring-amber-400/30"
+                        : st === "STALE"
+                          ? "bg-orange-500/15 text-orange-300 ring-orange-400/30"
+                          : "bg-rose-500/15 text-rose-300 ring-rose-400/30";
+                  return (
+                    <div key={key} className="rounded-lg bg-slate-900/90 px-2.5 py-1.5 ring-1 ring-slate-800">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[10.5px] font-medium text-slate-200">{isEn ? labelEn : labelEs}</span>
+                        <span className={`rounded-full px-1.5 py-0.5 font-mono-num text-[9px] font-semibold ring-1 ${badgeCls}`}>
+                          {feed ? (isEn ? feed.freshness_en : feed.freshness_es) : "OFFLINE"}
+                        </span>
+                      </div>
+                      {feed && (
+                        <p className="mt-0.5 text-[9.5px] text-slate-400">
+                          {isEn ? "Items" : "Registros"}: <span className="font-mono-num text-slate-200">{feed.count}</span>
+                          {feed.notice ? ` · ${feed.notice}` : ""}
+                        </p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="mt-2.5 flex items-center justify-between border-t border-slate-800 pt-2">
+                <button
+                  type="button"
+                  onClick={onToggleLive}
+                  className="rounded-md bg-cyan-500/20 px-2 py-1 text-[10px] font-semibold text-cyan-200 ring-1 ring-cyan-400/40 hover:bg-cyan-500/30 cursor-pointer"
+                >
+                  {liveActive
+                    ? isEn ? "Hide 3D Sensors" : "Ocultar Sensores 3D"
+                    : isEn ? "Show 3D Sensors" : "Mostrar Sensores 3D"}
+                </button>
+                <a
+                  href="/FROST-Server/v1.1/Things"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="font-mono-num text-[10px] text-sky-300 hover:underline"
+                >
+                  /FROST-Server/v1.1 ({sensorCount})
+                </a>
+              </div>
+            </div>
+          )}
+        </div>
 
         <div
           role="group"

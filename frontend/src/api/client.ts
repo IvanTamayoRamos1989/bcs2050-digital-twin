@@ -10,6 +10,7 @@ import type {
   MetadataCatalogResponse,
   OverviewResponse,
   RecommendationsResponse,
+  SensorThingsCollectionResponse,
   SimulationResponse,
   ZoningParcelRecord,
 } from "../types/twin";
@@ -86,6 +87,10 @@ export const TwinAPI = {
   getArchitecture: () => apiFetch<ArchitectureResponse>("/api/twin/architecture"),
   getMetadata: () => apiFetch<MetadataCatalogResponse>("/api/twin/metadata"),
   getLiveTelemetry: () => apiFetch<LiveTelemetrySummary>("/api/twin/live/summary"),
+  getSensorThings: () =>
+    apiFetch<SensorThingsCollectionResponse>(
+      "/FROST-Server/v1.1/Things?$expand=Locations,Datastreams($expand=Observations($top=1))",
+    ),
   getTours: () => apiFetch<{ tours: AerialTour[]; corridors: Record<string, CorridorPreset> }>("/api/twin/tours"),
   buildExportUrl: (
     kind: "dxf" | "obj3d" | "bim-package" | "unreal-manifest",

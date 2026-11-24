@@ -44,6 +44,23 @@ def get_chat_model() -> str:
     return os.environ.get("BCS2050_CHAT_MODEL", "gemini-4-hydrogen").strip() or "gemini-4-hydrogen"
 
 
+def use_firestore_cache() -> bool:
+    return os.environ.get("BCS2050_USE_FIRESTORE", "false").strip().lower() in {"1", "true", "yes"}
+
+
+def get_firestore_database() -> str:
+    return os.environ.get("BCS2050_FIRESTORE_DATABASE", "bcs-studio").strip() or "bcs-studio"
+
+
+def get_telemetry_pubsub_topic() -> str:
+    return os.environ.get("BCS2050_TELEMETRY_PUBSUB_TOPIC", "bcs2050-telemetry-events").strip() or "bcs2050-telemetry-events"
+
+
+def get_sensor_ingest_tokens() -> set[str]:
+    raw = os.environ.get("BCS2050_SENSOR_INGEST_TOKENS", "").strip()
+    return {tok.strip() for tok in raw.split(",") if tok.strip()}
+
+
 DEFAULT_ALLOWED_ORIGINS: list[str] = [
     "https://bcs2050.com",
     "https://www.bcs2050.com",
@@ -105,4 +122,7 @@ def get_runtime_capabilities() -> dict[str, bool]:
         "planner_rbac_enforced": require_auth_for_exports(),
         "vertex_gemini_strategist": use_vertex_strategist(),
         "bigquery_vector_rag": use_bigquery(),
+        "firestore_telemetry_cache": use_firestore_cache(),
+        "ogc_sensorthings_v11": True,
+        "bigquery_telemetry_history": use_bigquery(),
     }

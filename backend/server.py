@@ -28,6 +28,7 @@ from backend.metadata_catalog import (
 )
 from backend.ai_strategist import answer_strategist_chat_grounded
 from backend.security import SecurityAndRateLimitMiddleware
+from backend.sensorthings import get_pilot_schemas_catalog, router as sensorthings_router
 from backend.simulation_bridge import (
     compare_twin_scenarios,
     compute_goal_gap,
@@ -256,6 +257,14 @@ def twin_live_summary() -> dict[str, Any]:
     return get_live_telemetry_summary()
 
 
+@app.get("/api/twin/sensorthings/schemas")
+def twin_sensorthings_schemas() -> dict[str, Any]:
+    return get_pilot_schemas_catalog()
+
+
+app.include_router(sensorthings_router)
+
+
 @app.get("/api/twin/tours")
 def twin_tours() -> dict[str, Any]:
     return {
@@ -352,7 +361,7 @@ if FRONTEND_DIST_DIR.exists():
 
     @app.get("/{full_path:path}")
     def serve_spa(full_path: str) -> FileResponse:
-        if full_path.startswith("api/"):
+        if full_path.startswith("api/") or full_path.startswith("FROST-Server/"):
             raise HTTPException(status_code=404, detail="API endpoint not found")
         candidate: Path = FRONTEND_DIST_DIR / full_path
         if full_path and candidate.exists() and candidate.is_file():

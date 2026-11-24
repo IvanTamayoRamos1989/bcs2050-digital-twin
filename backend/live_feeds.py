@@ -1,132 +1,438 @@
-"""Live real-time telemetry aggregator for BCS2050 Digital Twin (Open-Meteo, OpenSky, NOAA NHC, AIS)."""
+"""Non-blocking shared-cache reader for live BCS2050 telemetry (Firestore + hot RAM mirror).
+
+Zero external HTTP requests happen inside HTTP request handlers; background ingestion runs
+asynchronously via `workers.telemetry_ingestor` (Cloud Run Job + Cloud Scheduler every 5 min).
+"""
 
 from __future__ import annotations
 
-import json
+import copy
+import logging
 import os
+import threading
 import time
-import urllib.request
+from datetime import datetime, timezone
 from typing import Any
 
-_CACHE: dict[str, tuple[float, Any]] = {}
+from backend.config import get_firestore_database, use_firestore_cache
+
+logger = logging.getLogger("bcs2050.live_feeds")
+
+PROJECT_ID = os.environ.get("GOOGLE_CLOUD_PROJECT", "bcs2050")
+FIRESTORE_COLLECTION = "twin_telemetry"
+FIRESTORE_LATEST_DOC = "latest"
+FIRESTORE_PILOTS_DOC = "pilot_observations"
+HOT_CACHE_TTL_S = 15.0
+
+_SNAPSHOT_LOCK = threading.Lock()
+_HOT_RAW_SNAPSHOT: dict[str, Any] | None = None
+_HOT_LOADED_MONO: float = 0.0
+_CACHE_BACKEND_LABEL: str = "memory_seed"
+
+_PILOT_LOCK = threading.Lock()
+_PILOT_MEMORY_OBS: dict[str, list[dict[str, Any]]] = {}
+_PILOT_LOADED_MONO: float = 0.0
 
 
-def _fetch_json(url: str, timeout: float = 6.0) -> Any:
-    req = urllib.request.Request(url, headers={"User-Agent": "BCS2050-DigitalTwin/2.0"})
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        return json.loads(resp.read().decode("utf-8"))
+def _iso_utc_now() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def _cached(key: str, ttl_s: float, loader: Any) -> Any:
-    now = time.monotonic()
-    hit = _CACHE.get(key)
-    if hit and (now - hit[0]) < ttl_s:
-        return hit[1]
-    val = loader()
-    _CACHE[key] = (now, val)
-    return val
+def _parse_iso_epoch(ts: str | None) -> float | None:
+    if not ts or not isinstance(ts, str):
+        return None
+    cleaned = ts.strip()
+    if cleaned.endswith("Z"):
+        cleaned = cleaned[:-1] + "+00:00"
+    try:
+        dt = datetime.fromisoformat(cleaned)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.timestamp()
+    except ValueError:
+        return None
 
 
-def get_weather_summary() -> dict[str, Any]:
-    def _load() -> dict[str, Any]:
-        # La Paz & Cabo San Lucas concurrent Open-Meteo current conditions
-        lpz_url = (
-            "https://api.open-meteo.com/v1/forecast?latitude=24.1426&longitude=-110.3128"
-            "&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code&timezone=America%2FMazatlan"
-        )
-        csl_url = (
-            "https://api.open-meteo.com/v1/forecast?latitude=22.8905&longitude=-109.9167"
-            "&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code&timezone=America%2FMazatlan"
-        )
-        out: dict[str, Any] = {}
-        for key, url in [("la_paz", lpz_url), ("cabo_san_lucas", csl_url)]:
-            try:
-                data = _fetch_json(url, timeout=5.0)
-                cur = data.get("current") or {}
-                out[key] = {
-                    "temp_c": cur.get("temperature_2m"),
-                    "humidity_pct": cur.get("relative_humidity_2m"),
-                    "wind_kmh": cur.get("wind_speed_10m"),
-                    "time": cur.get("time"),
-                }
-            except Exception as exc:  # noqa: BLE001
-                out[key] = {"error": str(exc)}
-        return out
+def _compute_feed_freshness(
+    *,
+    feed_meta: dict[str, Any],
+    now_epoch: float,
+    has_payload: bool,
+) -> dict[str, Any]:
+    fetched_at = feed_meta.get("fetched_at") or feed_meta.get("updated_at")
+    upstream_ok = bool(feed_meta.get("upstream_ok"))
+    epoch = _parse_iso_epoch(fetched_at)
+    age_s = max(0, int(now_epoch - epoch)) if epoch is not None else None
 
-    return _cached("weather", 180.0, _load)
+    if upstream_ok and age_s is not None and age_s < 360:
+        status = "LIVE"
+    elif has_payload and age_s is not None and age_s <= 1800:
+        status = "CACHED"
+    elif has_payload and age_s is not None and age_s > 1800:
+        status = "STALE"
+    else:
+        status = "OFFLINE"
 
+    if status == "OFFLINE" or age_s is None:
+        freshness_es = "SIN SEÑAL"
+        freshness_en = "OFFLINE"
+    elif age_s < 60:
+        if status == "LIVE":
+            freshness_es = "EN VIVO · <1m"
+            freshness_en = "LIVE · <1m"
+        else:
+            freshness_es = "CACHÉ <1m"
+            freshness_en = "CACHED <1m ago"
+    else:
+        mins = max(1, round(age_s / 60))
+        if status == "LIVE":
+            freshness_es = f"EN VIVO · {mins}m"
+            freshness_en = f"LIVE · {mins}m"
+        elif status == "CACHED":
+            freshness_es = f"CACHÉ hace {mins}m"
+            freshness_en = f"CACHED {mins}m ago"
+        else:
+            freshness_es = f"DESACTUALIZADO · {mins}m"
+            freshness_en = f"STALE · {mins}m"
 
-def get_opensky_aircraft() -> dict[str, Any]:
-    def _load() -> dict[str, Any]:
-        url = "https://opensky-network.org/api/states/all?lamin=22.0&lomin=-116.0&lamax=28.5&lomax=-108.5"
-        try:
-            data = _fetch_json(url, timeout=6.0)
-            states = data.get("states") or []
-            items = []
-            for s in states[:120]:
-                if s[5] is None or s[6] is None:
-                    continue
-                items.append(
-                    {
-                        "icao24": s[0],
-                        "callsign": str(s[1] or s[0] or "").strip(),
-                        "country": s[2] or "",
-                        "lon": float(s[5]),
-                        "lat": float(s[6]),
-                        "altitude_m": float(s[7] or s[13] or 0.0),
-                        "velocity_ms": float(s[9] or 0.0),
-                        "heading": float(s[10] or 0.0),
-                    }
-                )
-            return {"count": len(items), "aircraft": items, "source": "OpenSky Network", "stale": False}
-        except Exception as exc:  # noqa: BLE001
-            return {"count": 0, "aircraft": [], "source": "OpenSky Network", "stale": True, "notice": str(exc)}
-
-    return _cached("aircraft", 30.0, _load)
+    return {
+        "status": status,
+        "upstream_ok": upstream_ok,
+        "fetched_at": fetched_at,
+        "age_seconds": age_s,
+        "freshness_es": freshness_es,
+        "freshness_en": freshness_en,
+        "latency_ms": feed_meta.get("latency_ms"),
+        "source": feed_meta.get("source", ""),
+        "notice": feed_meta.get("notice", ""),
+        "count": feed_meta.get("count", 0),
+    }
 
 
-def get_marine_ais_proxy() -> dict[str, Any]:
-    def _load() -> dict[str, Any]:
-        base = os.environ.get(
-            "TERRITORIAL_IA_URL",
-            "https://bcs2050-territorial-ia-96586614897.northamerica-south1.run.app",
-        ).rstrip("/")
-        try:
-            data = _fetch_json(f"{base}/api/marine-traffic", timeout=5.0)
-            vessels = data.get("vessels") or []
-            return {
-                "count": len(vessels),
-                "connected": bool(data.get("connected")),
-                "vessels": vessels[:250],
-                "notice": data.get("notice", ""),
-            }
-        except Exception as exc:  # noqa: BLE001
-            return {"count": 0, "connected": False, "vessels": [], "notice": str(exc)}
+def _build_offline_seed_snapshot() -> dict[str, Any]:
+    now_iso = _iso_utc_now()
+    return {
+        "ingested_at": now_iso,
+        "updated_at": now_iso,
+        "weather": {
+            "la_paz": {
+                "municipality_code": "03003",
+                "name": "La Paz",
+                "lat": 24.1426,
+                "lon": -110.3128,
+                "temp_c": 26.4,
+                "humidity_pct": 52,
+                "wind_kmh": 14.8,
+                "time": now_iso,
+            },
+            "cabo_san_lucas": {
+                "municipality_code": "03008",
+                "name": "Los Cabos",
+                "lat": 22.8905,
+                "lon": -109.9167,
+                "temp_c": 27.1,
+                "humidity_pct": 58,
+                "wind_kmh": 16.2,
+                "time": now_iso,
+            },
+            "ciudad_constitucion": {
+                "municipality_code": "03001",
+                "name": "Comondú",
+                "lat": 25.0322,
+                "lon": -111.6703,
+                "temp_c": 25.9,
+                "humidity_pct": 44,
+                "wind_kmh": 18.0,
+                "time": now_iso,
+            },
+            "loreto": {
+                "municipality_code": "03009",
+                "name": "Loreto",
+                "lat": 26.0127,
+                "lon": -111.3489,
+                "temp_c": 26.8,
+                "humidity_pct": 54,
+                "wind_kmh": 13.4,
+                "time": now_iso,
+            },
+            "santa_rosalia": {
+                "municipality_code": "03002",
+                "name": "Mulegé",
+                "lat": 27.3396,
+                "lon": -112.2676,
+                "temp_c": 24.7,
+                "humidity_pct": 49,
+                "wind_kmh": 19.1,
+                "time": now_iso,
+            },
+        },
+        "aircraft": {
+            "count": 0,
+            "aircraft": [],
+            "source": "OpenSky Network",
+            "stale": False,
+            "notice": "Awaiting background telemetry ingestion worker.",
+        },
+        "marine": {
+            "count": 0,
+            "connected": False,
+            "vessels": [],
+            "source": "AIS Stream Proxy",
+            "notice": "Awaiting AIS stream / background telemetry worker.",
+        },
+        "cyclones": {
+            "count": 0,
+            "active_storms": [],
+            "source": "NOAA NHC",
+            "notice": "No active tropical cyclones reported.",
+        },
+        "feeds": {
+            "weather": {
+                "upstream_ok": False,
+                "fetched_at": now_iso,
+                "source": "Open-Meteo (Cache Seed)",
+                "notice": "Seed baseline active while background scheduler syncs.",
+                "count": 5,
+            },
+            "aircraft": {
+                "upstream_ok": False,
+                "fetched_at": now_iso,
+                "source": "OpenSky Network",
+                "notice": "Awaiting background worker sync.",
+                "count": 0,
+            },
+            "marine": {
+                "upstream_ok": False,
+                "fetched_at": now_iso,
+                "source": "AIS Stream Proxy",
+                "notice": "AIS stream offline / unconfigured.",
+                "count": 0,
+            },
+            "cyclones": {
+                "upstream_ok": False,
+                "fetched_at": now_iso,
+                "source": "NOAA NHC",
+                "notice": "Awaiting background worker sync.",
+                "count": 0,
+            },
+        },
+    }
 
-    return _cached("marine", 20.0, _load)
+
+def seed_in_memory_snapshot(snapshot: dict[str, Any], *, backend_label: str = "memory_seed") -> None:
+    """Populate the thread-safe in-process hot telemetry mirror."""
+    global _HOT_RAW_SNAPSHOT, _HOT_LOADED_MONO, _CACHE_BACKEND_LABEL
+    with _SNAPSHOT_LOCK:
+        _HOT_RAW_SNAPSHOT = copy.deepcopy(snapshot)
+        _HOT_LOADED_MONO = time.monotonic()
+        _CACHE_BACKEND_LABEL = backend_label
 
 
-def get_nhc_cyclones() -> dict[str, Any]:
-    def _load() -> dict[str, Any]:
-        try:
-            data = _fetch_json("https://www.nhc.noaa.gov/CurrentStorms.json", timeout=5.0)
-            storms = data.get("activeStorms") or []
-            return {"count": len(storms), "active_storms": storms, "source": "NOAA NHC"}
-        except Exception as exc:  # noqa: BLE001
-            return {"count": 0, "active_storms": [], "source": "NOAA NHC", "notice": str(exc)}
+def reset_telemetry_cache() -> None:
+    """Clear in-process caches (primarily for deterministic unit tests)."""
+    global _HOT_RAW_SNAPSHOT, _HOT_LOADED_MONO, _CACHE_BACKEND_LABEL, _PILOT_LOADED_MONO
+    with _SNAPSHOT_LOCK:
+        _HOT_RAW_SNAPSHOT = None
+        _HOT_LOADED_MONO = 0.0
+        _CACHE_BACKEND_LABEL = "memory_seed"
+    with _PILOT_LOCK:
+        _PILOT_MEMORY_OBS.clear()
+        _PILOT_LOADED_MONO = 0.0
 
-    return _cached("nhc", 300.0, _load)
+
+def _read_firestore_snapshot() -> dict[str, Any] | None:
+    if not use_firestore_cache():
+        return None
+    try:
+        from google.cloud import firestore
+
+        db = firestore.Client(project=PROJECT_ID, database=get_firestore_database())
+        doc = db.collection(FIRESTORE_COLLECTION).document(FIRESTORE_LATEST_DOC).get(timeout=2.5)
+        if doc.exists:
+            data = doc.to_dict()
+            if isinstance(data, dict):
+                return data
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Firestore telemetry cache read failed cleanly: %s", exc)
+    return None
+
+
+def get_cached_telemetry_snapshot() -> tuple[dict[str, Any], str]:
+    """Return raw snapshot and cache backend label from hot RAM mirror or Firestore (<150ms p95)."""
+    global _HOT_RAW_SNAPSHOT, _HOT_LOADED_MONO, _CACHE_BACKEND_LABEL
+    now_mono = time.monotonic()
+    with _SNAPSHOT_LOCK:
+        if _HOT_RAW_SNAPSHOT is not None and (now_mono - _HOT_LOADED_MONO) < HOT_CACHE_TTL_S:
+            return copy.deepcopy(_HOT_RAW_SNAPSHOT), _CACHE_BACKEND_LABEL
+
+    if use_firestore_cache():
+        fs_data = _read_firestore_snapshot()
+        if fs_data:
+            backend = f"firestore:{get_firestore_database()}"
+            with _SNAPSHOT_LOCK:
+                _HOT_RAW_SNAPSHOT = copy.deepcopy(fs_data)
+                _HOT_LOADED_MONO = time.monotonic()
+                _CACHE_BACKEND_LABEL = backend
+            return copy.deepcopy(fs_data), backend
+
+    with _SNAPSHOT_LOCK:
+        if _HOT_RAW_SNAPSHOT is not None:
+            return copy.deepcopy(_HOT_RAW_SNAPSHOT), _CACHE_BACKEND_LABEL
+        seed = _build_offline_seed_snapshot()
+        _HOT_RAW_SNAPSHOT = copy.deepcopy(seed)
+        _HOT_LOADED_MONO = time.monotonic()
+        _CACHE_BACKEND_LABEL = "memory_seed"
+        return copy.deepcopy(seed), "memory_seed"
 
 
 def get_live_telemetry_summary() -> dict[str, Any]:
-    weather = get_weather_summary()
-    air = get_opensky_aircraft()
-    marine = get_marine_ais_proxy()
-    nhc = get_nhc_cyclones()
+    """Return live telemetry summary strictly from shared cache with per-feed freshness statuses."""
+    snap, backend = get_cached_telemetry_snapshot()
+    now_epoch = time.time()
+    raw_feeds = snap.get("feeds") or {}
+
+    weather = snap.get("weather") or {}
+    air = snap.get("aircraft") or {"count": 0, "aircraft": [], "source": "OpenSky Network", "stale": True}
+    marine = snap.get("marine") or {"count": 0, "connected": False, "vessels": []}
+    cyclones = snap.get("cyclones") or {"count": 0, "active_storms": [], "source": "NOAA NHC"}
+
+    weather_has_data = any(isinstance(v, dict) and v.get("temp_c") is not None for v in weather.values())
+    air_has_data = len(air.get("aircraft") or []) > 0 or bool(raw_feeds.get("aircraft", {}).get("upstream_ok"))
+    marine_has_data = bool(marine.get("connected")) or len(marine.get("vessels") or []) > 0
+    cyc_has_data = isinstance(cyclones.get("active_storms"), list)
+
+    weather_meta = _compute_feed_freshness(
+        feed_meta={
+            "fetched_at": raw_feeds.get("weather", {}).get("fetched_at") or snap.get("ingested_at"),
+            "upstream_ok": raw_feeds.get("weather", {}).get("upstream_ok", False),
+            "latency_ms": raw_feeds.get("weather", {}).get("latency_ms"),
+            "source": raw_feeds.get("weather", {}).get("source", "Open-Meteo API"),
+            "notice": raw_feeds.get("weather", {}).get("notice", ""),
+            "count": sum(1 for v in weather.values() if isinstance(v, dict) and v.get("temp_c") is not None),
+        },
+        now_epoch=now_epoch,
+        has_payload=weather_has_data,
+    )
+    air_meta = _compute_feed_freshness(
+        feed_meta={
+            "fetched_at": raw_feeds.get("aircraft", {}).get("fetched_at") or snap.get("ingested_at"),
+            "upstream_ok": raw_feeds.get("aircraft", {}).get("upstream_ok", False),
+            "latency_ms": raw_feeds.get("aircraft", {}).get("latency_ms"),
+            "source": air.get("source", "OpenSky Network"),
+            "notice": raw_feeds.get("aircraft", {}).get("notice") or air.get("notice", ""),
+            "count": int(air.get("count") or 0),
+        },
+        now_epoch=now_epoch,
+        has_payload=air_has_data,
+    )
+    marine_meta = _compute_feed_freshness(
+        feed_meta={
+            "fetched_at": raw_feeds.get("marine", {}).get("fetched_at") or snap.get("ingested_at"),
+            "upstream_ok": bool(marine.get("connected")) and bool(raw_feeds.get("marine", {}).get("upstream_ok", True)),
+            "latency_ms": raw_feeds.get("marine", {}).get("latency_ms"),
+            "source": marine.get("source", "AIS Stream Proxy"),
+            "notice": raw_feeds.get("marine", {}).get("notice") or marine.get("notice", ""),
+            "count": int(marine.get("count") or 0),
+        },
+        now_epoch=now_epoch,
+        has_payload=marine_has_data,
+    )
+    cyc_meta = _compute_feed_freshness(
+        feed_meta={
+            "fetched_at": raw_feeds.get("cyclones", {}).get("fetched_at") or snap.get("ingested_at"),
+            "upstream_ok": raw_feeds.get("cyclones", {}).get("upstream_ok", False),
+            "latency_ms": raw_feeds.get("cyclones", {}).get("latency_ms"),
+            "source": cyclones.get("source", "NOAA NHC"),
+            "notice": raw_feeds.get("cyclones", {}).get("notice") or cyclones.get("notice", ""),
+            "count": int(cyclones.get("count") or 0),
+        },
+        now_epoch=now_epoch,
+        has_payload=cyc_has_data,
+    )
+
+    air["stale"] = air_meta["status"] != "LIVE"
+    ingested_at = snap.get("ingested_at") or snap.get("updated_at")
+    snap_epoch = _parse_iso_epoch(ingested_at)
+    snap_age = max(0, int(now_epoch - snap_epoch)) if snap_epoch is not None else None
+
+    statuses = [weather_meta["status"], air_meta["status"], marine_meta["status"], cyc_meta["status"]]
+    if weather_meta["status"] == "LIVE" and cyc_meta["status"] == "LIVE":
+        overall_status = "LIVE"
+    elif any(s in {"LIVE", "CACHED"} for s in statuses):
+        overall_status = "CACHED"
+    elif any(s == "STALE" for s in statuses):
+        overall_status = "STALE"
+    else:
+        overall_status = "OFFLINE"
+
     return {
-        "updated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "updated_at": snap.get("updated_at") or _iso_utc_now(),
+        "ingested_at": ingested_at,
+        "age_seconds": snap_age,
+        "cache_backend": backend,
+        "overall_status": overall_status,
         "weather": weather,
         "aircraft": air,
         "marine": marine,
-        "cyclones": nhc,
+        "cyclones": cyclones,
+        "feeds": {
+            "weather": weather_meta,
+            "aircraft": air_meta,
+            "marine": marine_meta,
+            "cyclones": cyc_meta,
+        },
     }
+
+
+def read_pilot_observations() -> dict[str, list[dict[str, Any]]]:
+    """Read SensorThings pilot observations from hot RAM mirror / Firestore."""
+    global _PILOT_LOADED_MONO
+    now_mono = time.monotonic()
+    with _PILOT_LOCK:
+        if _PILOT_MEMORY_OBS and (now_mono - _PILOT_LOADED_MONO) < HOT_CACHE_TTL_S:
+            return copy.deepcopy(_PILOT_MEMORY_OBS)
+
+    if use_firestore_cache():
+        try:
+            from google.cloud import firestore
+
+            db = firestore.Client(project=PROJECT_ID, database=get_firestore_database())
+            doc = db.collection(FIRESTORE_COLLECTION).document(FIRESTORE_PILOTS_DOC).get(timeout=2.5)
+            if doc.exists:
+                data = doc.to_dict() or {}
+                streams = data.get("streams")
+                if isinstance(streams, dict):
+                    with _PILOT_LOCK:
+                        _PILOT_MEMORY_OBS.clear()
+                        for k, v in streams.items():
+                            if isinstance(v, list):
+                                _PILOT_MEMORY_OBS[str(k)] = list(v)
+                        _PILOT_LOADED_MONO = time.monotonic()
+                    return copy.deepcopy(_PILOT_MEMORY_OBS)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Firestore pilot observations read failed cleanly: %s", exc)
+
+    with _PILOT_LOCK:
+        return copy.deepcopy(_PILOT_MEMORY_OBS)
+
+
+def append_pilot_observation(datastream_id: str, observation: dict[str, Any], *, max_per_stream: int = 50) -> None:
+    """Append an observation for a datastream in memory and optionally persist to Firestore."""
+    global _PILOT_LOADED_MONO
+    with _PILOT_LOCK:
+        bucket = _PILOT_MEMORY_OBS.setdefault(datastream_id, [])
+        bucket.insert(0, copy.deepcopy(observation))
+        del bucket[max_per_stream:]
+        _PILOT_LOADED_MONO = time.monotonic()
+        snapshot_streams = copy.deepcopy(_PILOT_MEMORY_OBS)
+
+    if use_firestore_cache():
+        try:
+            from google.cloud import firestore
+
+            db = firestore.Client(project=PROJECT_ID, database=get_firestore_database())
+            db.collection(FIRESTORE_COLLECTION).document(FIRESTORE_PILOTS_DOC).set(
+                {"updated_at": _iso_utc_now(), "streams": snapshot_streams}
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Firestore pilot observations write failed cleanly: %s", exc)

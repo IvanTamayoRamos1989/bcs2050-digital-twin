@@ -403,9 +403,26 @@ export interface ArchitectureResponse {
   aec_bim_bridge?: AecBimBridgeItem[];
 }
 
+export interface TelemetryFeedMeta {
+  status: "LIVE" | "CACHED" | "STALE" | "OFFLINE" | string;
+  upstream_ok: boolean;
+  fetched_at?: string | null;
+  age_seconds?: number | null;
+  freshness_es: string;
+  freshness_en: string;
+  latency_ms?: number | null;
+  source?: string;
+  notice?: string;
+  count: number;
+}
+
 export interface LiveTelemetrySummary {
   updated_at: string;
-  weather: Record<string, { temp_c?: number; humidity_pct?: number; wind_kmh?: number; error?: string }>;
+  ingested_at?: string | null;
+  age_seconds?: number | null;
+  cache_backend?: string;
+  overall_status?: "LIVE" | "CACHED" | "STALE" | "OFFLINE" | string;
+  weather: Record<string, { temp_c?: number; humidity_pct?: number; wind_kmh?: number; municipality_code?: string; name?: string; time?: string; error?: string }>;
   aircraft: {
     count: number;
     stale: boolean;
@@ -417,6 +434,58 @@ export interface LiveTelemetrySummary {
     vessels: { mmsi: string; name: string; type: string; lon: number; lat: number; cog?: number; heading?: number }[];
   };
   cyclones: { count: number; active_storms: unknown[]; source: string };
+  feeds?: {
+    weather: TelemetryFeedMeta;
+    aircraft: TelemetryFeedMeta;
+    marine: TelemetryFeedMeta;
+    cyclones: TelemetryFeedMeta;
+  };
+}
+
+export interface SensorObservationRecord {
+  "@iot.id": string;
+  phenomenonTime: string;
+  resultTime?: string;
+  result: number | string | boolean | null;
+  resultQuality?: string;
+  parameters?: Record<string, unknown>;
+}
+
+export interface SensorDatastreamRecord {
+  "@iot.id": string;
+  name: string;
+  description?: string;
+  unitOfMeasurement?: { name?: string; symbol?: string; definition?: string };
+  Observations?: SensorObservationRecord[];
+}
+
+export interface SensorLocationRecord {
+  "@iot.id": string;
+  name?: string;
+  encodingType?: string;
+  location?: { type: string; coordinates: [number, number] };
+}
+
+export interface SensorThingRecord {
+  "@iot.id": string;
+  "@iot.selfLink"?: string;
+  name: string;
+  description?: string;
+  properties?: {
+    category?: string;
+    municipality_code?: string;
+    feed_status?: string;
+    origin?: string;
+    source?: string;
+    [key: string]: unknown;
+  };
+  Locations?: SensorLocationRecord[];
+  Datastreams?: SensorDatastreamRecord[];
+}
+
+export interface SensorThingsCollectionResponse {
+  "@iot.count"?: number;
+  value: SensorThingRecord[];
 }
 
 export interface LayerVisibility {

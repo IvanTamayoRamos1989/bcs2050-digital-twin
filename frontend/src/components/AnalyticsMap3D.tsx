@@ -15,6 +15,7 @@ import type {
   CorridorArc,
   LayerVisibility,
   LiveTelemetrySummary,
+  SensorThingRecord,
   SimulationResponse,
   ZoningParcelRecord,
 } from "../types/twin";
@@ -36,6 +37,7 @@ interface Props {
   simulation: SimulationResponse | null;
   corridorArcs: CorridorArc[];
   liveTelemetry: LiveTelemetrySummary | null;
+  sensorThings?: SensorThingRecord[];
   selectedAgebId: string | null;
   tours?: AerialTour[];
   activeTourId?: string | null;
@@ -133,6 +135,7 @@ export const AnalyticsMap3D: React.FC<Props> = ({
   simulation,
   corridorArcs,
   liveTelemetry,
+  sensorThings = [],
   selectedAgebId,
   tours,
   activeTourId,
@@ -835,6 +838,55 @@ export const AnalyticsMap3D: React.FC<Props> = ({
       );
     }
 
+    // 14b. OGC SensorThings API v1.1 Live & Pilot Stations
+    if (layers.liveTelemetry && sensorThings.length > 0) {
+      const validThings = sensorThings.filter(
+        (t) => Array.isArray(t.Locations?.[0]?.location?.coordinates) && t.Locations![0].location!.coordinates.length === 2,
+      );
+      if (validThings.length > 0) {
+        list.push(
+          new ScatterplotLayer<SensorThingRecord>({
+            id: "ogc-sensorthings-live",
+            data: validThings,
+            getPosition: (d) => d.Locations![0].location!.coordinates,
+            getRadius: 1100,
+            radiusMinPixels: 6,
+            radiusMaxPixels: 13,
+            getFillColor: (d) => {
+              const cat = d.properties?.category;
+              if (cat === "conagua_aquifer") return [59, 130, 246, 235];
+              if (cat === "weather") return [34, 211, 238, 235];
+              return [251, 191, 36, 235];
+            },
+            getLineColor: [255, 255, 255, 220],
+            lineWidthMinPixels: 1.5,
+            stroked: true,
+            pickable: true,
+            onHover: ({ x, y, object }) => {
+              if (!object) return setHoverInfo(null);
+              const ds = object.Datastreams?.[0];
+              const obs = ds?.Observations?.[0];
+              const unit = ds?.unitOfMeasurement?.symbol || "";
+              const valStr =
+                obs?.result !== null && obs?.result !== undefined
+                  ? `${obs.result} ${unit}`.trim()
+                  : "Piloto SCADA en espera";
+              setHoverInfo({
+                x,
+                y,
+                title: `OGC Thing · ${object.name}`,
+                lines: [
+                  `ID: ${object["@iot.id"]} · Estado: ${object.properties?.feed_status || "LIVE"}`,
+                  `${ds?.name || "Medición"}: ${valStr}`,
+                  `Fuente: ${object.properties?.source || "OGC SensorThings v1.1"}`,
+                ],
+              });
+            },
+          }),
+        );
+      }
+    }
+
     return list;
   }, [
     activeMetric,
@@ -845,6 +897,7 @@ export const AnalyticsMap3D: React.FC<Props> = ({
     geoCache,
     layers,
     liveTelemetry,
+    sensorThings,
     onInspectLocation,
     phase,
     selectedAgebId,

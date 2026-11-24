@@ -106,7 +106,7 @@ class SecurityAndRateLimitMiddleware(BaseHTTPMiddleware):
             return _apply_security_headers(resp)
 
         # Static assets & health probe skip rate limiting / RBAC
-        if not path.startswith("/api/") or path in EXEMPT_PATHS:
+        if not (path.startswith("/api/") or path.startswith("/FROST-Server/")) or path in EXEMPT_PATHS:
             resp = await call_next(request)
             return _apply_security_headers(resp)
 
