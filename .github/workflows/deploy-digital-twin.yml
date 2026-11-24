@@ -127,6 +127,6 @@ jobs:
             --max-instances 10 \
             --concurrency 160 \
             --allow-unauthenticated \
-            --set-secrets="VITE_GOOGLE_MAPS_API_KEY=bcs2050-google-maps-3dtiles-key:latest,VITE_CESIUM_ION_TOKEN=bcs2050-cesium-ion-token:latest" \
+            --set-secrets="VITE_GOOGLE_MAPS_API_KEY=bcs2050-google-maps-3dtiles-key:latest,VITE_CESIUM_ION_TOKEN=bcs2050-cesium-ion-token:latest,VITE_MAPTILER_KEY=bcs2050-maptiler-key:latest" \
             --set-env-vars "^@^BCS2050_USE_BIGQUERY=true@BCS2050_USE_FIRESTORE=true@BCS2050_FIRESTORE_DATABASE=bcs-studio@BCS2050_TELEMETRY_PUBSUB_TOPIC=bcs2050-telemetry-events@BCS2050_GCS_HYDRATE_DATA=true@BCS2050_GCS_DATA_TAR_URI=${{ vars.GCS_DATA_TAR_URI }}@BCS2050_3DTILES_URL=https://storage.googleapis.com/bcs2050-3dtiles-public/bcs_buildings_v11/tileset.json@BCS2050_USE_CLOUD_RUN_JOBS=true@BCS2050_PHYSICS_JOB_NAME=bcs2050-physics-worker@BCS2050_SIM_ARTIFACTS_BUCKET=bcs2050-3dtiles-public@GOOGLE_CLOUD_PROJECT=${{ env.PROJECT_ID }}@GOOGLE_CLOUD_LOCATION=global@BCS2050_CHAT_MODEL=gemini-4-hydrogen@BQ_LOCATION=${{ env.REGION }}@BQ_DATASET=bcs2050_intelligence_sandbox@TERRITORIAL_IA_URL=https://bcs2050-territorial-ia-96586614897.northamerica-south1.run.app@BCS2050_HEAVY_RPM=12@BCS2050_READ_RPM=180@BCS2050_REQUIRE_AUTH_FOR_EXPORTS=false@ALLOWED_ORIGINS=https://bcs2050.com,https://www.bcs2050.com,https://panel.bcs2050.com,https://twin.bcs2050.com,https://bcs2050-digital-twin-96586614897.northamerica-south1.run.app,https://bcs2050-digital-twin-4aurr37ktq-pv.a.run.app" \
             --quiet
