@@ -334,10 +334,28 @@ export interface RecommendationsResponse {
   priority_actions: PriorityActionCard[];
 }
 
+export interface ChatCitation {
+  doc_id: string;
+  chunk_id?: string | null;
+  doc_type?: string | null;
+  municipality_code?: string | null;
+  source_uri?: string | null;
+  page_or_section?: string | null;
+  distance?: number | null;
+  excerpt?: string | null;
+}
+
 export interface ChatResponse {
   query: string;
   scope_id: string;
   scope_name: string;
+  language?: "es" | "en";
+  engine_mode?: "vertex_gemini_grounded" | "deterministic_fallback" | string;
+  model_used?: string | null;
+  tools_used?: string[];
+  citations?: ChatCitation[];
+  uncertainty_note?: string | null;
+  implan_context_used?: boolean;
   answer_markdown: string;
   fly_to: CameraPreset | null;
   lineage: string[];

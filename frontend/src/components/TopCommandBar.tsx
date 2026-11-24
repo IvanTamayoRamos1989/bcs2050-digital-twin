@@ -39,13 +39,15 @@ interface Props {
   onOpenArchitecture: () => void;
   chatOpen: boolean;
   onToggleChat: () => void;
+  language: "es" | "en";
+  onLanguageChange: (lang: "es" | "en") => void;
 }
 
-const PHASES: { id: AretianPhase; num: string; label: string; icon: React.ReactNode }[] = [
-  { id: "diagnostics", num: "01", label: "Diagnóstico", icon: <Activity className="h-3.5 w-3.5" /> },
-  { id: "goals", num: "02", label: "Metas 2050", icon: <Target className="h-3.5 w-3.5" /> },
-  { id: "scenarios", num: "03", label: "Escenarios", icon: <SlidersHorizontal className="h-3.5 w-3.5" /> },
-  { id: "recommendations", num: "04", label: "Acciones", icon: <Sparkles className="h-3.5 w-3.5" /> },
+const PHASES: { id: AretianPhase; num: string; labelEs: string; labelEn: string; icon: React.ReactNode }[] = [
+  { id: "diagnostics", num: "01", labelEs: "Diagnóstico", labelEn: "Diagnostics", icon: <Activity className="h-3.5 w-3.5" /> },
+  { id: "goals", num: "02", labelEs: "Metas 2050", labelEn: "2050 Goals", icon: <Target className="h-3.5 w-3.5" /> },
+  { id: "scenarios", num: "03", labelEs: "Escenarios", labelEn: "Scenarios", icon: <SlidersHorizontal className="h-3.5 w-3.5" /> },
+  { id: "recommendations", num: "04", labelEs: "Acciones", labelEn: "Actions", icon: <Sparkles className="h-3.5 w-3.5" /> },
 ];
 
 export const TopCommandBar: React.FC<Props> = ({
@@ -66,6 +68,8 @@ export const TopCommandBar: React.FC<Props> = ({
   onOpenArchitecture,
   chatOpen,
   onToggleChat,
+  language,
+  onLanguageChange,
 }) => {
   const cities = overview ? Object.values(overview.cities) : [];
   const totalBuildings = overview?.state.buildings_3d_count ?? 396823;
@@ -83,11 +87,13 @@ export const TopCommandBar: React.FC<Props> = ({
               BCS2050 · City Digital Twin
             </span>
             <span className="hidden sm:inline-flex items-center rounded-full bg-emerald-500/15 px-2 py-0.5 font-mono-num text-[10px] font-semibold text-emerald-300 ring-1 ring-emerald-400/30">
-              LIVE · {totalBuildings.toLocaleString()} EDIFICIOS 3D
+              LIVE · {totalBuildings.toLocaleString()} {language === "en" ? "3D BUILDINGS" : "EDIFICIOS 3D"}
             </span>
           </div>
           <p className="text-[10px] text-slate-400 hidden md:block">
-            City Science (Aretian Benchmark) · Esri Digital Thread · Ontología v3.0
+            {language === "en"
+              ? "City Science (Aretian Benchmark) · Esri Digital Thread · Ontology v3.0"
+              : "City Science (Aretian Benchmark) · Esri Digital Thread · Ontología v3.0"}
           </p>
         </div>
       </div>
@@ -109,7 +115,7 @@ export const TopCommandBar: React.FC<Props> = ({
             >
               <span className="font-mono-num opacity-75 text-[10px]">{p.num}</span>
               {p.icon}
-              <span>{p.label}</span>
+              <span>{language === "en" ? p.labelEn : p.labelEs}</span>
             </button>
           );
         })}
@@ -227,12 +233,41 @@ export const TopCommandBar: React.FC<Props> = ({
           </span>
         </button>
 
+        <div
+          role="group"
+          aria-label="Language switcher"
+          className="flex items-center rounded-lg bg-slate-900/90 p-0.5 ring-1 ring-slate-700/70"
+        >
+          <button
+            type="button"
+            onClick={() => onLanguageChange("es")}
+            className={`rounded-md px-1.5 py-0.5 text-[10px] font-bold transition-all cursor-pointer ${
+              language === "es"
+                ? "bg-sky-500 text-slate-950"
+                : "text-slate-400 hover:text-white"
+            }`}
+          >
+            ES
+          </button>
+          <button
+            type="button"
+            onClick={() => onLanguageChange("en")}
+            className={`rounded-md px-1.5 py-0.5 text-[10px] font-bold transition-all cursor-pointer ${
+              language === "en"
+                ? "bg-sky-500 text-slate-950"
+                : "text-slate-400 hover:text-white"
+            }`}
+          >
+            EN
+          </button>
+        </div>
+
         <button
           type="button"
           onClick={onOpenArchitecture}
           className="rounded-lg bg-slate-800/90 px-2.5 py-1 text-[11px] font-medium text-slate-200 ring-1 ring-slate-600/60 hover:bg-slate-700 cursor-pointer"
         >
-          Stack & Licencias
+          {language === "en" ? "Stack & Licenses" : "Stack & Licencias"}
         </button>
 
         <a
@@ -255,7 +290,7 @@ export const TopCommandBar: React.FC<Props> = ({
           }`}
         >
           <Bot className="h-3.5 w-3.5" />
-          <span>Estratega IA</span>
+          <span>{language === "en" ? "AI Strategist" : "Estratega IA"}</span>
         </button>
       </div>
     </header>

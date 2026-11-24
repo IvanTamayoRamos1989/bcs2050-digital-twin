@@ -13,6 +13,7 @@ __pycache__/
 
 # Heavy compiled spatial artifacts & deployment stages (stored in GCS, never Git)
 .cloud_stage/
+bcs2050_intelligence/
 data/spatial_index.sqlite
 data/spatial_index.sqlite-wal
 data/spatial_index.sqlite-shm

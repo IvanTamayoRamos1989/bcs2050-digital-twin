@@ -26,9 +26,9 @@ from backend.metadata_catalog import (
     CANONICAL_KPI_RECONCILIATION,
     build_iso19115_metadata_catalog,
 )
+from backend.ai_strategist import answer_strategist_chat_grounded
 from backend.security import SecurityAndRateLimitMiddleware
 from backend.simulation_bridge import (
-    answer_strategist_chat,
     compare_twin_scenarios,
     compute_goal_gap,
     generate_recommendations,
@@ -81,6 +81,7 @@ class ChatRequest(BaseModel):
     query: str = Field(min_length=2, max_length=2000)
     scope_id: str = "03"
     scenario_name: str = "COMPACT_SUSTAINABLE_2050"
+    language: str = Field(default="es", pattern="^(es|en)$")
 
 
 @app.get("/api/twin/health")
@@ -237,10 +238,11 @@ def twin_recommendations(scope_id: str) -> dict[str, Any]:
 
 @app.post("/api/twin/chat")
 def twin_chat(req: ChatRequest) -> dict[str, Any]:
-    return answer_strategist_chat(
+    return answer_strategist_chat_grounded(
         query=req.query,
         scope_id=req.scope_id,
         scenario_name=req.scenario_name,
+        language=req.language,
     )
 
 

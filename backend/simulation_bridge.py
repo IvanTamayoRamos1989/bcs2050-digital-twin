@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import math
+import threading
+import time
+import unicodedata
 from typing import Any
 
 from backend.config import get_runtime_capabilities, use_bigquery
@@ -62,6 +65,12 @@ def _filter_agebs_for_scope(scope_id: str) -> list[dict[str, Any]]:
     return [f["properties"] for f in agebs]
 
 
+_ONTOLOGY_CACHE_LOCK = threading.Lock()
+_SIM_CACHE: dict[tuple[str, str, int, bool], tuple[float, dict[str, Any]]] = {}
+_RECS_CACHE: dict[tuple[str, bool], tuple[float, dict[str, Any]]] = {}
+_CACHE_TTL_SEC = 300.0
+
+
 def run_twin_simulation(
     *,
     scope_id: str = "03",
@@ -70,6 +79,14 @@ def run_twin_simulation(
     target_year: int = 2050,
 ) -> dict[str, Any]:
     bq_flag = use_bigquery()
+    cache_key = (scope_id, scenario_name, target_year, bq_flag)
+    if custom_levers is None:
+        now = time.monotonic()
+        with _ONTOLOGY_CACHE_LOCK:
+            cached = _SIM_CACHE.get(cache_key)
+            if cached and (now - cached[0]) < _CACHE_TTL_SEC:
+                return cached[1]
+
     levers_obj = ScenarioLevers.model_validate(custom_levers) if custom_levers else None
     sim = simulate_scenario(
         scope_id,
@@ -117,7 +134,7 @@ def run_twin_simulation(
 
     deployed_solar_mw = round(total_solar_potential_mw * solar_share * progress, 1)
 
-    return {
+    result = {
         "scope_id": sim["scope_id"],
         "scope_name": sim["scope_name"],
         "scope_level": sim["scope_level"],
@@ -138,6 +155,10 @@ def run_twin_simulation(
         },
         "ageb_deltas": ageb_deltas,
     }
+    if custom_levers is None:
+        with _ONTOLOGY_CACHE_LOCK:
+            _SIM_CACHE[cache_key] = (time.monotonic(), result)
+    return result
 
 
 def compare_twin_scenarios(scope_id: str = "03") -> dict[str, Any]:
@@ -294,6 +315,12 @@ def compute_goal_gap(
 
 def generate_recommendations(scope_id: str = "03") -> dict[str, Any]:
     bq_flag = use_bigquery()
+    cache_key = (scope_id, bq_flag)
+    now = time.monotonic()
+    with _ONTOLOGY_CACHE_LOCK:
+        cached = _RECS_CACHE.get(cache_key)
+        if cached and (now - cached[0]) < _CACHE_TTL_SEC:
+            return cached[1]
     lenses = evaluate_all_decision_lenses(scope_id, use_bigquery=bq_flag)
     analysis = analyze_territory_ontology(scope_id, use_bigquery=bq_flag)
     scope_agebs = _filter_agebs_for_scope(scope_id)
@@ -443,7 +470,7 @@ def generate_recommendations(scope_id: str = "03") -> dict[str, Any]:
             ageb_row=a,
         )
 
-    return {
+    recs_result = {
         "scope_id": scope_id,
         "sdi_100": analysis["sdi_100"],
         "carrying_capacity": analysis["carrying_capacity"],
@@ -457,6 +484,9 @@ def generate_recommendations(scope_id: str = "03") -> dict[str, Any]:
             "solar_hubs": solar_top,
         },
     }
+    with _ONTOLOGY_CACHE_LOCK:
+        _RECS_CACHE[cache_key] = (time.monotonic(), recs_result)
+    return recs_result
 
 
 def answer_strategist_chat(
@@ -464,12 +494,19 @@ def answer_strategist_chat(
     query: str,
     scope_id: str = "03",
     scenario_name: str = "COMPACT_SUSTAINABLE_2050",
+    precomputed_recs: dict[str, Any] | None = None,
+    precomputed_sim: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Deterministic grounded territorial intelligence strategist backed by live City Science + Ontology v3."""
     summary = load_summary()
-    recs = generate_recommendations(scope_id)
-    sim = run_twin_simulation(scope_id=scope_id, scenario_name=scenario_name, target_year=2050)
-    q_low = query.lower()
+    recs = precomputed_recs if precomputed_recs is not None else generate_recommendations(scope_id)
+    sim = (
+        precomputed_sim
+        if precomputed_sim is not None
+        else run_twin_simulation(scope_id=scope_id, scenario_name=scenario_name, target_year=2050)
+    )
+    q_norm = unicodedata.normalize("NFKD", query.lower())
+    q_low = "".join(ch for ch in q_norm if not unicodedata.combining(ch))
 
     st = summary["state"]
     muns = summary["municipalities"]
@@ -543,7 +580,9 @@ def answer_strategist_chat(
             f"(2031: `{sim['sdi_score_2031']}`) con `{sim['active_year_snapshot']['deployed_rooftop_solar_mw']} MW` solares desplegados."
         )
         if recs["contradictions"]:
-            lines.append(f"**Alerta normativa detectada:** {recs['contradictions'][0]['message']}")
+            c0 = recs["contradictions"][0]
+            msg = c0.get("description") or c0.get("message") or str(c0)
+            lines.append(f"**Alerta normativa detectada:** {msg}")
 
     return {
         "query": query,

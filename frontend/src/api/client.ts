@@ -81,7 +81,7 @@ export const TwinAPI = {
   }) => apiFetch<GoalGapResponse>("/api/twin/goal-gap", { method: "POST", body: JSON.stringify(payload) }),
   getRecommendations: (scopeId: string) =>
     apiFetch<RecommendationsResponse>(`/api/twin/recommendations/${encodeURIComponent(scopeId)}`),
-  chat: (payload: { query: string; scope_id: string; scenario_name: string }) =>
+  chat: (payload: { query: string; scope_id: string; scenario_name: string; language?: "es" | "en" }) =>
     apiFetch<ChatResponse>("/api/twin/chat", { method: "POST", body: JSON.stringify(payload) }),
   getArchitecture: () => apiFetch<ArchitectureResponse>("/api/twin/architecture"),
   getMetadata: () => apiFetch<MetadataCatalogResponse>("/api/twin/metadata"),

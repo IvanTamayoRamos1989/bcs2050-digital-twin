@@ -35,23 +35,29 @@ jobs:
       - name: Install backend & test dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install fastapi "uvicorn[standard]" pydantic pyyaml shapely numpy httpx ezdxf pyproj google-cloud-bigquery pytest
+          pip install fastapi "uvicorn[standard]" pydantic pyyaml shapely numpy httpx ezdxf pyproj google-cloud-bigquery google-genai pytest
 
       - name: Fetch spatial datastore artifact (if configured)
-        if: ${{ vars.GCS_SPATIAL_INDEX_URI != '' && secrets.GCP_WIF_PROVIDER != '' }}
+        if: ${{ (vars.GCS_DATA_TAR_URI != '' || vars.GCS_SPATIAL_INDEX_URI != '') && secrets.GCP_WIF_PROVIDER != '' }}
         uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
           service_account: ${{ secrets.GCP_DEPLOY_SA }}
 
-      - name: Download spatial datastore for full integration tests
-        if: ${{ vars.GCS_SPATIAL_INDEX_URI != '' && secrets.GCP_WIF_PROVIDER != '' }}
-        run: gcloud storage cp "${{ vars.GCS_SPATIAL_INDEX_URI }}" data/spatial_index.sqlite
+      - name: Download runtime bundle & spatial datastore for full integration tests
+        if: ${{ (vars.GCS_DATA_TAR_URI != '' || vars.GCS_SPATIAL_INDEX_URI != '') && secrets.GCP_WIF_PROVIDER != '' }}
+        run: |
+          if [ -n "${{ vars.GCS_DATA_TAR_URI }}" ]; then
+            gcloud storage cp "${{ vars.GCS_DATA_TAR_URI }}" /tmp/twin_data.tar.gz
+            tar -xzf /tmp/twin_data.tar.gz -C .
+          elif [ -n "${{ vars.GCS_SPATIAL_INDEX_URI }}" ]; then
+            gcloud storage cp "${{ vars.GCS_SPATIAL_INDEX_URI }}" data/spatial_index.sqlite
+          fi
 
       - name: Run security & API unit tests
         run: |
           if [ -f data/spatial_index.sqlite ]; then
-            python -m pytest backend/tests/test_twin_api.py -v
+            python -m pytest backend/tests -v
           else
             python -m pytest backend/tests/test_twin_api.py -k "security or architecture" -v
           fi
@@ -118,5 +124,5 @@ jobs:
             --max-instances 10 \
             --concurrency 160 \
             --allow-unauthenticated \
-            --set-env-vars "BCS2050_USE_BIGQUERY=true,GOOGLE_CLOUD_PROJECT=${{ env.PROJECT_ID }},BQ_LOCATION=${{ env.REGION }},BQ_DATASET=bcs2050_intelligence_sandbox,BCS2050_HEAVY_RPM=12,BCS2050_READ_RPM=180,BCS2050_REQUIRE_AUTH_FOR_EXPORTS=false,ALLOWED_ORIGINS=https://bcs2050.com^:^https://www.bcs2050.com^:^https://panel.bcs2050.com^:^https://twin.bcs2050.com" \
+            --set-env-vars "^@^BCS2050_USE_BIGQUERY=true@GOOGLE_CLOUD_PROJECT=${{ env.PROJECT_ID }}@GOOGLE_CLOUD_LOCATION=global@BCS2050_CHAT_MODEL=gemini-4-hydrogen@BQ_LOCATION=${{ env.REGION }}@BQ_DATASET=bcs2050_intelligence_sandbox@TERRITORIAL_IA_URL=https://bcs2050-territorial-ia-96586614897.northamerica-south1.run.app@BCS2050_HEAVY_RPM=12@BCS2050_READ_RPM=180@BCS2050_REQUIRE_AUTH_FOR_EXPORTS=false@ALLOWED_ORIGINS=https://bcs2050.com,https://www.bcs2050.com,https://panel.bcs2050.com,https://twin.bcs2050.com,https://bcs2050-digital-twin-96586614897.northamerica-south1.run.app,https://bcs2050-digital-twin-4aurr37ktq-pv.a.run.app" \
             --quiet

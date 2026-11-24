@@ -30,5 +30,31 @@ export default defineConfig({
   },
   build: {
     chunkSizeWarningLimit: 5000,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes("node_modules/cesium")) return "vendor-cesium";
+          if (
+            id.includes("node_modules/@deck.gl") ||
+            id.includes("node_modules/@luma.gl") ||
+            id.includes("node_modules/@loaders.gl") ||
+            id.includes("node_modules/@math.gl")
+          ) {
+            return "vendor-deckgl";
+          }
+          if (id.includes("node_modules/maplibre-gl")) return "vendor-maplibre";
+          if (
+            id.includes("node_modules/recharts") ||
+            id.includes("node_modules/victory-vendor") ||
+            id.includes("node_modules/d3-")
+          ) {
+            return "vendor-charts";
+          }
+          if (id.includes("node_modules/react/") || id.includes("node_modules/react-dom/")) {
+            return "vendor-react";
+          }
+        },
+      },
+    },
   },
 });

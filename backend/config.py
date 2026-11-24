@@ -8,7 +8,10 @@ from pathlib import Path
 
 DIGITAL_TWIN_ROOT = Path(__file__).resolve().parents[1]
 WORKSPACE_ROOT = DIGITAL_TWIN_ROOT.parent
-INTELLIGENCE_DIR = WORKSPACE_ROOT / "bcs2050_intelligence"
+_LOCAL_INTELLIGENCE_DIR = DIGITAL_TWIN_ROOT / "bcs2050_intelligence"
+INTELLIGENCE_DIR = (
+    _LOCAL_INTELLIGENCE_DIR if _LOCAL_INTELLIGENCE_DIR.exists() else WORKSPACE_ROOT / "bcs2050_intelligence"
+)
 
 if INTELLIGENCE_DIR.exists() and str(INTELLIGENCE_DIR) not in sys.path:
     sys.path.insert(0, str(INTELLIGENCE_DIR))
@@ -22,6 +25,23 @@ FRONTEND_DIST_DIR = DIGITAL_TWIN_ROOT / "frontend" / "dist"
 
 def use_bigquery() -> bool:
     return os.environ.get("BCS2050_USE_BIGQUERY", "false").strip().lower() in {"1", "true", "yes"}
+
+
+def use_vertex_strategist() -> bool:
+    explicit = os.environ.get("BCS2050_USE_VERTEX_STRATEGIST", "").strip().lower()
+    if explicit in {"1", "true", "yes"}:
+        return True
+    if explicit in {"0", "false", "no"}:
+        return False
+    return use_bigquery()
+
+
+def get_gemini_location() -> str:
+    return os.environ.get("GOOGLE_CLOUD_LOCATION", "global").strip() or "global"
+
+
+def get_chat_model() -> str:
+    return os.environ.get("BCS2050_CHAT_MODEL", "gemini-4-hydrogen").strip() or "gemini-4-hydrogen"
 
 
 DEFAULT_ALLOWED_ORIGINS: list[str] = [
@@ -83,4 +103,6 @@ def get_runtime_capabilities() -> dict[str, bool]:
         "strict_cors_enabled": True,
         "rate_limiting_enabled": True,
         "planner_rbac_enforced": require_auth_for_exports(),
+        "vertex_gemini_strategist": use_vertex_strategist(),
+        "bigquery_vector_rag": use_bigquery(),
     }

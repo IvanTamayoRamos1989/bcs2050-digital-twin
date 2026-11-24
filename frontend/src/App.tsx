@@ -1,13 +1,20 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { Suspense, lazy, useCallback, useEffect, useState } from "react";
 import { TwinAPI } from "./api/client";
 import { AnalyticsMap3D } from "./components/AnalyticsMap3D";
-import { ArchitectureModal } from "./components/ArchitectureModal";
-import { CesiumGlobe3D } from "./components/CesiumGlobe3D";
 import { ChallengeLayerDock } from "./components/ChallengeLayerDock";
 import { PhaseTelemetryPanel } from "./components/PhaseTelemetryPanel";
-import { StrategistChatDrawer } from "./components/StrategistChatDrawer";
 import { TopCommandBar } from "./components/TopCommandBar";
 import { WebGLErrorBoundary } from "./components/WebGLErrorBoundary";
+
+const ArchitectureModal = lazy(() =>
+  import("./components/ArchitectureModal").then((m) => ({ default: m.ArchitectureModal })),
+);
+const CesiumGlobe3D = lazy(() =>
+  import("./components/CesiumGlobe3D").then((m) => ({ default: m.CesiumGlobe3D })),
+);
+const StrategistChatDrawer = lazy(() =>
+  import("./components/StrategistChatDrawer").then((m) => ({ default: m.StrategistChatDrawer })),
+);
 import type {
   AerialTour,
   AgebMetricKey,
@@ -54,7 +61,10 @@ export const App: React.FC = () => {
   const [leftCollapsed, setLeftCollapsed] = useState(false);
   const [rightCollapsed, setRightCollapsed] = useState(false);
   const [archOpen, setArchOpen] = useState(false);
+  const [archMounted, setArchMounted] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
+  const [chatMounted, setChatMounted] = useState(false);
+  const [language, setLanguage] = useState<"es" | "en">("es");
 
   const [activeChallenge, setActiveChallenge] = useState<ChallengeId>("urban_form_15m");
   const [activeMetric, setActiveMetric] = useState<AgebMetricKey>("city_science_index");
@@ -241,9 +251,17 @@ export const App: React.FC = () => {
           onEngineModeChange={setEngineMode}
           basemapMode={basemapMode}
           onBasemapModeChange={setBasemapMode}
-          onOpenArchitecture={() => setArchOpen(true)}
+          onOpenArchitecture={() => {
+            setArchMounted(true);
+            setArchOpen(true);
+          }}
           chatOpen={chatOpen}
-          onToggleChat={() => setChatOpen((o) => !o)}
+          onToggleChat={() => {
+            setChatMounted(true);
+            setChatOpen((o) => !o);
+          }}
+          language={language}
+          onLanguageChange={setLanguage}
         />
       </div>
 
@@ -271,20 +289,31 @@ export const App: React.FC = () => {
                 setViewportBbox(bbox);
                 setViewportZoom(z);
               }}
-              onOpenExportModal={() => setArchOpen(true)}
+              onOpenExportModal={() => {
+                setArchMounted(true);
+                setArchOpen(true);
+              }}
               onInspectLocation={handleInspectLocation}
               onQuickJumpCity={handleCityJump}
             />
           </WebGLErrorBoundary>
         ) : (
           <WebGLErrorBoundary fallbackTitle="Globo 3D CesiumJS">
-            <CesiumGlobe3D
-              cameraTarget={cameraTarget}
-              activeCitySlug={activeCitySlug || "la_paz"}
-              activeMetric={activeMetric}
-              extrusionScale={extrusionScale}
-              onInspectLocation={handleInspectLocation}
-            />
+            <Suspense
+              fallback={
+                <div className="flex h-full w-full items-center justify-center bg-[#050811] text-xs font-semibold text-sky-300">
+                  {language === "en" ? "Loading 3D CesiumJS Globe..." : "Cargando Globo 3D CesiumJS..."}
+                </div>
+              }
+            >
+              <CesiumGlobe3D
+                cameraTarget={cameraTarget}
+                activeCitySlug={activeCitySlug || "la_paz"}
+                activeMetric={activeMetric}
+                extrusionScale={extrusionScale}
+                onInspectLocation={handleInspectLocation}
+              />
+            </Suspense>
           </WebGLErrorBoundary>
         )}
       </main>
@@ -330,23 +359,32 @@ export const App: React.FC = () => {
       />
 
       {/* Slide-over AI Territorial Strategist */}
-      <StrategistChatDrawer
-        open={chatOpen}
-        onClose={() => setChatOpen(false)}
-        scopeId={scopeId}
-        scenarioName={scenarioName}
-        onFlyTo={(cam) => setCameraTarget({ ...cam })}
-      />
+      {chatMounted && (
+        <Suspense fallback={null}>
+          <StrategistChatDrawer
+            open={chatOpen}
+            onClose={() => setChatOpen(false)}
+            scopeId={scopeId}
+            scenarioName={scenarioName}
+            language={language}
+            onFlyTo={(cam) => setCameraTarget({ ...cam })}
+          />
+        </Suspense>
+      )}
 
       {/* Executive Architecture & Commercial Stack Modal */}
-      <ArchitectureModal
-        open={archOpen}
-        onClose={() => setArchOpen(false)}
-        currentBbox={viewportBbox}
-        currentZoom={viewportZoom}
-        corridors={corridors}
-        onStartTour={handleStartTour}
-      />
+      {archMounted && (
+        <Suspense fallback={null}>
+          <ArchitectureModal
+            open={archOpen}
+            onClose={() => setArchOpen(false)}
+            currentBbox={viewportBbox}
+            currentZoom={viewportZoom}
+            corridors={corridors}
+            onStartTour={handleStartTour}
+          />
+        </Suspense>
+      )}
     </div>
   );
 };
