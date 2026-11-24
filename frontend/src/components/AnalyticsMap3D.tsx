@@ -555,20 +555,20 @@ export const AnalyticsMap3D: React.FC<Props> = ({
           getFillColor: (f: GeoJSON.Feature) => {
             const p = f.properties || {};
             const val = Number(p[activeMetric] ?? 0);
-            const alpha = buildingsVisible ? 55 : 175;
+            const alpha = buildingsVisible ? 32 : 92;
             return interpolateMetricColor(val, metricMeta, alpha, colorblindSafe);
           },
           getLineColor: (f: GeoJSON.Feature) =>
-            f.properties?.cvegeo_ageb === selectedAgebId ? [255, 255, 255, 255] : [15, 23, 42, 160],
+            f.properties?.cvegeo_ageb === selectedAgebId ? [255, 255, 255, 255] : [203, 213, 225, 95],
           getLineWidth: (f: GeoJSON.Feature) => (f.properties?.cvegeo_ageb === selectedAgebId ? 3 : 1),
           lineWidthUnits: "pixels",
           getElevation: (f: GeoJSON.Feature) => {
             if (!extrudeAgebs) return 0;
             const p = f.properties || {};
             const val = Number(p[activeMetric] ?? 0);
-            const norm = Math.max(0.05, Math.min(1.2, val / Math.max(1, metricMeta.maxValue)));
+            const norm = Math.max(0.05, Math.min(1.0, val / Math.max(1, metricMeta.maxValue)));
             const simBoost = deltas[p.cvegeo_ageb]?.height_multiplier ?? 1.0;
-            return norm * 1600 * extrusionScale * simBoost;
+            return norm * 300 * extrusionScale * simBoost;
           },
           pickable: true,
           autoHighlight: true,

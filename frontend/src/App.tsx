@@ -46,12 +46,12 @@ import type {
 const INITIAL_LAYERS: LayerVisibility = {
   buildings3d: true,
   agebs: true,
-  zoning: true,
+  zoning: false,
   aquifers: false,
-  tandeo: true,
+  tandeo: false,
   powerGrid: true,
   services: false,
-  transit: true,
+  transit: false,
   poer: false,
   anps: false,
   corridorArcs: true,
@@ -94,8 +94,8 @@ export const App: React.FC = () => {
   const [activeChallenge, setActiveChallenge] = useState<ChallengeId>("urban_form_15m");
   const [activeMetric, setActiveMetric] = useState<AgebMetricKey>("city_science_index");
   const [layers, setLayers] = useState<LayerVisibility>(INITIAL_LAYERS);
-  const [extrusionScale, setExtrusionScale] = useState<number>(1.3);
-  const [agebs3dMode, setAgebs3dMode] = useState<boolean>(true);
+  const [extrusionScale, setExtrusionScale] = useState<number>(1.0);
+  const [agebs3dMode, setAgebs3dMode] = useState<boolean>(false);
 
   const [cameraTarget, setCameraTarget] = useState<CameraPreset | null>(null);
   const [inspection, setInspection] = useState<InspectResponse | null>(null);
@@ -487,6 +487,10 @@ export const App: React.FC = () => {
                   activeCitySlug={activeCitySlug || "la_paz"}
                   activeMetric={activeMetric}
                   extrusionScale={extrusionScale}
+                  agebs3dMode={agebs3dMode}
+                  layers={layers}
+                  colorblindSafe={colorblindSafe}
+                  language={language}
                   onInspectLocation={handleInspectLocation}
                 />
               </Suspense>
