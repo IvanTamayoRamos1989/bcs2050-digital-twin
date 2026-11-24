@@ -7,6 +7,7 @@ import { ArcLayer, GeoJsonLayer, PolygonLayer, ScatterplotLayer } from "@deck.gl
 import { Box, Building2, Compass, Film, Square, ZoomIn } from "lucide-react";
 import { TwinAPI } from "../api/client";
 import type {
+  ActivePhysicsOverlay,
   AerialTour,
   AgebMetricKey,
   AretianPhase,
@@ -39,6 +40,7 @@ interface Props {
   corridorArcs: CorridorArc[];
   liveTelemetry: LiveTelemetrySummary | null;
   sensorThings?: SensorThingRecord[];
+  physicsOverlay?: ActivePhysicsOverlay | null;
   selectedAgebId: string | null;
   tours?: AerialTour[];
   activeTourId?: string | null;
@@ -137,6 +139,7 @@ export const AnalyticsMap3D: React.FC<Props> = ({
   corridorArcs,
   liveTelemetry,
   sensorThings = [],
+  physicsOverlay = null,
   selectedAgebId,
   tours,
   activeTourId,
@@ -956,6 +959,100 @@ export const AnalyticsMap3D: React.FC<Props> = ({
       }
     }
 
+    // 15. Coupled OGC Physics Simulation Overlay (SFINCS Flood / r5py Isochrones / WNTR Pipes)
+    if (physicsOverlay?.result?.overlay_geojson) {
+      const procId = physicsOverlay.processId;
+      list.push(
+        new GeoJsonLayer({
+          id: `ogc-physics-overlay-${physicsOverlay.jobId}`,
+          data: physicsOverlay.result.overlay_geojson,
+          extruded: procId === "arroyo_flood_sfincs",
+          filled: true,
+          stroked: true,
+          pointType: "circle",
+          getPointRadius: (f: GeoJSON.Feature) => (f.properties?.kind === "isochrone_origin" ? 130 : 85),
+          pointRadiusMinPixels: 4,
+          pointRadiusMaxPixels: 11,
+          getLineWidth: (f: GeoJSON.Feature) => (f.properties?.kind === "water_pipe" ? 3 : 1.5),
+          lineWidthUnits: "pixels",
+          getElevation: (f: GeoJSON.Feature) => {
+            if (procId !== "arroyo_flood_sfincs") return 0;
+            return Math.max(0.2, Number(f.properties?.depth_m || 0.3)) * 18.0 * extrusionScale;
+          },
+          getFillColor: (f: GeoJSON.Feature) => {
+            const p = f.properties || {};
+            if (p.kind === "flood_depth_cell") {
+              const d = Number(p.depth_m || 0);
+              if (d >= 2.0) return [239, 68, 68, 210];
+              if (d >= 1.0) return [249, 115, 22, 185];
+              return [56, 189, 248, 165];
+            }
+            if (p.kind === "isochrone_band") {
+              const m = Number(p.minutes || 15);
+              if (m <= 5) return [16, 185, 129, 125];
+              if (m <= 10) return [56, 189, 248, 88];
+              return [99, 102, 241, 62];
+            }
+            if (p.kind === "water_node") {
+              return Number(p.scenario_min_pressure_m || 0) >= 15.0 ? [16, 185, 129, 235] : [244, 63, 94, 235];
+            }
+            if (p.kind === "isochrone_origin") return [250, 204, 21, 250];
+            return [34, 211, 238, 210];
+          },
+          getLineColor: (f: GeoJSON.Feature) => {
+            const p = f.properties || {};
+            if (p.kind === "water_pipe") return [34, 211, 238, 235];
+            if (p.kind === "isochrone_band") return [255, 255, 255, 180];
+            return [15, 23, 42, 210];
+          },
+          pickable: true,
+          onHover: ({ x, y, object }) => {
+            if (!object) return setHoverInfo(null);
+            const p = object.properties || {};
+            if (p.kind === "flood_depth_cell") {
+              setHoverInfo({
+                x,
+                y,
+                title: `Inundación 2D · Tirante ${p.depth_m} m (${p.severity})`,
+                lines: [`Cota DEM: ${p.elev_m} m`, p.in_arroyo ? "Zona de flujo de arroyo activo" : "Llanura / costa"],
+              });
+            } else if (p.kind === "isochrone_band") {
+              setHoverInfo({
+                x,
+                y,
+                title: `Isócrona Red Vial · ${p.label || `${p.minutes} min`}`,
+                lines: [`Área alcanzada: ${p.area_ha} ha`, p.include_transit ? "Incluye rutas de autobús" : "Solo peatonal"],
+              });
+            } else if (p.kind === "water_node") {
+              setHoverInfo({
+                x,
+                y,
+                title: `Nodo WNTR · ${p.label || p.node_id}`,
+                lines: [
+                  `Presión mín: ${p.baseline_min_pressure_m} -> ${p.scenario_min_pressure_m} m (+${p.pressure_gain_m} m)`,
+                  `${p.status}`,
+                ],
+              });
+            } else if (p.kind === "water_pipe") {
+              setHoverInfo({
+                x,
+                y,
+                title: `Tramo Hidráulico ${p.pipe_id}`,
+                lines: [`Diámetro: ${p.diameter_mm} mm · Long: ${p.length_m} m`, `Gasto pico: ${p.peak_flow_lps} lps`],
+              });
+            } else if (p.kind === "reachable_poi" || p.kind === "isochrone_origin") {
+              setHoverInfo({
+                x,
+                y,
+                title: `${p.name || p.label || "Punto"}`,
+                lines: [p.sector ? `Sector alcanzable: ${p.sector}` : "Punto origen red 15-min"],
+              });
+            }
+          },
+        }),
+      );
+    }
+
     return list;
   }, [
     activeMetric,
@@ -967,6 +1064,7 @@ export const AnalyticsMap3D: React.FC<Props> = ({
     layers,
     liveTelemetry,
     sensorThings,
+    physicsOverlay,
     onInspectLocation,
     phase,
     selectedAgebId,

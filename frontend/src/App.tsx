@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useCallback, useEffect, useState } from "react";
+import React, { Suspense, lazy, useCallback, useEffect, useRef, useState } from "react";
 import { TwinAPI } from "./api/client";
 import { AnalyticsMap3D } from "./components/AnalyticsMap3D";
 import { ChallengeLayerDock } from "./components/ChallengeLayerDock";
@@ -16,6 +16,7 @@ const StrategistChatDrawer = lazy(() =>
   import("./components/StrategistChatDrawer").then((m) => ({ default: m.StrategistChatDrawer })),
 );
 import type {
+  ActivePhysicsOverlay,
   AerialTour,
   AgebMetricKey,
   AretianPhase,
@@ -28,6 +29,8 @@ import type {
   InspectResponse,
   LayerVisibility,
   LiveTelemetrySummary,
+  OgcPhysicsJobStatus,
+  OgcPhysicsProcessId,
   OverviewResponse,
   RecommendationsResponse,
   SensorThingRecord,
@@ -102,6 +105,80 @@ export const App: React.FC = () => {
   const [activeTourId, setActiveTourId] = useState<string | null>(null);
   const [viewportBbox, setViewportBbox] = useState<[number, number, number, number] | null>(null);
   const [viewportZoom, setViewportZoom] = useState<number>(6.4);
+
+  // Coupled Physics Workers (OGC API - Processes -> Cloud Run Jobs)
+  const [physicsJobStatus, setPhysicsJobStatus] = useState<OgcPhysicsJobStatus | null>(null);
+  const [physicsOverlay, setPhysicsOverlay] = useState<ActivePhysicsOverlay | null>(null);
+  const physicsRunTokenRef = useRef<number>(0);
+
+  const handleRunPhysicsProcess = useCallback(
+    async (processId: OgcPhysicsProcessId, customInputs?: Record<string, unknown>) => {
+      const token = ++physicsRunTokenRef.current;
+      const defaultCity =
+        activeCitySlug && ["cabo_san_lucas", "san_jose_del_cabo", "la_paz", "loreto"].includes(activeCitySlug)
+          ? activeCitySlug
+          : scopeId === "03008"
+            ? "cabo_san_lucas"
+            : scopeId === "03009"
+              ? "loreto"
+              : "la_paz";
+
+      const defaultInputs: Record<string, unknown> =
+        processId === "arroyo_flood_sfincs"
+          ? {
+              city_slug: activeCitySlug || (scopeId === "03008" ? "cabo_san_lucas" : defaultCity),
+              return_period_yr: 100,
+              suds_coverage_pct: customLevers.suds_coverage_pct ?? simulation?.levers.suds_coverage_pct ?? 20,
+              slr_m: 0.25,
+            }
+          : processId === "network_isochrone_r5py"
+            ? { city_slug: defaultCity, walk_speed_kmh: 4.5, max_minutes: 15, include_transit: true }
+            : {
+                pilot_id: scopeId === "03008" ? "los_cabos_desal" : "la_paz_tandeo",
+                ptar_reuse_pct: customLevers.ptar_reuse_target_pct ?? simulation?.levers.ptar_reuse_target_pct ?? 65,
+                desal_added_lps: customLevers.desalination_added_lps ?? simulation?.levers.desalination_added_lps ?? 150,
+                leak_reduction_pct: 14,
+              };
+
+      const inputs = customInputs || defaultInputs;
+      setPhysicsJobStatus({ jobID: "dispatching...", processID: processId, status: "accepted" });
+      try {
+        const launch = await TwinAPI.executeOgcProcessAsync(processId, inputs);
+        if (physicsRunTokenRef.current !== token) return;
+        setPhysicsJobStatus(launch);
+
+        for (let attempt = 0; attempt < 50; attempt += 1) {
+          await new Promise((r) => window.setTimeout(r, 1200));
+          if (physicsRunTokenRef.current !== token) return;
+          const st = await TwinAPI.getOgcJobStatus(launch.jobID);
+          if (physicsRunTokenRef.current !== token) return;
+          setPhysicsJobStatus(st);
+          if (st.status === "successful") {
+            const res = await TwinAPI.getOgcJobResults(launch.jobID);
+            if (physicsRunTokenRef.current !== token) return;
+            setPhysicsOverlay({ jobId: launch.jobID, processId, result: res });
+            if (res.camera) setCameraTarget({ ...res.camera });
+            return;
+          }
+          if (st.status === "failed") {
+            return;
+          }
+        }
+        setPhysicsJobStatus((prev) =>
+          prev ? { ...prev, status: "failed", error: "Tiempo de espera agotado consultando Cloud Run Job." } : prev,
+        );
+      } catch (err) {
+        if (physicsRunTokenRef.current !== token) return;
+        setPhysicsJobStatus({
+          jobID: "error",
+          processID: processId,
+          status: "failed",
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    },
+    [activeCitySlug, customLevers, scopeId, simulation],
+  );
 
   // Initial Overview Load & Live Telemetry Polling
   useEffect(() => {
@@ -287,6 +364,7 @@ export const App: React.FC = () => {
               corridorArcs={overview?.corridor_arcs || []}
               liveTelemetry={liveTelemetry}
               sensorThings={sensorThings}
+              physicsOverlay={physicsOverlay}
               selectedAgebId={selectedAgebId}
               tours={tours}
               activeTourId={activeTourId}
@@ -362,6 +440,14 @@ export const App: React.FC = () => {
         onLeverChange={(k, v) => setCustomLevers((prev) => ({ ...prev, [k]: v }))}
         simulation={simulation}
         recommendations={recommendations}
+        physicsOverlay={physicsOverlay}
+        physicsJobStatus={physicsJobStatus}
+        onRunPhysicsProcess={handleRunPhysicsProcess}
+        onClearPhysicsOverlay={() => {
+          physicsRunTokenRef.current += 1;
+          setPhysicsOverlay(null);
+          setPhysicsJobStatus(null);
+        }}
         onFlyTo={(cam) => setCameraTarget({ ...cam })}
       />
 

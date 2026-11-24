@@ -248,6 +248,17 @@ export interface InspectResponse {
   nearest_substation: { name: string; voltage: string; distance_km: number } | null;
 }
 
+export interface VvuqMetadata {
+  standard: string;
+  engine_family: string;
+  calibration_dataset: string;
+  validation_error_rmse_or_mape: Record<string, number | string>;
+  p10_p50_p90_uncertainty_band: Record<string, unknown>;
+  assumptions: string[];
+  legal_disclaimer: string;
+  backtest_report?: string;
+}
+
 export interface SimulationTrajectoryPoint {
   year: number;
   population: number;
@@ -261,6 +272,15 @@ export interface SimulationTrajectoryPoint {
   period_capex_mdp: number;
   sdi_score_100: number;
   carrying_capacity_status: string;
+  sdi_p10?: number;
+  sdi_p50?: number;
+  sdi_p90?: number;
+  aquifer_p10?: number;
+  aquifer_p50?: number;
+  aquifer_p90?: number;
+  sibcs_margin_p10?: number;
+  sibcs_margin_p50?: number;
+  sibcs_margin_p90?: number;
 }
 
 export interface SimulationResponse {
@@ -282,6 +302,7 @@ export interface SimulationResponse {
     state_infill_capacity_homes: number;
   };
   ageb_deltas: Record<string, { height_multiplier: number; projected_solar_mw: number; water_relief_factor: number }>;
+  vvuq?: VvuqMetadata;
 }
 
 export interface GoalGapResponse {
@@ -299,6 +320,45 @@ export interface GoalGapResponse {
   capex_breakdown_mdp: Record<string, number>;
   pillars: { id: string; label: string; unit: string; current: number; target: number; gap: number }[];
   optimal_levers: Record<string, number>;
+  vvuq?: VvuqMetadata;
+}
+
+export type OgcPhysicsProcessId = "arroyo_flood_sfincs" | "network_isochrone_r5py" | "water_network_wntr";
+
+export interface OgcPhysicsJobStatus {
+  jobID: string;
+  processID: string;
+  status: "accepted" | "running" | "successful" | "failed" | string;
+  execution_backend?: string;
+  cloud_run_execution?: string;
+  error?: string | null;
+}
+
+export interface OgcPhysicsJobResult {
+  process_id: OgcPhysicsProcessId | string;
+  execution_backend?: string;
+  summary: Record<string, number | string | boolean | number[]>;
+  overlay_geojson?: GeoJSON.FeatureCollection;
+  artifact_urls?: {
+    overlay_geojson?: string;
+    flood_depth_cog?: string;
+    result_json?: string;
+  };
+  camera?: CameraPreset;
+  tank_depletion_series?: {
+    hour: number;
+    baseline_pressure_m: number;
+    scenario_pressure_m: number;
+    tank_norte_m: number;
+    tank_sur_m: number;
+  }[];
+  vvuq?: VvuqMetadata;
+}
+
+export interface ActivePhysicsOverlay {
+  jobId: string;
+  processId: OgcPhysicsProcessId | string;
+  result: OgcPhysicsJobResult;
 }
 
 export interface PriorityActionCard {

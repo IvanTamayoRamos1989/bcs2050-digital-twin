@@ -22,7 +22,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     GOOGLE_CLOUD_LOCATION=global \
     BCS2050_CHAT_MODEL=gemini-4-hydrogen
 
-RUN pip install --no-cache-dir \
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libexpat1 libgomp1 \
+    && rm -rf /var/lib/apt/lists/* \
+    && pip install --no-cache-dir \
     fastapi>=0.115.0 \
     "uvicorn[standard]>=0.32.0" \
     pydantic>=2.9.0 \
@@ -39,11 +42,16 @@ RUN pip install --no-cache-dir \
     mapbox-vector-tile>=2.1.0 \
     mercantile>=1.2.1 \
     psycopg2-binary>=2.9.9 \
+    scipy>=1.13.0 \
+    networkx>=3.3 \
+    wntr>=1.5.0 \
+    rasterio>=1.4.0 \
     google-genai>=1.0.0
 
 COPY bcs2050_intelligence /app/bcs2050_intelligence
 COPY backend /app/bcs2050_digital_twin/backend
 COPY workers /app/bcs2050_digital_twin/workers
+COPY docs /app/bcs2050_digital_twin/docs
 COPY --from=frontend-build /app/frontend/dist /app/bcs2050_digital_twin/frontend/dist
 
 WORKDIR /app/bcs2050_digital_twin

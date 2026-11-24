@@ -8,6 +8,9 @@ import type {
   InspectResponse,
   LiveTelemetrySummary,
   MetadataCatalogResponse,
+  OgcPhysicsJobResult,
+  OgcPhysicsJobStatus,
+  OgcPhysicsProcessId,
   OverviewResponse,
   RecommendationsResponse,
   SensorThingsCollectionResponse,
@@ -20,8 +23,8 @@ const BASE = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
 
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
-    headers: { "Content-Type": "application/json", ...(init?.headers || {}) },
     ...init,
+    headers: { "Content-Type": "application/json", ...(init?.headers || {}) },
   });
   if (!res.ok) {
     const txt = await res.text();
@@ -94,6 +97,14 @@ export const TwinAPI = {
       "/FROST-Server/v1.1/Things?$expand=Locations,Datastreams($expand=Observations($top=1))",
     ),
   getTours: () => apiFetch<{ tours: AerialTour[]; corridors: Record<string, CorridorPreset> }>("/api/twin/tours"),
+  executeOgcProcessAsync: (processId: OgcPhysicsProcessId, inputs: Record<string, unknown>) =>
+    apiFetch<OgcPhysicsJobStatus>(`/ogc/processes/${processId}/execution`, {
+      method: "POST",
+      headers: { Prefer: "respond-async" },
+      body: JSON.stringify({ inputs, mode: "async" }),
+    }),
+  getOgcJobStatus: (jobId: string) => apiFetch<OgcPhysicsJobStatus>(`/ogc/jobs/${encodeURIComponent(jobId)}`),
+  getOgcJobResults: (jobId: string) => apiFetch<OgcPhysicsJobResult>(`/ogc/jobs/${encodeURIComponent(jobId)}/results`),
   buildExportUrl: (
     kind: "dxf" | "obj3d" | "bim-package" | "unreal-manifest",
     opts: { corridor?: string; bbox?: [number, number, number, number] | null; label?: string },

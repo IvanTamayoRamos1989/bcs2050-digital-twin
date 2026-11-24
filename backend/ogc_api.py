@@ -7,13 +7,16 @@ and 167 ISO 19115 metadata records.
 
 from __future__ import annotations
 
+import json
 import math
+import os
 import threading
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from typing import Any
 
+import httpx
 import mapbox_vector_tile
 import mercantile
 from fastapi import APIRouter, HTTPException, Query, Request, Response
@@ -27,9 +30,19 @@ from backend.cad_bim_bridge import (
     export_iso19650_bim_package,
     resolve_export_bbox,
 )
+from backend.config import (
+    get_firestore_database,
+    get_physics_job_name,
+    get_sim_artifacts_bucket,
+    use_cloud_run_jobs,
+    use_firestore_cache,
+)
 from backend.metadata_catalog import build_iso19115_metadata_catalog
 from backend.simulation_bridge import compute_goal_gap, run_twin_simulation
 from backend.spatial_store import LAYER_FILES, SPATIAL_STORE, load_layer_geojson
+from backend.vvuq import build_vvuq_block
+from workers.physics_engines import PHYSICS_DISPATCH, run_physics_process
+from workers.physics_job_runner import JOB_COLLECTION, execute_physics_job_to_cloud
 
 PREFIX = "/ogc"
 router = APIRouter(prefix=PREFIX, tags=["OGC API Family (Features / Tiles / Processes / Records)"])
@@ -106,6 +119,33 @@ PROCESSES_CATALOG: dict[str, dict[str, Any]] = {
         "jobControlOptions": ["sync-execute", "async-execute"],
         "outputTransmission": ["value"],
         "inputs": {"corridor": "el_tezal"},
+    },
+    "arroyo_flood_sfincs": {
+        "id": "arroyo_flood_sfincs",
+        "title": "2D Cyclone & Arroyo Diffusive-Wave Flood Simulation (SFINCS / NRCS)",
+        "description": "Simula tirantes de inundación 2D (Tr=10/50/100 + SLR) con atenuación SUDS, exporta COG GeoTIFF y edificios expuestos con bandas VVUQ.",
+        "version": "2.0.0",
+        "jobControlOptions": ["async-execute", "sync-execute"],
+        "outputTransmission": ["value", "reference"],
+        "inputs": {"city_slug": "cabo_san_lucas", "return_period_yr": 100, "suds_coverage_pct": 20.0, "slr_m": 0.25},
+    },
+    "network_isochrone_r5py": {
+        "id": "network_isochrone_r5py",
+        "title": "Multimodal Street-Network 15-Min Isochrone Solver (r5py / Red Vial INEGI)",
+        "description": "Calcula isócronas peatonales y transporte público (5/10/15 min) sobre grafos viales reales y compara contra proxy euclidiano.",
+        "version": "2.0.0",
+        "jobControlOptions": ["async-execute", "sync-execute"],
+        "outputTransmission": ["value", "reference"],
+        "inputs": {"city_slug": "la_paz", "walk_speed_kmh": 4.5, "max_minutes": 15.0, "include_transit": True},
+    },
+    "water_network_wntr": {
+        "id": "water_network_wntr",
+        "title": "Pressurized Tandeo & Purple-Line Hydraulic Pilot (WNTR / EPANET PDD 24h)",
+        "description": "Modela sectores de tandeo en La Paz y troncal desaladora/Línea Morada en Los Cabos con presiones horarias y depleción de tanques.",
+        "version": "2.0.0",
+        "jobControlOptions": ["async-execute", "sync-execute"],
+        "outputTransmission": ["value", "reference"],
+        "inputs": {"pilot_id": "la_paz_tandeo", "ptar_reuse_pct": 65.0, "desal_added_lps": 150.0, "leak_reduction_pct": 14.0},
     },
 }
 
@@ -585,7 +625,97 @@ class ProcessExecutionRequest(BaseModel):
     mode: str | None = None
 
 
+def _get_firestore_db() -> Any | None:
+    if not use_firestore_cache():
+        return None
+    try:
+        from google.cloud import firestore
+
+        project = os.environ.get("GOOGLE_CLOUD_PROJECT", "bcs2050").strip() or "bcs2050"
+        return firestore.Client(project=project, database=get_firestore_database())
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _save_job_state(job_id: str, payload: dict[str, Any]) -> None:
+    with _JOBS_LOCK:
+        existing = _PROCESS_JOBS.get(job_id, {})
+        existing.update(payload)
+        _PROCESS_JOBS[job_id] = existing
+        merged_snapshot = dict(existing)
+
+    db = _get_firestore_db()
+    if db is not None:
+        try:
+            fs_doc = dict(payload)
+            if "results" in fs_doc and isinstance(fs_doc["results"], dict):
+                res_copy = dict(fs_doc.pop("results"))
+                art_urls = fs_doc.get("artifact_urls") or merged_snapshot.get("artifact_urls") or {}
+                if "overlay_geojson" in art_urls:
+                    res_copy.pop("overlay_geojson", None)
+                fs_doc["results_json"] = json.dumps(res_copy, ensure_ascii=False)
+            elif "results" in fs_doc and fs_doc["results"] is None:
+                fs_doc.pop("results", None)
+            db.collection(JOB_COLLECTION).document(job_id).set(fs_doc, merge=True)
+        except Exception:  # noqa: BLE001
+            pass
+
+
+def _load_job_state(job_id: str) -> dict[str, Any] | None:
+    db = _get_firestore_db()
+    if db is not None:
+        try:
+            snap = db.collection(JOB_COLLECTION).document(job_id).get()
+            if snap.exists:
+                doc = snap.to_dict() or {}
+                if doc.get("results_json") and not doc.get("results"):
+                    try:
+                        doc["results"] = json.loads(doc["results_json"])
+                    except Exception:  # noqa: BLE001
+                        doc["results"] = {}
+                with _JOBS_LOCK:
+                    _PROCESS_JOBS[job_id] = dict(doc)
+                return doc
+        except Exception:  # noqa: BLE001
+            pass
+    with _JOBS_LOCK:
+        job = _PROCESS_JOBS.get(job_id)
+        return dict(job) if job else None
+
+
+def _trigger_cloud_run_physics_job(job_id: str, process_id: str, inputs: dict[str, Any]) -> str:
+    import google.auth
+    from google.auth.transport.requests import Request as GoogleAuthRequest
+
+    project = os.environ.get("GOOGLE_CLOUD_PROJECT", "bcs2050").strip() or "bcs2050"
+    region = os.environ.get("BQ_LOCATION", "northamerica-south1").strip() or "northamerica-south1"
+    job_name = get_physics_job_name()
+    creds, _ = google.auth.default(scopes=["https://www.googleapis.com/auth/cloud-platform"])
+    creds.refresh(GoogleAuthRequest())
+    url = f"https://run.googleapis.com/v2/projects/{project}/locations/{region}/jobs/{job_name}:run"
+    payload = {
+        "overrides": {
+            "containerOverrides": [
+                {
+                    "env": [
+                        {"name": "JOB_ID", "value": job_id},
+                        {"name": "PROCESS_ID", "value": process_id},
+                        {"name": "INPUTS_JSON", "value": json.dumps(inputs, ensure_ascii=False)},
+                        {"name": "OUTPUT_BUCKET", "value": get_sim_artifacts_bucket()},
+                    ]
+                }
+            ]
+        }
+    }
+    resp = httpx.post(url, json=payload, headers={"Authorization": f"Bearer {creds.token}"}, timeout=20.0)
+    resp.raise_for_status()
+    data = resp.json()
+    return str(data.get("name") or (data.get("metadata") or {}).get("name") or url)
+
+
 def _execute_process_sync(process_id: str, inputs: dict[str, Any]) -> dict[str, Any]:
+    if process_id in PHYSICS_DISPATCH:
+        return run_physics_process(process_id, inputs)
     if process_id == "bcs-scenario-simulation-2050":
         return run_twin_simulation(
             scope_id=str(inputs.get("scope_id", "03")),
@@ -611,11 +741,26 @@ def _execute_process_sync(process_id: str, inputs: dict[str, Any]) -> dict[str, 
             "slug": slug,
             "byte_length": len(dxf_bytes),
             "download_url": f"/api/twin/export/dxf?corridor={corridor}",
+            "vvuq": build_vvuq_block(
+                engine_family="BCS2050 CAD Metric UTM12N DXF R2018 Compiler",
+                calibration_dataset="SpatialIndex 396,823 edif. + EPSG:32612 projection",
+                validation_error_rmse_or_mape={"projection_precision_m": "< 0.05 m (UTM 12N)"},
+                p10_p50_p90_uncertainty_band={"height_m_tolerance": {"p10": -0.8, "p50": 0.0, "p90": 0.8}},
+                assumptions=["Elevaciones basadas en OpenBuildings/DEM; requiere levantamiento topográfico ejecutivo."],
+            ),
         }
     if process_id == "bcs-bim-iso19650-export":
         corridor = str(inputs.get("corridor", "el_tezal"))
         x0, y0, x1, y1, slug, display_label = resolve_export_bbox(corridor, None, None, None, None, None)
-        return export_iso19650_bim_package(minx=x0, miny=y0, maxx=x1, maxy=y1, label=display_label)
+        pkg = export_iso19650_bim_package(minx=x0, miny=y0, maxx=x1, maxy=y1, label=display_label)
+        pkg["vvuq"] = build_vvuq_block(
+            engine_family="BCS2050 BIM ISO 19650-2 Container Exporter",
+            calibration_dataset="PMDU COS/CUS + SpatialIndex 3D envelopes",
+            validation_error_rmse_or_mape={"coordinate_rounding_m": 0.01},
+            p10_p50_p90_uncertainty_band={"gfa_envelope_tolerance_pct": {"p10": -5.0, "p50": 0.0, "p90": 5.0}},
+            assumptions=["Envolventes conceptuales LOD 200; sujeta a dictamen estructural y licencia municipal."],
+        )
+        return pkg
     raise HTTPException(status_code=404, detail=f"Unknown OGC Process '{process_id}'")
 
 
@@ -645,34 +790,54 @@ def ogc_process_execute(process_id: str, body: ProcessExecutionRequest, request:
         result = _execute_process_sync(process_id, body.inputs)
         return JSONResponse(status_code=200, content={"jobID": job_id, "status": "successful", "results": result})
 
-    job_entry = {
+    job_entry: dict[str, Any] = {
         "jobID": job_id,
         "processID": process_id,
         "type": "process",
         "status": "accepted",
+        "execution_backend": "local_threadpool",
         "created": _utc_iso(),
         "finished": None,
         "results": None,
         "error": None,
         "links": [{"href": f"{base}/jobs/{job_id}/results", "rel": "http://www.opengis.net/def/rel/ogc/1.0/results"}],
     }
-    with _JOBS_LOCK:
-        _PROCESS_JOBS[job_id] = job_entry
+    _save_job_state(job_id, job_entry)
+
+    # Dispatch heavy coupled physics jobs to Cloud Run Jobs when enabled
+    if process_id in PHYSICS_DISPATCH and use_cloud_run_jobs():
+        try:
+            exec_ref = _trigger_cloud_run_physics_job(job_id, process_id, body.inputs)
+            job_entry["execution_backend"] = "cloud_run_job"
+            job_entry["cloud_run_execution"] = exec_ref
+            _save_job_state(
+                job_id,
+                {"execution_backend": "cloud_run_job", "cloud_run_execution": exec_ref},
+            )
+            return JSONResponse(
+                status_code=201,
+                content={k: v for k, v in job_entry.items() if k != "results"},
+                headers={"Location": f"{base}/jobs/{job_id}"},
+            )
+        except Exception as exc:  # noqa: BLE001
+            job_entry["cloud_run_dispatch_fallback_reason"] = str(exc)
 
     def _run_bg() -> None:
-        with _JOBS_LOCK:
-            _PROCESS_JOBS[job_id]["status"] = "running"
+        _save_job_state(job_id, {"status": "running"})
         try:
-            res = _execute_process_sync(process_id, body.inputs)
-            with _JOBS_LOCK:
-                _PROCESS_JOBS[job_id]["status"] = "successful"
-                _PROCESS_JOBS[job_id]["finished"] = _utc_iso()
-                _PROCESS_JOBS[job_id]["results"] = res
+            if process_id in PHYSICS_DISPATCH:
+                res = execute_physics_job_to_cloud(job_id=job_id, process_id=process_id, inputs=body.inputs)
+            else:
+                res = _execute_process_sync(process_id, body.inputs)
+            _save_job_state(
+                job_id,
+                {"status": "successful", "finished": _utc_iso(), "results": res},
+            )
         except Exception as exc:  # noqa: BLE001
-            with _JOBS_LOCK:
-                _PROCESS_JOBS[job_id]["status"] = "failed"
-                _PROCESS_JOBS[job_id]["finished"] = _utc_iso()
-                _PROCESS_JOBS[job_id]["error"] = str(exc)
+            _save_job_state(
+                job_id,
+                {"status": "failed", "finished": _utc_iso(), "error": str(exc)},
+            )
 
     _PROCESS_POOL.submit(_run_bg)
     return JSONResponse(
@@ -691,24 +856,35 @@ def ogc_jobs_list() -> dict[str, Any]:
 
 @router.get("/jobs/{job_id}")
 def ogc_job_status(job_id: str) -> dict[str, Any]:
-    with _JOBS_LOCK:
-        job = _PROCESS_JOBS.get(job_id)
-        if not job:
-            raise HTTPException(status_code=404, detail=f"Job '{job_id}' not found")
-        return {k: v for k, v in job.items() if k != "results"}
+    job = _load_job_state(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail=f"Job '{job_id}' not found")
+    return {k: v for k, v in job.items() if k != "results"}
 
 
 @router.get("/jobs/{job_id}/results")
 def ogc_job_results(job_id: str) -> JSONResponse:
-    with _JOBS_LOCK:
-        job = _PROCESS_JOBS.get(job_id)
-        if not job:
-            raise HTTPException(status_code=404, detail=f"Job '{job_id}' not found")
-        status = job["status"]
-        results = job.get("results")
-        error = job.get("error")
+    job = _load_job_state(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail=f"Job '{job_id}' not found")
+    status = job["status"]
+    results = job.get("results")
+    error = job.get("error")
     if status in {"accepted", "running"}:
-        return JSONResponse(status_code=202, content={"jobID": job_id, "status": status})
+        return JSONResponse(status_code=202, content={"jobID": job_id, "status": status, "execution_backend": job.get("execution_backend")})
     if status == "failed":
         raise HTTPException(status_code=500, detail=f"Job '{job_id}' failed: {error}")
+
+    if isinstance(results, dict):
+        results = dict(results)
+        results.setdefault("execution_backend", job.get("execution_backend"))
+        if job.get("artifact_urls") and "artifact_urls" not in results:
+            results["artifact_urls"] = job["artifact_urls"]
+        if "overlay_geojson" not in results:
+            ov_url = (results.get("artifact_urls") or {}).get("overlay_geojson")
+            if ov_url:
+                try:
+                    results["overlay_geojson"] = httpx.get(ov_url, timeout=15.0).json()
+                except Exception:  # noqa: BLE001
+                    pass
     return JSONResponse(status_code=200, content=results)

@@ -89,6 +89,21 @@ def get_3dtiles_tileset_url() -> str:
     )
 
 
+def get_sim_artifacts_bucket() -> str:
+    return (
+        os.environ.get("BCS2050_SIM_ARTIFACTS_BUCKET", "bcs2050-3dtiles-public").strip()
+        or "bcs2050-3dtiles-public"
+    )
+
+
+def use_cloud_run_jobs() -> bool:
+    return os.environ.get("BCS2050_USE_CLOUD_RUN_JOBS", "false").strip().lower() in {"1", "true", "yes"}
+
+
+def get_physics_job_name() -> str:
+    return os.environ.get("BCS2050_PHYSICS_JOB_NAME", "bcs2050-physics-worker").strip() or "bcs2050-physics-worker"
+
+
 DEFAULT_ALLOWED_ORIGINS: list[str] = [
     "https://bcs2050.com",
     "https://www.bcs2050.com",
@@ -160,4 +175,7 @@ def get_runtime_capabilities() -> dict[str, bool]:
         "ogc_api_processes": True,
         "ogc_api_records": True,
         "ogc_3dtiles_v11": True,
+        "physics_cloud_run_jobs": use_cloud_run_jobs(),
+        "vvuq_uncertainty_framework": True,
+        "wntr_hydraulic_solver": True,
     }

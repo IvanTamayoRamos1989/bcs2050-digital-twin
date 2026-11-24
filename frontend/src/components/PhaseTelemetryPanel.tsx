@@ -2,22 +2,30 @@ import React from "react";
 import {
   AlertTriangle,
   ArrowRight,
+  CheckCircle2,
   ChevronLeft,
   ChevronRight,
   Download,
+  Droplets,
+  ExternalLink,
+  Loader2,
   MapPin,
   Navigation,
+  Route,
   ShieldAlert,
   Sparkles,
   Sun,
+  Trash2,
+  Waves,
   Zap,
 } from "lucide-react";
 import {
+  Area,
   Bar,
   BarChart,
   CartesianGrid,
+  ComposedChart,
   Line,
-  LineChart,
   PolarAngleAxis,
   PolarGrid,
   PolarRadiusAxis,
@@ -29,10 +37,13 @@ import {
   YAxis,
 } from "recharts";
 import type {
+  ActivePhysicsOverlay,
   AretianPhase,
   CameraPreset,
   GoalGapResponse,
   InspectResponse,
+  OgcPhysicsJobStatus,
+  OgcPhysicsProcessId,
   OverviewResponse,
   RecommendationsResponse,
   SimulationResponse,
@@ -67,6 +78,10 @@ interface Props {
   simulation: SimulationResponse | null;
   // Phase 4: Recommendations
   recommendations: RecommendationsResponse | null;
+  physicsOverlay?: ActivePhysicsOverlay | null;
+  physicsJobStatus?: OgcPhysicsJobStatus | null;
+  onRunPhysicsProcess?: (processId: OgcPhysicsProcessId) => void;
+  onClearPhysicsOverlay?: () => void;
   onFlyTo: (cam: CameraPreset) => void;
 }
 
@@ -99,6 +114,10 @@ export const PhaseTelemetryPanel: React.FC<Props> = ({
   onLeverChange,
   simulation,
   recommendations,
+  physicsOverlay,
+  physicsJobStatus,
+  onRunPhysicsProcess,
+  onClearPhysicsOverlay,
   onFlyTo,
 }) => {
   if (collapsed) {
@@ -611,24 +630,192 @@ export const PhaseTelemetryPanel: React.FC<Props> = ({
                   ))}
                 </div>
 
-                {/* Trajectory Line Chart */}
-                <div className="rounded-lg bg-slate-900/75 p-2.5 ring-1 ring-slate-700/70">
-                  <p className="font-mono-num text-[10px] uppercase text-slate-400 mb-1">
-                    Trayectoria 2025–2050 (SDI-100 & Reserva SIBCS)
-                  </p>
-                  <div className="h-36 w-full">
+                {/* Trajectory ComposedChart with P10–P90 VVUQ Confidence Band */}
+                <div className="rounded-lg bg-slate-900/75 p-2.5 ring-1 ring-slate-700/70 space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="font-mono-num text-[10px] uppercase text-slate-300">
+                      Trayectoria 2025–2050 (Banda P10–P90 VVUQ)
+                    </p>
+                    <span className="rounded bg-emerald-500/15 px-1.5 py-0.5 font-mono-num text-[8.5px] font-bold text-emerald-300">
+                      ISO 23247-8
+                    </span>
+                  </div>
+                  <div className="h-40 w-full">
                     <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={simulation.trajectory}>
+                      <ComposedChart
+                        data={simulation.trajectory.map((t) => ({
+                          ...t,
+                          sdi_band: [
+                            t.sdi_p10 ?? Math.max(0, Number((t.sdi_score_100 - 2.2).toFixed(1))),
+                            t.sdi_p90 ?? Math.min(100, Number((t.sdi_score_100 + 2.2).toFixed(1))),
+                          ],
+                        }))}
+                      >
                         <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.12)" />
                         <XAxis dataKey="year" tick={{ fill: "#94a3b8", fontSize: 9 }} />
-                        <YAxis tick={{ fill: "#94a3b8", fontSize: 9 }} />
+                        <YAxis domain={[0, 100]} tick={{ fill: "#94a3b8", fontSize: 9 }} />
                         <Tooltip contentStyle={{ background: "#0f172a", border: "1px solid #334155", fontSize: 11 }} />
-                        <Line type="monotone" dataKey="sdi_score_100" name="SDI-100" stroke="#10b981" strokeWidth={2} />
-                        <Line type="monotone" dataKey="sibcs_reserve_margin_pct" name="Margen SIBCS %" stroke="#38bdf8" strokeWidth={2} />
-                      </LineChart>
+                        <Area
+                          type="monotone"
+                          dataKey="sdi_band"
+                          name="Banda SDI P10–P90"
+                          stroke="none"
+                          fill="#10b981"
+                          fillOpacity={0.22}
+                        />
+                        <Line type="monotone" dataKey="sdi_score_100" name="SDI-100 (P50)" stroke="#10b981" strokeWidth={2.2} />
+                        <Line type="monotone" dataKey="sibcs_reserve_margin_pct" name="Margen SIBCS %" stroke="#38bdf8" strokeWidth={1.8} />
+                      </ComposedChart>
                     </ResponsiveContainer>
                   </div>
+
+                  {simulation.vvuq && (
+                    <div className="rounded-md bg-slate-950/75 p-2 ring-1 ring-slate-800 space-y-1.5 text-[10px]">
+                      <div className="flex items-center justify-between text-sky-300 font-semibold">
+                        <span>Validación Histórica &amp; VVUQ</span>
+                        <span className="font-mono-num text-[9px] text-emerald-300">
+                          MAPE Pob 2010–20:{" "}
+                          {String(simulation.vvuq.validation_error_rmse_or_mape.demographic_2010_2020_mape_pct ?? "8.39")}%
+                        </span>
+                      </div>
+                      <p className="font-mono-num text-[9.5px] text-slate-300">
+                        SDI 2050 P10/P50/P90:{" "}
+                        <span className="text-emerald-300 font-bold">
+                          {simulation.trajectory[simulation.trajectory.length - 1]?.sdi_p10 ?? "-"} /{" "}
+                          {simulation.sdi_score_2050} /{" "}
+                          {simulation.trajectory[simulation.trajectory.length - 1]?.sdi_p90 ?? "-"}
+                        </span>{" "}
+                        · RMSE Acuíferos: {String(simulation.vvuq.validation_error_rmse_or_mape.aquifer_2020_2023_rmse_hm3 ?? "2.23")} hm³
+                      </p>
+                      <p className="text-[9px] text-amber-200/85 leading-snug">
+                        {simulation.vvuq.legal_disclaimer}
+                      </p>
+                    </div>
+                  )}
                 </div>
+
+                {/* Coupled OGC Physics Simulation Workers (Cloud Run Jobs) */}
+                {onRunPhysicsProcess && (
+                  <div className="rounded-lg bg-slate-900/85 p-2.5 ring-1 ring-cyan-500/35 space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-mono-num text-[10px] uppercase tracking-wider text-cyan-300 font-semibold">
+                        Motores Físicos OGC · Cloud Run Jobs
+                      </span>
+                      {physicsOverlay && onClearPhysicsOverlay && (
+                        <button
+                          type="button"
+                          onClick={onClearPhysicsOverlay}
+                          className="flex items-center gap-1 rounded bg-slate-800 px-1.5 py-0.5 text-[9.5px] text-slate-300 hover:bg-rose-950 hover:text-rose-200 cursor-pointer"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                          <span>Limpiar</span>
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => onRunPhysicsProcess("arroyo_flood_sfincs")}
+                        disabled={physicsJobStatus?.status === "accepted" || physicsJobStatus?.status === "running"}
+                        className="flex items-center justify-between rounded-md bg-rose-500/15 px-2.5 py-1.5 text-left text-[10.5px] font-semibold text-rose-200 ring-1 ring-rose-400/35 hover:bg-rose-500/25 disabled:opacity-50 cursor-pointer"
+                      >
+                        <span className="flex items-center gap-1.5">
+                          <Waves className="h-3.5 w-3.5 text-rose-300" />
+                          <span>Inundación 2D Arroyos (SFINCS · Tr100)</span>
+                        </span>
+                        <span className="font-mono-num text-[9px] text-rose-300">COG + Vector</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onRunPhysicsProcess("network_isochrone_r5py")}
+                        disabled={physicsJobStatus?.status === "accepted" || physicsJobStatus?.status === "running"}
+                        className="flex items-center justify-between rounded-md bg-indigo-500/15 px-2.5 py-1.5 text-left text-[10.5px] font-semibold text-indigo-200 ring-1 ring-indigo-400/35 hover:bg-indigo-500/25 disabled:opacity-50 cursor-pointer"
+                      >
+                        <span className="flex items-center gap-1.5">
+                          <Route className="h-3.5 w-3.5 text-indigo-300" />
+                          <span>Isócronas Red Vial 15-Min (r5py / INEGI)</span>
+                        </span>
+                        <span className="font-mono-num text-[9px] text-indigo-300">Dijkstra</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onRunPhysicsProcess("water_network_wntr")}
+                        disabled={physicsJobStatus?.status === "accepted" || physicsJobStatus?.status === "running"}
+                        className="flex items-center justify-between rounded-md bg-cyan-500/15 px-2.5 py-1.5 text-left text-[10.5px] font-semibold text-cyan-200 ring-1 ring-cyan-400/35 hover:bg-cyan-500/25 disabled:opacity-50 cursor-pointer"
+                      >
+                        <span className="flex items-center gap-1.5">
+                          <Droplets className="h-3.5 w-3.5 text-cyan-300" />
+                          <span>Hidráulica Tandeo / Línea Morada (WNTR)</span>
+                        </span>
+                        <span className="font-mono-num text-[9px] text-cyan-300">PDD 24h</span>
+                      </button>
+                    </div>
+
+                    {physicsJobStatus && (
+                      <div className="rounded-md bg-slate-950/80 p-2 ring-1 ring-slate-800 text-[10px] space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="flex items-center gap-1.5 font-semibold text-white">
+                            {physicsJobStatus.status === "accepted" || physicsJobStatus.status === "running" ? (
+                              <Loader2 className="h-3 w-3 animate-spin text-sky-400" />
+                            ) : (
+                              <CheckCircle2 className="h-3 w-3 text-emerald-400" />
+                            )}
+                            <span>{physicsJobStatus.processID}</span>
+                          </span>
+                          <span className="font-mono-num text-[9px] uppercase text-sky-300">
+                            {physicsJobStatus.status} · {physicsJobStatus.execution_backend || "async"}
+                          </span>
+                        </div>
+                        {physicsJobStatus.error && (
+                          <p className="text-[9.5px] text-rose-300">{physicsJobStatus.error}</p>
+                        )}
+                        {physicsOverlay?.jobId === physicsJobStatus.jobID && (
+                          <div className="space-y-1 pt-0.5 text-slate-300 font-mono-num text-[9.5px]">
+                            {physicsOverlay.processId === "arroyo_flood_sfincs" && (
+                              <p>
+                                Edif. expuestos (&gt;0.3m):{" "}
+                                <strong className="text-rose-300">
+                                  {Number(physicsOverlay.result.summary.buildings_exposed_gt_03m || 0).toLocaleString()}
+                                </strong>{" "}
+                                · Máx: {String(physicsOverlay.result.summary.max_depth_m)} m
+                              </p>
+                            )}
+                            {physicsOverlay.processId === "network_isochrone_r5py" && (
+                              <p>
+                                Área 15m:{" "}
+                                <strong className="text-indigo-300">{String(physicsOverlay.result.summary.area_15m_ha)} ha</strong>{" "}
+                                · Score red: {String(physicsOverlay.result.summary.network_15m_score)} pts (Δ{" "}
+                                {String(physicsOverlay.result.summary.score_delta_network_vs_euclid)})
+                              </p>
+                            )}
+                            {physicsOverlay.processId === "water_network_wntr" && (
+                              <p>
+                                Presión:{" "}
+                                <strong className="text-cyan-300">
+                                  {String(physicsOverlay.result.summary.baseline_mean_pressure_m)} →{" "}
+                                  {String(physicsOverlay.result.summary.scenario_mean_pressure_m)} m
+                                </strong>{" "}
+                                · Sectores ≥15m: {String(physicsOverlay.result.summary.nodes_restored_above_15m)}
+                              </p>
+                            )}
+                            {physicsOverlay.result.artifact_urls?.flood_depth_cog && (
+                              <a
+                                href={physicsOverlay.result.artifact_urls.flood_depth_cog}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-1 text-sky-300 hover:underline"
+                              >
+                                <span>COG GeoTIFF</span>
+                                <ExternalLink className="h-2.5 w-2.5" />
+                              </a>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
               </>
             )}
           </>
