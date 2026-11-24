@@ -265,3 +265,17 @@ def test_canonical_kpis_and_iso19115_metadata() -> None:
     for lyr in layers:
         for k in ("source_agency", "reference_date", "license_spdx", "data_nature", "attribution_text"):
             assert lyr.get(k), f"Panel v2 layer {lyr.get('id')} missing {k}"
+
+
+def test_public_client_config_endpoint(monkeypatch) -> None:
+    monkeypatch.setenv("VITE_GOOGLE_MAPS_API_KEY", "AIzaTestOnly123")
+    monkeypatch.setenv("VITE_CESIUM_ION_TOKEN", "eyTestCesiumToken")
+    monkeypatch.setenv("VITE_MAPTILER_KEY", "mtTestKey")
+    monkeypatch.setenv("BCS2050_PLANNER_API_TOKENS", "super-secret-planner-token")
+    res = client.get("/api/twin/client-config")
+    assert res.status_code == 200
+    assert res.headers.get("cache-control") == "no-store"
+    body = res.json()
+    assert set(body.keys()) == {"google_maps_api_key", "cesium_ion_token", "maptiler_key"}
+    assert body["google_maps_api_key"] == "AIzaTestOnly123"
+    assert "super-secret-planner-token" not in str(body)

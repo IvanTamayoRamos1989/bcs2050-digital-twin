@@ -645,3 +645,9 @@ export interface GovernanceSummaryResponse {
   technical_controls: Record<string, boolean>;
   documents: GovernanceDocumentSpec[];
 }
+
+export interface ClientConfigResponse {
+  google_maps_api_key: string;
+  cesium_ion_token: string;
+  maptiler_key: string;
+}

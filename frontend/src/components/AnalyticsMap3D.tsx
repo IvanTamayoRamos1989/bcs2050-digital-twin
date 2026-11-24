@@ -33,6 +33,7 @@ import {
 interface Props {
   cameraTarget: CameraPreset | null;
   basemapMode: BasemapMode;
+  maptilerKey?: string;
   activeMetric: AgebMetricKey;
   colorblindSafe?: boolean;
   language?: "es" | "en";
@@ -61,8 +62,8 @@ interface Props {
   onQuickJumpCity: (citySlug: string) => void;
 }
 
-function buildMapStyle(mode: BasemapMode): maplibregl.StyleSpecification {
-  const maptilerKey = (import.meta.env.VITE_MAPTILER_KEY || "").trim();
+function buildMapStyle(mode: BasemapMode, maptilerKeyOverride?: string): maplibregl.StyleSpecification {
+  const maptilerKey = (maptilerKeyOverride ?? import.meta.env.VITE_MAPTILER_KEY ?? "").trim();
   const sources: Record<string, maplibregl.SourceSpecification> = {};
   const layers: maplibregl.LayerSpecification[] = [];
 
@@ -70,7 +71,7 @@ function buildMapStyle(mode: BasemapMode): maplibregl.StyleSpecification {
     if (maptilerKey) {
       sources.base = {
         type: "raster",
-        tiles: [`https://api.maptiler.com/maps/dataviz-dark/{z}/{x}/{y}.png?key=${maptilerKey}`],
+        tiles: [`https://api.maptiler.com/maps/dataviz-dark/256/{z}/{x}/{y}@2x.png?key=${maptilerKey}`],
         tileSize: 256,
         maxzoom: 19,
       };
@@ -102,30 +103,48 @@ function buildMapStyle(mode: BasemapMode): maplibregl.StyleSpecification {
       });
     }
   } else {
-    sources.esriSat = {
-      type: "raster",
-      tiles: ["https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"],
-      tileSize: 256,
-      maxzoom: 19,
-    };
-    sources.labels = {
-      type: "raster",
-      tiles: ["https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}"],
-      tileSize: 256,
-      maxzoom: 19,
-    };
-    layers.push({ id: "sat-layer", type: "raster", source: "esriSat" });
-    layers.push({ id: "labels-layer", type: "raster", source: "labels", paint: { "raster-opacity": 0.85 } });
+    if (maptilerKey) {
+      sources.maptilerSat = {
+        type: "raster",
+        tiles: [`https://api.maptiler.com/maps/hybrid/256/{z}/{x}/{y}@2x.jpg?key=${maptilerKey}`],
+        tileSize: 256,
+        maxzoom: 20,
+      };
+      layers.push({ id: "sat-layer", type: "raster", source: "maptilerSat" });
+    } else {
+      sources.esriSat = {
+        type: "raster",
+        tiles: ["https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"],
+        tileSize: 256,
+        maxzoom: 19,
+      };
+      sources.labels = {
+        type: "raster",
+        tiles: ["https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}"],
+        tileSize: 256,
+        maxzoom: 19,
+      };
+      layers.push({ id: "sat-layer", type: "raster", source: "esriSat" });
+      layers.push({ id: "labels-layer", type: "raster", source: "labels", paint: { "raster-opacity": 0.85 } });
+    }
   }
 
   if (mode === "terrain") {
-    sources.terrainDem = {
-      type: "raster-dem",
-      tiles: ["https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png"],
-      tileSize: 256,
-      encoding: "terrarium",
-      maxzoom: 15,
-    };
+    sources.terrainDem = maptilerKey
+      ? {
+          type: "raster-dem",
+          tiles: [`https://api.maptiler.com/tiles/terrain-rgb-v2/{z}/{x}/{y}.webp?key=${maptilerKey}`],
+          tileSize: 256,
+          encoding: "mapbox",
+          maxzoom: 14,
+        }
+      : {
+          type: "raster-dem",
+          tiles: ["https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png"],
+          tileSize: 256,
+          encoding: "terrarium",
+          maxzoom: 15,
+        };
   }
 
   return {
@@ -139,6 +158,7 @@ function buildMapStyle(mode: BasemapMode): maplibregl.StyleSpecification {
 export const AnalyticsMap3D: React.FC<Props> = ({
   cameraTarget,
   basemapMode,
+  maptilerKey = "",
   activeMetric,
   colorblindSafe = true,
   language = "es",
@@ -316,7 +336,7 @@ export const AnalyticsMap3D: React.FC<Props> = ({
     if (!containerRef.current || mapRef.current) return;
     const map = new maplibregl.Map({
       container: containerRef.current,
-      style: buildMapStyle(basemapMode),
+      style: buildMapStyle(basemapMode, maptilerKey),
       center: [-111.55, 25.15],
       zoom: 6.4,
       pitch: 36,
@@ -368,8 +388,8 @@ export const AnalyticsMap3D: React.FC<Props> = ({
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
-    map.setStyle(buildMapStyle(basemapMode));
-  }, [basemapMode]);
+    map.setStyle(buildMapStyle(basemapMode, maptilerKey));
+  }, [basemapMode, maptilerKey]);
 
   // Smooth camera flights
   useEffect(() => {

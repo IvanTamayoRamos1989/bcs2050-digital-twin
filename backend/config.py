@@ -179,3 +179,12 @@ def get_runtime_capabilities() -> dict[str, bool]:
         "vvuq_uncertainty_framework": True,
         "wntr_hydraulic_solver": True,
     }
+
+
+def get_public_client_config() -> dict[str, str]:
+    """Return strictly browser-restricted frontend map/3D visualization keys (zero backend secrets)."""
+    return {
+        "google_maps_api_key": os.environ.get("VITE_GOOGLE_MAPS_API_KEY", "").strip(),
+        "cesium_ion_token": os.environ.get("VITE_CESIUM_ION_TOKEN", "").strip(),
+        "maptiler_key": os.environ.get("VITE_MAPTILER_KEY", "").strip(),
+    }

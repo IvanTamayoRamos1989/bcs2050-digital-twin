@@ -26,6 +26,7 @@ import type {
   CameraPreset,
   ChallengeId,
   CitizenPin,
+  ClientConfigResponse,
   CorridorPreset,
   EngineMode,
   GoalGapResponse,
@@ -81,6 +82,11 @@ export const App: React.FC = () => {
   const [chatOpen, setChatOpen] = useState(false);
   const [chatMounted, setChatMounted] = useState(false);
   const [language, setLanguage] = useState<"es" | "en">("es");
+  const [clientConfig, setClientConfig] = useState<ClientConfigResponse>({
+    google_maps_api_key: (import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "").trim(),
+    cesium_ion_token: (import.meta.env.VITE_CESIUM_ION_TOKEN || "").trim(),
+    maptiler_key: (import.meta.env.VITE_MAPTILER_KEY || "").trim(),
+  });
 
   // Moderated Citizen Participation PMDU State
   const [participationOpen, setParticipationOpen] = useState(false);
@@ -219,6 +225,15 @@ export const App: React.FC = () => {
     TwinAPI.getOverview()
       .then((res) => {
         setOverview(res);
+      })
+      .catch(() => {});
+    TwinAPI.getClientConfig()
+      .then((cfg) => {
+        setClientConfig((prev) => ({
+          google_maps_api_key: cfg.google_maps_api_key || prev.google_maps_api_key,
+          cesium_ion_token: cfg.cesium_ion_token || prev.cesium_ion_token,
+          maptiler_key: cfg.maptiler_key || prev.maptiler_key,
+        }));
       })
       .catch(() => {});
     TwinAPI.getTours()
@@ -439,6 +454,7 @@ export const App: React.FC = () => {
               <AnalyticsMap3D
                 cameraTarget={cameraTarget}
                 basemapMode={basemapMode}
+                maptilerKey={clientConfig.maptiler_key}
                 activeMetric={activeMetric}
                 colorblindSafe={colorblindSafe}
                 language={language}
@@ -491,6 +507,8 @@ export const App: React.FC = () => {
                   layers={layers}
                   colorblindSafe={colorblindSafe}
                   language={language}
+                  googleMapsApiKey={clientConfig.google_maps_api_key}
+                  cesiumIonToken={clientConfig.cesium_ion_token}
                   onInspectLocation={handleInspectLocation}
                 />
               </Suspense>

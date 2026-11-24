@@ -4,6 +4,7 @@ import type {
   BuildingRecord,
   ChatResponse,
   CitizenPin,
+  ClientConfigResponse,
   CorridorPreset,
   GoalGapResponse,
   GovernanceSummaryResponse,
@@ -92,6 +93,7 @@ export const TwinAPI = {
   chat: (payload: { query: string; scope_id: string; scenario_name: string; language?: "es" | "en" }) =>
     apiFetch<ChatResponse>("/api/twin/chat", { method: "POST", body: JSON.stringify(payload) }),
   getArchitecture: () => apiFetch<ArchitectureResponse>("/api/twin/architecture"),
+  getClientConfig: () => apiFetch<ClientConfigResponse>("/api/twin/client-config"),
   getGovernanceSummary: () => apiFetch<GovernanceSummaryResponse>("/api/twin/governance/summary"),
   getParticipationPins: (opts?: {
     pmdu_period?: string;

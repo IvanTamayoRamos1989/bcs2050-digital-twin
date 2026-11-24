@@ -25,6 +25,7 @@ from backend.config import (
     FRONTEND_DIST_DIR,
     get_3dtiles_tileset_url,
     get_allowed_origins,
+    get_public_client_config,
     get_runtime_capabilities,
 )
 from backend.live_feeds import get_live_telemetry_summary
@@ -292,6 +293,14 @@ def twin_chat(req: ChatRequest) -> dict[str, Any]:
 @app.get("/api/twin/architecture")
 def twin_architecture() -> dict[str, Any]:
     return get_architecture_catalog()
+
+
+@app.get("/api/twin/client-config")
+def twin_client_config() -> JSONResponse:
+    return JSONResponse(
+        content=get_public_client_config(),
+        headers={"Cache-Control": "no-store"},
+    )
 
 
 @app.get("/api/twin/live/summary")

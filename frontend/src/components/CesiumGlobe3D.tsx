@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import * as Cesium from "cesium";
 import "cesium/Build/Cesium/Widgets/widgets.css";
-import { Globe2, KeyRound } from "lucide-react";
+import { Globe2, KeyRound, Layers } from "lucide-react";
 import { TwinAPI } from "../api/client";
 import type { AgebMetricKey, CameraPreset, LayerVisibility } from "../types/twin";
 import { METRIC_CATALOG, interpolateMetricColor } from "../utils/colorScales";
@@ -17,6 +17,8 @@ interface Props {
   layers: LayerVisibility;
   colorblindSafe?: boolean;
   language?: "es" | "en";
+  googleMapsApiKey?: string;
+  cesiumIonToken?: string;
   onInspectLocation: (lon: number, lat: number, buildingPk?: number | null, agebCvegeo?: string | null) => void;
 }
 
@@ -51,7 +53,6 @@ function buildTilesetStyle(metric: AgebMetricKey, colorblindSafe: boolean): Cesi
     });
   }
 
-  // Default architectural contrast: bright structural whites/sky-blues against dark/satellite terrain
   return new Cesium.Cesium3DTileStyle({
     color: {
       conditions: [
@@ -73,26 +74,29 @@ export const CesiumGlobe3D: React.FC<Props> = ({
   layers,
   colorblindSafe = true,
   language = "es",
+  googleMapsApiKey = "",
+  cesiumIonToken = "",
   onInspectLocation,
 }) => {
   const isEn = language === "en";
   const containerRef = useRef<HTMLDivElement | null>(null);
   const viewerRef = useRef<Cesium.Viewer | null>(null);
   const tilesetRef = useRef<Cesium.Cesium3DTileset | null>(null);
+  const googleTilesetRef = useRef<Cesium.Cesium3DTileset | null>(null);
+  const terrainLoadedRef = useRef<boolean>(false);
   const agebDsRef = useRef<Cesium.GeoJsonDataSource | null>(null);
   const powerDsRef = useRef<Cesium.GeoJsonDataSource | null>(null);
   const agebsReadyRef = useRef<boolean>(false);
 
-  const [tilesMode, setTilesMode] = useState<string>(
-    isEn ? "HD Satellite + 3D Buildings" : "Satélite HD + Edificios 3D",
-  );
+  const [cesiumViewMode, setCesiumViewMode] = useState<"photorealistic" | "analytical">("analytical");
+  const [googleTilesLoaded, setGoogleTilesLoaded] = useState<boolean>(false);
+  const [worldTerrainLoaded, setWorldTerrainLoaded] = useState<boolean>(false);
   const [streaming3DTiles, setStreaming3DTiles] = useState<boolean>(false);
   const [buildingCount, setBuildingCount] = useState<number>(0);
 
-  const googleKey = (import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "").trim();
-  const cesiumToken = (import.meta.env.VITE_CESIUM_ION_TOKEN || "").trim();
+  const googleKey = (googleMapsApiKey || import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "").trim();
+  const cesiumToken = (cesiumIonToken || import.meta.env.VITE_CESIUM_ION_TOKEN || "").trim();
 
-  // Helper to apply clean choropleth (flat by default, capped subtle prisms if opted in)
   const applyAgebStyling = (
     ds: Cesium.GeoJsonDataSource | null,
     visible: boolean,
@@ -131,10 +135,6 @@ export const CesiumGlobe3D: React.FC<Props> = ({
   useEffect(() => {
     if (!containerRef.current || viewerRef.current) return;
 
-    if (cesiumToken) {
-      Cesium.Ion.defaultAccessToken = cesiumToken;
-    }
-
     const esriImagery = new Cesium.UrlTemplateImageryProvider({
       url: "https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
       maximumLevel: 18,
@@ -167,7 +167,6 @@ export const CesiumGlobe3D: React.FC<Props> = ({
       viewer.scene.skyAtmosphere.show = true;
     }
 
-    // Use active cameraTarget on launch if already focused on a city/corridor
     if (cameraTarget) {
       const altitudeM = Math.max(650, 320000 / Math.pow(1.9, Math.max(0, cameraTarget.zoom - 6)));
       viewer.camera.setView({
@@ -189,28 +188,6 @@ export const CesiumGlobe3D: React.FC<Props> = ({
       });
     }
 
-    // Optional paid Google Photorealistic 3D Tiles upgrade
-    if (googleKey) {
-      Cesium.createGooglePhotorealistic3DTileset({ key: googleKey })
-        .then((tileset) => {
-          if (!viewer.isDestroyed()) {
-            viewer.scene.primitives.add(tileset);
-            setTilesMode("Google Photorealistic 3D Tiles");
-          }
-        })
-        .catch(() => {});
-    } else if (cesiumToken) {
-      Cesium.createWorldTerrainAsync()
-        .then((terrain) => {
-          if (!viewer.isDestroyed()) {
-            viewer.terrainProvider = terrain;
-            setTilesMode("Cesium ion World Terrain 3D");
-          }
-        })
-        .catch(() => {});
-    }
-
-    // Load AGEBs as clean flat translucent layer by default
     TwinAPI.getLayer("agebs")
       .then(async (fc) => {
         if (viewer.isDestroyed()) return;
@@ -265,6 +242,10 @@ export const CesiumGlobe3D: React.FC<Props> = ({
     return () => {
       handler.destroy();
       if (!viewer.isDestroyed()) {
+        if (googleTilesetRef.current) {
+          viewer.scene.primitives.remove(googleTilesetRef.current);
+          googleTilesetRef.current = null;
+        }
         if (tilesetRef.current) {
           viewer.scene.primitives.remove(tilesetRef.current);
           tilesetRef.current = null;
@@ -275,16 +256,70 @@ export const CesiumGlobe3D: React.FC<Props> = ({
       agebDsRef.current = null;
       powerDsRef.current = null;
       agebsReadyRef.current = false;
+      terrainLoadedRef.current = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Reactive updates to AGEB overlay, Power Grid visibility, and OGC 3D Tiles visibility/style
+  // Dynamically load Google Photorealistic 3D Tiles whenever runtime or build-time key is present
   useEffect(() => {
+    const viewer = viewerRef.current;
+    if (!viewer || viewer.isDestroyed() || !googleKey || googleTilesetRef.current) return;
+    let cancelled = false;
+    Cesium.createGooglePhotorealistic3DTileset(
+      { key: googleKey, onlyUsingWithGoogleGeocoder: true },
+      { showCreditsOnScreen: true },
+    )
+      .then((tileset) => {
+        if (cancelled || viewer.isDestroyed()) return;
+        viewer.scene.primitives.add(tileset);
+        googleTilesetRef.current = tileset;
+        setGoogleTilesLoaded(true);
+        setCesiumViewMode("photorealistic");
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [googleKey]);
+
+  // Dynamically load Cesium ion World Terrain whenever runtime or build-time token is present
+  useEffect(() => {
+    const viewer = viewerRef.current;
+    if (!viewer || viewer.isDestroyed() || !cesiumToken || terrainLoadedRef.current) return;
+    let cancelled = false;
+    Cesium.Ion.defaultAccessToken = cesiumToken;
+    Cesium.createWorldTerrainAsync()
+      .then((terrain) => {
+        if (cancelled || viewer.isDestroyed()) return;
+        viewer.terrainProvider = terrain;
+        terrainLoadedRef.current = true;
+        setWorldTerrainLoaded(true);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [cesiumToken]);
+
+  // Switch cleanly between Photorealistic 3D Tiles mode and Analytical OGC 3D Tiles mode
+  useEffect(() => {
+    const viewer = viewerRef.current;
+    if (!viewer || viewer.isDestroyed()) return;
+    const isPhoto = cesiumViewMode === "photorealistic" && googleTilesLoaded && Boolean(googleTilesetRef.current);
+
+    viewer.scene.globe.show = !isPhoto;
+    if (googleTilesetRef.current) {
+      googleTilesetRef.current.show = isPhoto;
+    }
+    if (tilesetRef.current) {
+      tilesetRef.current.show = !isPhoto && layers.buildings3d;
+      tilesetRef.current.style = buildTilesetStyle(activeMetric, colorblindSafe);
+    }
     if (agebsReadyRef.current && agebDsRef.current) {
       applyAgebStyling(
         agebDsRef.current,
-        layers.agebs,
+        !isPhoto && layers.agebs,
         agebs3dMode,
         activeMetric,
         extrusionScale,
@@ -292,13 +327,19 @@ export const CesiumGlobe3D: React.FC<Props> = ({
       );
     }
     if (powerDsRef.current) {
-      powerDsRef.current.show = layers.powerGrid;
+      powerDsRef.current.show = !isPhoto && layers.powerGrid;
     }
-    if (tilesetRef.current) {
-      tilesetRef.current.show = layers.buildings3d;
-      tilesetRef.current.style = buildTilesetStyle(activeMetric, colorblindSafe);
-    }
-  }, [layers.agebs, layers.buildings3d, layers.powerGrid, agebs3dMode, activeMetric, extrusionScale, colorblindSafe]);
+  }, [
+    cesiumViewMode,
+    googleTilesLoaded,
+    layers.agebs,
+    layers.buildings3d,
+    layers.powerGrid,
+    agebs3dMode,
+    activeMetric,
+    extrusionScale,
+    colorblindSafe,
+  ]);
 
   // Fly camera on target change (crisp oblique framing for 3D building legibility)
   useEffect(() => {
@@ -330,7 +371,7 @@ export const CesiumGlobe3D: React.FC<Props> = ({
         .then((res) => {
           if (cancelled || viewer.isDestroyed()) return;
           const ds = new Cesium.CustomDataSource("bcs_buildings_3d");
-          ds.show = layers.buildings3d;
+          ds.show = cesiumViewMode === "analytical" && layers.buildings3d;
           for (const b of res.buildings) {
             const flat: number[] = [];
             for (const pt of b.polygon) {
@@ -379,11 +420,10 @@ export const CesiumGlobe3D: React.FC<Props> = ({
           });
           if (cancelled || viewer.isDestroyed()) return;
           tileset.style = buildTilesetStyle(activeMetric, colorblindSafe);
-          tileset.show = layers.buildings3d;
+          tileset.show = cesiumViewMode === "analytical" && layers.buildings3d;
           viewer.scene.primitives.add(tileset);
           tilesetRef.current = tileset;
           setStreaming3DTiles(true);
-          setTilesMode("OGC 3D Tiles 1.1 · glTF 2.0");
           setBuildingCount(info.buildings_count || 396823);
         } catch {
           loadFallbackCity();
@@ -393,7 +433,16 @@ export const CesiumGlobe3D: React.FC<Props> = ({
     return () => {
       cancelled = true;
     };
-  }, [activeCitySlug, activeMetric, colorblindSafe, extrusionScale, layers.buildings3d]);
+  }, [activeCitySlug, activeMetric, cesiumViewMode, colorblindSafe, extrusionScale, layers.buildings3d]);
+
+  const activeModeLabel =
+    cesiumViewMode === "photorealistic" && googleTilesLoaded
+      ? "Google Photorealistic 3D Tiles"
+      : worldTerrainLoaded
+        ? "Cesium ion World Terrain + OGC 3D Tiles 1.1"
+        : streaming3DTiles
+          ? "OGC 3D Tiles 1.1 · glTF 2.0"
+          : isEn ? "HD Satellite + 3D Buildings" : "Satélite HD + Edificios 3D";
 
   return (
     <div className="relative h-full w-full overflow-hidden">
@@ -402,29 +451,65 @@ export const CesiumGlobe3D: React.FC<Props> = ({
         aria-label={isEn ? "CesiumJS 3D Globe of Baja California Sur" : "Globo 3D CesiumJS de Baja California Sur"}
         className="h-full w-full"
       />
-      <div className="glass-panel pointer-events-auto absolute bottom-3 left-1/2 z-20 flex max-w-[calc(100vw-24px)] -translate-x-1/2 items-center gap-3 overflow-x-auto rounded-full px-3.5 py-1.5 text-[11px] whitespace-nowrap">
+      <div className="glass-panel pointer-events-auto absolute bottom-3 left-1/2 z-20 flex max-w-[calc(100vw-24px)] -translate-x-1/2 items-center gap-2.5 overflow-x-auto rounded-full px-3.5 py-1.5 text-[11px] whitespace-nowrap">
         <span className="flex items-center gap-1.5 text-sky-300 font-semibold">
           <Globe2 className="h-3.5 w-3.5" aria-hidden="true" />
-          CesiumJS 3D · {tilesMode}
+          CesiumJS 3D · {activeModeLabel}
         </span>
+
+        {googleTilesLoaded && (
+          <>
+            <span className="h-3 w-px bg-slate-700" />
+            <div role="group" aria-label={isEn ? "Cesium 3D mode switcher" : "Selector modo 3D Cesium"} className="flex items-center rounded-full bg-slate-900/90 p-0.5 ring-1 ring-slate-700">
+              <button
+                type="button"
+                onClick={() => setCesiumViewMode("photorealistic")}
+                aria-pressed={cesiumViewMode === "photorealistic"}
+                className={`rounded-full px-2 py-0.5 text-[10px] font-bold cursor-pointer ${
+                  cesiumViewMode === "photorealistic" ? "bg-emerald-400 text-slate-950" : "text-slate-200 hover:text-white"
+                }`}
+              >
+                {isEn ? "Photorealistic 3D" : "Fotorrealista 3D"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setCesiumViewMode("analytical")}
+                aria-pressed={cesiumViewMode === "analytical"}
+                className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold cursor-pointer ${
+                  cesiumViewMode === "analytical" ? "bg-sky-400 text-slate-950" : "text-slate-200 hover:text-white"
+                }`}
+              >
+                <Layers className="h-2.5 w-2.5" aria-hidden="true" />
+                <span>{isEn ? "Analytical OGC" : "Analítico OGC"}</span>
+              </button>
+            </div>
+          </>
+        )}
+
         <span className="h-3 w-px bg-slate-700" />
         <span className="font-mono-num text-emerald-200">
           {streaming3DTiles
-            ? `OGC 3D Tiles 1.1 · ${buildingCount.toLocaleString()} ${isEn ? "3D buildings" : "edificios 3D"}`
-            : `${buildingCount.toLocaleString()} ${isEn ? "3D buildings" : "edificios 3D"} (${activeCitySlug || "la_paz"})`}
+            ? `${buildingCount.toLocaleString()} ${isEn ? "3D bldgs" : "edif. 3D"}`
+            : `${buildingCount.toLocaleString()} ${isEn ? "bldgs" : "edif."} (${activeCitySlug || "la_paz"})`}
         </span>
-        <span className="hidden sm:inline-flex h-3 w-px bg-slate-700" />
-        <span className="hidden sm:flex items-center gap-2 text-[10px] text-slate-200">
-          <span className="inline-flex items-center gap-1">
-            <span className="h-2 w-2 rounded-xs bg-slate-100 ring-1 ring-slate-500" /> &lt;6m
-          </span>
-          <span className="inline-flex items-center gap-1">
-            <span className="h-2 w-2 rounded-xs bg-blue-400" /> 9–15m
-          </span>
-          <span className="inline-flex items-center gap-1">
-            <span className="h-2 w-2 rounded-xs bg-sky-400" /> 16m+
-          </span>
-        </span>
+
+        {cesiumViewMode === "analytical" && (
+          <>
+            <span className="hidden sm:inline-flex h-3 w-px bg-slate-700" />
+            <span className="hidden sm:flex items-center gap-2 text-[10px] text-slate-200">
+              <span className="inline-flex items-center gap-1">
+                <span className="h-2 w-2 rounded-xs bg-slate-100 ring-1 ring-slate-500" /> &lt;6m
+              </span>
+              <span className="inline-flex items-center gap-1">
+                <span className="h-2 w-2 rounded-xs bg-blue-400" /> 9–15m
+              </span>
+              <span className="inline-flex items-center gap-1">
+                <span className="h-2 w-2 rounded-xs bg-sky-400" /> 16m+
+              </span>
+            </span>
+          </>
+        )}
+
         {!googleKey && (
           <span className="hidden lg:flex items-center gap-1 text-[10px] text-amber-200">
             <KeyRound className="h-3 w-3" aria-hidden="true" />
