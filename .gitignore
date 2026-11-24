@@ -1,0 +1,24 @@
+# OS & Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.ruff_cache/
+*.log
+
+# Environment & Secrets
+.env
+.env.local
+.env.*.local
+
+# Heavy compiled spatial artifacts & deployment stages (stored in GCS, never Git)
+.cloud_stage/
+data/spatial_index.sqlite
+data/spatial_index.sqlite-wal
+data/spatial_index.sqlite-shm
+data/panel_v2_release/
+
+# Frontend build outputs & dependencies
+frontend/node_modules/
+frontend/dist/
+frontend/public/cesium/

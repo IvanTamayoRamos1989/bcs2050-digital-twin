@@ -1,0 +1,500 @@
+{
+  "generated_at": "2026-11-23T12:47:28Z",
+  "state": {
+    "scope_id": "03",
+    "name": "Baja California Sur",
+    "population_2025": 955463,
+    "dwellings_2025": 311585,
+    "agebs_count": 1155,
+    "buildings_3d_count": 396823,
+    "zoning_parcels_count": 79515,
+    "essential_services_count": 3510,
+    "transit_stops_count": 115,
+    "aquifers_count": 40,
+    "aquifers_in_deficit_count": 21,
+    "total_aquifer_dma_2023_hm3": -79.49,
+    "tandeo_sectors_lapaz": 280,
+    "power_lines_count": 102,
+    "substations_count": 34,
+    "power_plants_count": 14,
+    "planned_projects_count": 9,
+    "poer_ugas_count": 1990,
+    "anps_count": 76,
+    "total_built_gfa_m2": 46902810.0,
+    "infill_homes_potential": 776913,
+    "rooftop_solar_mw": 3896.1,
+    "rooftop_solar_gwh_yr": 6701.1,
+    "surge_exposed_buildings": 24209,
+    "city_science_index": 66.6,
+    "city15_score": 81.0,
+    "fractality_score": 69.4,
+    "harmony_score": 79.6,
+    "landuse_entropy_score": 26.8,
+    "carrying_resilience_score": 71.0,
+    "socioecon_score": 72.0,
+    "camera": {
+      "lon": -111.55,
+      "lat": 25.15,
+      "zoom": 6.4,
+      "pitch": 36,
+      "bearing": -8
+    }
+  },
+  "municipalities": {
+    "03003": {
+      "municipality_code": "03003",
+      "name": "La Paz",
+      "corridor": "CORR-CENTRO-LA-PAZ",
+      "population_2020": 270846,
+      "population_2025": 330954,
+      "dwellings_2025": 110654,
+      "ageb_count": 465,
+      "buildings_3d_count": 162375,
+      "built_gfa_m2": 18629090.0,
+      "infill_homes_potential": 291771,
+      "solar_mw": 1670.56,
+      "solar_gwh_yr": 2873.2,
+      "surge_exposed_buildings": 10179,
+      "city_science_index": 68.7,
+      "city15_score": 81.3,
+      "fractality_score": 48.9,
+      "harmony_score": 73.5,
+      "landuse_entropy_score": 22.8,
+      "carrying_resilience_score": 75.6,
+      "socioecon_score": 77.9,
+      "ipcc_slr_2050_ssp585_m": 0.249,
+      "mangrove_buffer_ha": 5523.6,
+      "coastal_erosion_sites": 0,
+      "camera": {
+        "lon": -110.3128,
+        "lat": 24.1426,
+        "zoom": 10.6,
+        "pitch": 45,
+        "bearing": -15
+      }
+    },
+    "03008": {
+      "municipality_code": "03008",
+      "name": "Los Cabos",
+      "corridor": "CORR-SUR-CABOS",
+      "population_2020": 338838,
+      "population_2025": 469164,
+      "dwellings_2025": 149440,
+      "ageb_count": 325,
+      "buildings_3d_count": 168577,
+      "built_gfa_m2": 21548145.0,
+      "infill_homes_potential": 284193,
+      "solar_mw": 1574.77,
+      "solar_gwh_yr": 2708.6,
+      "surge_exposed_buildings": 1064,
+      "city_science_index": 64.0,
+      "city15_score": 79.6,
+      "fractality_score": 56.0,
+      "harmony_score": 75.4,
+      "landuse_entropy_score": 19.0,
+      "carrying_resilience_score": 70.2,
+      "socioecon_score": 71.2,
+      "ipcc_slr_2050_ssp585_m": 0.249,
+      "mangrove_buffer_ha": 0.0,
+      "coastal_erosion_sites": 20,
+      "camera": {
+        "lon": -109.805,
+        "lat": 23.02,
+        "zoom": 10.5,
+        "pitch": 45,
+        "bearing": -15
+      }
+    },
+    "03009": {
+      "municipality_code": "03009",
+      "name": "Loreto",
+      "corridor": "CORR-NORTE-LORETO-MULEGE",
+      "population_2020": 16311,
+      "population_2025": 18322,
+      "dwellings_2025": 6014,
+      "ageb_count": 50,
+      "buildings_3d_count": 12023,
+      "built_gfa_m2": 1128595.0,
+      "infill_homes_potential": 28146,
+      "solar_mw": 108.05,
+      "solar_gwh_yr": 185.8,
+      "surge_exposed_buildings": 3949,
+      "city_science_index": 74.9,
+      "city15_score": 86.2,
+      "fractality_score": 45.2,
+      "harmony_score": 73.6,
+      "landuse_entropy_score": 27.2,
+      "carrying_resilience_score": 83.7,
+      "socioecon_score": 76.2,
+      "ipcc_slr_2050_ssp585_m": 0.249,
+      "mangrove_buffer_ha": 15.7,
+      "coastal_erosion_sites": 0,
+      "camera": {
+        "lon": -111.352,
+        "lat": 25.97,
+        "zoom": 10.5,
+        "pitch": 45,
+        "bearing": -15
+      }
+    },
+    "03001": {
+      "municipality_code": "03001",
+      "name": "Comondú",
+      "corridor": "CORR-VALLE-COMONDU",
+      "population_2020": 58680,
+      "population_2025": 77434,
+      "dwellings_2025": 25379,
+      "ageb_count": 160,
+      "buildings_3d_count": 36234,
+      "built_gfa_m2": 3619705.0,
+      "infill_homes_potential": 90103,
+      "solar_mw": 359.07,
+      "solar_gwh_yr": 617.6,
+      "surge_exposed_buildings": 0,
+      "city_science_index": 74.0,
+      "city15_score": 88.5,
+      "fractality_score": 40.2,
+      "harmony_score": 64.7,
+      "landuse_entropy_score": 25.5,
+      "carrying_resilience_score": 85.1,
+      "socioecon_score": 76.0,
+      "ipcc_slr_2050_ssp585_m": 0.249,
+      "mangrove_buffer_ha": 32374.6,
+      "coastal_erosion_sites": 2,
+      "camera": {
+        "lon": -111.6625,
+        "lat": 25.0322,
+        "zoom": 9.3,
+        "pitch": 45,
+        "bearing": -15
+      }
+    },
+    "03002": {
+      "municipality_code": "03002",
+      "name": "Mulegé",
+      "corridor": "CORR-NORTE-LORETO-MULEGE",
+      "population_2020": 45051,
+      "population_2025": 59589,
+      "dwellings_2025": 20098,
+      "ageb_count": 155,
+      "buildings_3d_count": 17499,
+      "built_gfa_m2": 1977274.0,
+      "infill_homes_potential": 82700,
+      "solar_mw": 183.62,
+      "solar_gwh_yr": 315.8,
+      "surge_exposed_buildings": 9017,
+      "city_science_index": 64.1,
+      "city15_score": 79.3,
+      "fractality_score": 28.2,
+      "harmony_score": 52.5,
+      "landuse_entropy_score": 25.7,
+      "carrying_resilience_score": 61.2,
+      "socioecon_score": 70.8,
+      "ipcc_slr_2050_ssp585_m": 0.249,
+      "mangrove_buffer_ha": 4674.3,
+      "coastal_erosion_sites": 0,
+      "camera": {
+        "lon": -112.9,
+        "lat": 27.25,
+        "zoom": 8.2,
+        "pitch": 45,
+        "bearing": -15
+      }
+    }
+  },
+  "cities": {
+    "cabo_san_lucas": {
+      "slug": "cabo_san_lucas",
+      "name": "Cabo San Lucas",
+      "municipality_code": "03008",
+      "buildings_count": 99951,
+      "mean_height_m": 3.74,
+      "max_height_m": 45.7,
+      "footprint_ha": 804.31,
+      "total_gfa_m2": 12145851.0,
+      "rooftop_solar_mw": 906.85,
+      "rooftop_solar_gwh_yr": 1559.8,
+      "surge_exposed_buildings": 651,
+      "surge_exposed_pct": 0.65,
+      "camera": {
+        "name": "Cabo San Lucas",
+        "municipality_code": "03008",
+        "lon": -109.9167,
+        "lat": 22.8905,
+        "zoom": 13.8,
+        "pitch": 58,
+        "bearing": -28
+      }
+    },
+    "ciudad_constitucion": {
+      "slug": "ciudad_constitucion",
+      "name": "Ciudad Constitucion",
+      "municipality_code": "03001",
+      "buildings_count": 36234,
+      "mean_height_m": 3.26,
+      "max_height_m": 12.4,
+      "footprint_ha": 318.47,
+      "total_gfa_m2": 3619705.0,
+      "rooftop_solar_mw": 359.07,
+      "rooftop_solar_gwh_yr": 617.6,
+      "surge_exposed_buildings": 0,
+      "surge_exposed_pct": 0.0,
+      "camera": {
+        "name": "Ciudad Constitución",
+        "municipality_code": "03001",
+        "lon": -111.6625,
+        "lat": 25.0322,
+        "zoom": 13.7,
+        "pitch": 54,
+        "bearing": -12
+      }
+    },
+    "corredor_turistico": {
+      "slug": "corredor_turistico",
+      "name": "Corredor Turistico",
+      "municipality_code": "03008",
+      "buildings_count": 9873,
+      "mean_height_m": 5.29,
+      "max_height_m": 40.2,
+      "footprint_ha": 124.59,
+      "total_gfa_m2": 2764076.0,
+      "rooftop_solar_mw": 140.48,
+      "rooftop_solar_gwh_yr": 241.6,
+      "surge_exposed_buildings": 159,
+      "surge_exposed_pct": 1.61,
+      "camera": {
+        "name": "Corredor Turístico Los Cabos",
+        "municipality_code": "03008",
+        "lon": -109.805,
+        "lat": 22.975,
+        "zoom": 12.2,
+        "pitch": 54,
+        "bearing": -16
+      }
+    },
+    "guerrero_negro": {
+      "slug": "guerrero_negro",
+      "name": "Guerrero Negro",
+      "municipality_code": "03002",
+      "buildings_count": 9500,
+      "mean_height_m": 3.17,
+      "max_height_m": 19.1,
+      "footprint_ha": 93.28,
+      "total_gfa_m2": 1032293.0,
+      "rooftop_solar_mw": 105.17,
+      "rooftop_solar_gwh_yr": 180.9,
+      "surge_exposed_buildings": 8775,
+      "surge_exposed_pct": 92.37,
+      "camera": {
+        "name": "Guerrero Negro",
+        "municipality_code": "03002",
+        "lon": -114.0485,
+        "lat": 27.9688,
+        "zoom": 14.0,
+        "pitch": 54,
+        "bearing": -15
+      }
+    },
+    "la_paz": {
+      "slug": "la_paz",
+      "name": "La Paz",
+      "municipality_code": "03003",
+      "buildings_count": 151975,
+      "mean_height_m": 3.47,
+      "max_height_m": 39.6,
+      "footprint_ha": 1415.09,
+      "total_gfa_m2": 17851486.0,
+      "rooftop_solar_mw": 1595.5,
+      "rooftop_solar_gwh_yr": 2744.3,
+      "surge_exposed_buildings": 10152,
+      "surge_exposed_pct": 6.68,
+      "camera": {
+        "name": "La Paz",
+        "municipality_code": "03003",
+        "lon": -110.3128,
+        "lat": 24.1426,
+        "zoom": 13.6,
+        "pitch": 56,
+        "bearing": -22
+      }
+    },
+    "loreto": {
+      "slug": "loreto",
+      "name": "Loreto",
+      "municipality_code": "03009",
+      "buildings_count": 12023,
+      "mean_height_m": 3.36,
+      "max_height_m": 14.4,
+      "footprint_ha": 95.83,
+      "total_gfa_m2": 1128595.0,
+      "rooftop_solar_mw": 108.05,
+      "rooftop_solar_gwh_yr": 185.8,
+      "surge_exposed_buildings": 3949,
+      "surge_exposed_pct": 32.85,
+      "camera": {
+        "name": "Loreto",
+        "municipality_code": "03009",
+        "lon": -111.3489,
+        "lat": 26.0124,
+        "zoom": 14.1,
+        "pitch": 58,
+        "bearing": -26
+      }
+    },
+    "san_jose_del_cabo": {
+      "slug": "san_jose_del_cabo",
+      "name": "San Jose del Cabo",
+      "municipality_code": "03008",
+      "buildings_count": 58839,
+      "mean_height_m": 3.71,
+      "max_height_m": 31.4,
+      "footprint_ha": 468.38,
+      "total_gfa_m2": 6644407.0,
+      "rooftop_solar_mw": 528.09,
+      "rooftop_solar_gwh_yr": 908.3,
+      "surge_exposed_buildings": 338,
+      "surge_exposed_pct": 0.57,
+      "camera": {
+        "name": "San José del Cabo",
+        "municipality_code": "03008",
+        "lon": -109.6989,
+        "lat": 23.0617,
+        "zoom": 13.8,
+        "pitch": 58,
+        "bearing": 20
+      }
+    },
+    "santa_rosalia": {
+      "slug": "santa_rosalia",
+      "name": "Santa Rosalia",
+      "municipality_code": "03002",
+      "buildings_count": 8005,
+      "mean_height_m": 3.61,
+      "max_height_m": 21.6,
+      "footprint_ha": 69.61,
+      "total_gfa_m2": 945278.0,
+      "rooftop_solar_mw": 78.49,
+      "rooftop_solar_gwh_yr": 135.0,
+      "surge_exposed_buildings": 246,
+      "surge_exposed_pct": 3.07,
+      "camera": {
+        "name": "Santa Rosalía",
+        "municipality_code": "03002",
+        "lon": -112.2673,
+        "lat": 27.3396,
+        "zoom": 14.3,
+        "pitch": 58,
+        "bearing": 22
+      }
+    },
+    "todos_santos": {
+      "slug": "todos_santos",
+      "name": "Todos Santos",
+      "municipality_code": "03003",
+      "buildings_count": 10423,
+      "mean_height_m": 3.37,
+      "max_height_m": 13.5,
+      "footprint_ha": 66.74,
+      "total_gfa_m2": 779205.0,
+      "rooftop_solar_mw": 75.24,
+      "rooftop_solar_gwh_yr": 129.4,
+      "surge_exposed_buildings": 50,
+      "surge_exposed_pct": 0.48,
+      "camera": {
+        "name": "Todos Santos",
+        "municipality_code": "03003",
+        "lon": -110.2266,
+        "lat": 23.4488,
+        "zoom": 14.0,
+        "pitch": 55,
+        "bearing": -18
+      }
+    }
+  },
+  "corridor_arcs": [
+    {
+      "id": "ARC-CABOS-LPZ",
+      "name": "Corredor Sur–Centro (Los Cabos ↔ La Paz)",
+      "source": [
+        -109.85,
+        22.97
+      ],
+      "target": [
+        -110.31,
+        24.14
+      ],
+      "flow_index": 94,
+      "corridor": "CORR-SUR-CABOS"
+    },
+    {
+      "id": "ARC-LPZ-TS",
+      "name": "Eje Pacífico Sur (La Paz ↔ Todos Santos)",
+      "source": [
+        -110.31,
+        24.14
+      ],
+      "target": [
+        -110.23,
+        23.45
+      ],
+      "flow_index": 62,
+      "corridor": "CORR-CENTRO-LA-PAZ"
+    },
+    {
+      "id": "ARC-LPZ-COM",
+      "name": "Eje Valle Agrícola (La Paz ↔ Cd. Constitución)",
+      "source": [
+        -110.31,
+        24.14
+      ],
+      "target": [
+        -111.66,
+        25.03
+      ],
+      "flow_index": 71,
+      "corridor": "CORR-VALLE-COMONDU"
+    },
+    {
+      "id": "ARC-COM-LOR",
+      "name": "Eje Golfo Norte (Cd. Constitución ↔ Loreto)",
+      "source": [
+        -111.66,
+        25.03
+      ],
+      "target": [
+        -111.35,
+        26.01
+      ],
+      "flow_index": 54,
+      "corridor": "CORR-NORTE-LORETO-MULEGE"
+    },
+    {
+      "id": "ARC-LOR-SRO",
+      "name": "Corredor Mar de Cortés (Loreto ↔ Santa Rosalía)",
+      "source": [
+        -111.35,
+        26.01
+      ],
+      "target": [
+        -112.27,
+        27.34
+      ],
+      "flow_index": 48,
+      "corridor": "CORR-NORTE-LORETO-MULEGE"
+    },
+    {
+      "id": "ARC-SRO-GNE",
+      "name": "Eje Transpeninsular Norte (Santa Rosalía ↔ Guerrero Negro)",
+      "source": [
+        -112.27,
+        27.34
+      ],
+      "target": [
+        -114.05,
+        27.97
+      ],
+      "flow_index": 42,
+      "corridor": "CORR-NORTE-LORETO-MULEGE"
+    }
+  ]
+}

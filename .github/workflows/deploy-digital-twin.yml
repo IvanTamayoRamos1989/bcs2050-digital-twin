@@ -1,0 +1,122 @@
+name: Deploy BCS2050 Digital Twin to Cloud Run
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - "frontend/**"
+      - "Dockerfile"
+      - ".github/workflows/deploy-digital-twin.yml"
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  PROJECT_ID: bcs2050
+  REGION: northamerica-south1
+  SERVICE_NAME: bcs2050-digital-twin
+  SERVICE_ACCOUNT: sa-bcs2050-agent-sandbox@bcs2050.iam.gserviceaccount.com
+
+jobs:
+  test-backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install backend & test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install fastapi "uvicorn[standard]" pydantic pyyaml shapely numpy httpx ezdxf pyproj google-cloud-bigquery pytest
+
+      - name: Fetch spatial datastore artifact (if configured)
+        if: ${{ vars.GCS_SPATIAL_INDEX_URI != '' && secrets.GCP_WIF_PROVIDER != '' }}
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_DEPLOY_SA }}
+
+      - name: Download spatial datastore for full integration tests
+        if: ${{ vars.GCS_SPATIAL_INDEX_URI != '' && secrets.GCP_WIF_PROVIDER != '' }}
+        run: gcloud storage cp "${{ vars.GCS_SPATIAL_INDEX_URI }}" data/spatial_index.sqlite
+
+      - name: Run security & API unit tests
+        run: |
+          if [ -f data/spatial_index.sqlite ]; then
+            python -m pytest backend/tests/test_twin_api.py -v
+          else
+            python -m pytest backend/tests/test_twin_api.py -k "security or architecture" -v
+          fi
+
+  build-frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install & build React/Cesium/deck.gl bundle
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+
+  deploy-cloud-run:
+    needs: [test-backend, build-frontend]
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Build frontend dist
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_DEPLOY_SA }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Sync spatial datastore from GCS & verify container import
+        run: |
+          if [ -n "${{ vars.GCS_DATA_TAR_URI }}" ]; then
+            gcloud storage cp "${{ vars.GCS_DATA_TAR_URI }}" /tmp/twin_data.tar.gz
+            tar -xzf /tmp/twin_data.tar.gz -C .
+          fi
+
+      - name: Deploy hardened Cloud Run revision
+        run: |
+          gcloud run deploy "${{ env.SERVICE_NAME }}" \
+            --source . \
+            --project "${{ env.PROJECT_ID }}" \
+            --region "${{ env.REGION }}" \
+            --service-account "${{ env.SERVICE_ACCOUNT }}" \
+            --memory 2Gi \
+            --cpu 2 \
+            --max-instances 10 \
+            --concurrency 160 \
+            --allow-unauthenticated \
+            --set-env-vars "BCS2050_USE_BIGQUERY=true,GOOGLE_CLOUD_PROJECT=${{ env.PROJECT_ID }},BQ_LOCATION=${{ env.REGION }},BQ_DATASET=bcs2050_intelligence_sandbox,BCS2050_HEAVY_RPM=12,BCS2050_READ_RPM=180,BCS2050_REQUIRE_AUTH_FOR_EXPORTS=false,ALLOWED_ORIGINS=https://bcs2050.com^:^https://www.bcs2050.com^:^https://panel.bcs2050.com^:^https://twin.bcs2050.com" \
+            --quiet

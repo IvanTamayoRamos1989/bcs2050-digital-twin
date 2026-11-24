@@ -1,0 +1,86 @@
+"""Runtime configuration and path bridging for BCS2050 Digital Twin."""
+
+from __future__ import annotations
+
+import os
+import sys
+from pathlib import Path
+
+DIGITAL_TWIN_ROOT = Path(__file__).resolve().parents[1]
+WORKSPACE_ROOT = DIGITAL_TWIN_ROOT.parent
+INTELLIGENCE_DIR = WORKSPACE_ROOT / "bcs2050_intelligence"
+
+if INTELLIGENCE_DIR.exists() and str(INTELLIGENCE_DIR) not in sys.path:
+    sys.path.insert(0, str(INTELLIGENCE_DIR))
+
+DATA_DIR = Path(os.environ.get("BCS2050_DATA_DIR", str(DIGITAL_TWIN_ROOT / "data")))
+LAYERS_DIR = DATA_DIR / "layers"
+SQLITE_PATH = DATA_DIR / "spatial_index.sqlite"
+SUMMARY_PATH = DATA_DIR / "city_science_summary.json"
+FRONTEND_DIST_DIR = DIGITAL_TWIN_ROOT / "frontend" / "dist"
+
+
+def use_bigquery() -> bool:
+    return os.environ.get("BCS2050_USE_BIGQUERY", "false").strip().lower() in {"1", "true", "yes"}
+
+
+DEFAULT_ALLOWED_ORIGINS: list[str] = [
+    "https://bcs2050.com",
+    "https://www.bcs2050.com",
+    "https://panel.bcs2050.com",
+    "https://twin.bcs2050.com",
+    "https://bcs2050-digital-twin-96586614897.northamerica-south1.run.app",
+    "https://bcs2050-digital-twin-4aurr37ktq-pv.a.run.app",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:8050",
+    "http://127.0.0.1:8050",
+]
+
+
+def get_allowed_origins() -> list[str]:
+    raw = os.environ.get("ALLOWED_ORIGINS", "").strip()
+    if not raw:
+        return list(DEFAULT_ALLOWED_ORIGINS)
+    parsed = [o.strip() for o in raw.split(",") if o.strip()]
+    return parsed or list(DEFAULT_ALLOWED_ORIGINS)
+
+
+def get_rate_limits() -> tuple[int, int]:
+    """Return (heavy_requests_per_min, read_requests_per_min)."""
+    try:
+        heavy = max(1, int(os.environ.get("BCS2050_HEAVY_RPM", "12")))
+    except ValueError:
+        heavy = 12
+    try:
+        read = max(10, int(os.environ.get("BCS2050_READ_RPM", "180")))
+    except ValueError:
+        read = 180
+    return heavy, read
+
+
+def require_auth_for_exports() -> bool:
+    return os.environ.get("BCS2050_REQUIRE_AUTH_FOR_EXPORTS", "false").strip().lower() in {"1", "true", "yes"}
+
+
+def get_planner_api_tokens() -> set[str]:
+    raw = os.environ.get("BCS2050_PLANNER_API_TOKENS", "").strip()
+    return {tok.strip() for tok in raw.split(",") if tok.strip()}
+
+
+def get_runtime_capabilities() -> dict[str, bool]:
+    """Report active commercial 3D/GIS API keys and cloud capabilities without leaking secrets."""
+    return {
+        "bigquery_live": use_bigquery(),
+        "google_photorealistic_3d_tiles": bool(os.environ.get("VITE_GOOGLE_MAPS_API_KEY", "").strip()),
+        "cesium_ion_terrain": bool(os.environ.get("VITE_CESIUM_ION_TOKEN", "").strip()),
+        "maptiler_enterprise": bool(os.environ.get("VITE_MAPTILER_KEY", "").strip()),
+        "arcgis_platform": bool(os.environ.get("VITE_ARCGIS_API_KEY", "").strip()),
+        "ontology_v3_connected": INTELLIGENCE_DIR.exists(),
+        "cad_bim_exporters": True,
+        "autodesk_aps_acc": bool(os.environ.get("AUTODESK_APS_CLIENT_ID", "").strip()),
+        "autodesk_tandem": bool(os.environ.get("AUTODESK_TANDEM_FACILITY_URN", "").strip()),
+        "strict_cors_enabled": True,
+        "rate_limiting_enabled": True,
+        "planner_rbac_enforced": require_auth_for_exports(),
+    }
