@@ -8,4 +8,3 @@ frontend/.vite
 .pytest_cache
 *.sqlite
 *.tar.gz
-docs

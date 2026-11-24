@@ -125,9 +125,9 @@ export const PhaseTelemetryPanel: React.FC<Props> = ({
       <button
         type="button"
         onClick={onToggleCollapse}
-        className="glass-panel pointer-events-auto absolute right-3 top-[92px] z-20 flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold text-emerald-300 hover:bg-slate-800/90 cursor-pointer"
+        className="glass-panel pointer-events-auto absolute right-3 top-3 z-20 flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold text-emerald-200 hover:bg-slate-800/90 cursor-pointer"
       >
-        <ChevronLeft className="h-4 w-4" />
+        <ChevronLeft className="h-4 w-4" aria-hidden="true" />
         <span>Telemetría & Simulador</span>
       </button>
     );
@@ -202,7 +202,10 @@ export const PhaseTelemetryPanel: React.FC<Props> = ({
   };
 
   return (
-    <aside className="glass-panel pointer-events-auto absolute right-3 top-[92px] z-20 flex max-h-[calc(100vh-108px)] w-[392px] flex-col rounded-xl overflow-hidden">
+    <aside
+      aria-label="Panel técnico de telemetría, simulador 2050 y modelos físicos"
+      className="glass-panel pointer-events-auto absolute right-3 top-3 z-20 flex max-h-[calc(100%-64px)] w-[calc(100vw-24px)] sm:w-[392px] flex-col rounded-xl overflow-hidden"
+    >
       {/* Header */}
       <div className="flex items-center justify-between border-b border-slate-700/60 px-4 py-2.5">
         <div>

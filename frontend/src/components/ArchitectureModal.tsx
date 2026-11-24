@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Box, CheckCircle2, CircleDashed, Cpu, Download, FileJson, Film, Layers, ShieldCheck, X } from "lucide-react";
 import { TwinAPI } from "../api/client";
-import type { ArchitectureResponse, CorridorPreset, MetadataCatalogResponse } from "../types/twin";
+import type { ArchitectureResponse, CorridorPreset, GovernanceSummaryResponse, MetadataCatalogResponse } from "../types/twin";
 
 interface Props {
   open: boolean;
@@ -22,6 +22,7 @@ export const ArchitectureModal: React.FC<Props> = ({
 }) => {
   const [data, setData] = useState<ArchitectureResponse | null>(null);
   const [metaCatalog, setMetaCatalog] = useState<MetadataCatalogResponse | null>(null);
+  const [governance, setGovernance] = useState<GovernanceSummaryResponse | null>(null);
   const [selectedCorridor, setSelectedCorridor] = useState<string>("el_tezal");
 
   useEffect(() => {
@@ -31,7 +32,19 @@ export const ArchitectureModal: React.FC<Props> = ({
     if (open && !metaCatalog) {
       TwinAPI.getMetadata().then(setMetaCatalog).catch(() => {});
     }
-  }, [open, data, metaCatalog]);
+    if (open && !governance) {
+      TwinAPI.getGovernanceSummary().then(setGovernance).catch(() => {});
+    }
+  }, [open, data, metaCatalog, governance]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
 
   useEffect(() => {
     if (open && currentZoom >= 12.0 && currentBbox && selectedCorridor === "el_tezal") {
@@ -53,32 +66,83 @@ export const ArchitectureModal: React.FC<Props> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="arch-modal-title"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4"
+    >
       <div className="glass-panel flex max-h-[88vh] w-full max-w-4xl flex-col rounded-2xl overflow-hidden">
         <div className="flex items-center justify-between border-b border-slate-700/70 px-5 py-3.5">
           <div className="flex items-center gap-2.5">
-            <Cpu className="h-5 w-5 text-sky-400" />
+            <Cpu className="h-5 w-5 text-sky-400" aria-hidden="true" />
             <div>
-              <h2 className="text-sm font-bold text-white">
-                Arquitectura Empresarial BCS2050 · Stack Comercial & Motores Open Source
+              <h2 id="arch-modal-title" className="text-sm font-bold text-white">
+                Gobernanza BCS2050 · Arquitectura Empresarial, Privacidad y Stack OGC
               </h2>
-              <p className="text-[11px] text-slate-400">
-                Benchmark Aretian (Barcelona) + Esri Living Digital Twin + Catálogo 126 Herramientas
+              <p className="text-[11px] text-slate-300">
+                Principios Gemini · LGPDPPSO/LFPDPPP · CityGML 3.0 LoD2.2 · Catálogo 126 Herramientas
               </p>
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white cursor-pointer"
+            aria-label="Cerrar diálogo de gobernanza y arquitectura"
+            className="rounded-lg p-1.5 text-slate-300 hover:bg-slate-800 hover:text-white cursor-pointer"
           >
-            <X className="h-4 w-4" />
+            <X className="h-4 w-4" aria-hidden="true" />
           </button>
         </div>
 
         <div className="twin-scroll overflow-y-auto p-5 space-y-5 text-xs">
           {data ? (
             <>
+              {/* Institutional Governance, Privacy DPIA & CityGML 3.0 RFP */}
+              {governance && (
+                <div className="rounded-xl bg-gradient-to-br from-slate-900/95 via-slate-900/90 to-emerald-950/50 p-4 ring-1 ring-emerald-400/35 space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <h3 className="text-xs font-bold text-white">
+                        Gobernanza Institucional (Principios Gemini) · Privacidad DPIA · RFP CityGML 3.0 LoD2.2
+                      </h3>
+                      <p className="text-[10.5px] text-slate-300">
+                        {governance.framework} · Marco legal: {governance.legal_frameworks.join(" · ")}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid sm:grid-cols-3 gap-2">
+                    {governance.data_classification_tiers.map((tier) => (
+                      <div key={tier.tier} className="rounded-lg bg-slate-950/80 p-2.5 ring-1 ring-slate-800 space-y-1">
+                        <p className="text-[11px] font-bold text-emerald-300">{tier.tier}</p>
+                        <p className="font-mono-num text-[9.5px] text-sky-300">{tier.license}</p>
+                        <p className="text-[10px] text-slate-300 leading-snug">{tier.scope}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="grid sm:grid-cols-2 gap-2">
+                    {governance.documents.map((doc) => (
+                      <div key={doc.id} className="rounded-lg bg-slate-950/75 p-2.5 ring-1 ring-slate-800 space-y-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-[11px] font-bold text-white">{doc.title_es}</span>
+                          <span
+                            className={`rounded-full px-1.5 py-0.5 font-mono-num text-[9px] font-semibold ${
+                              doc.exists ? "bg-emerald-500/20 text-emerald-200" : "bg-amber-500/20 text-amber-200"
+                            }`}
+                          >
+                            {doc.exists ? `${Math.round(doc.size_bytes / 1024)} KB` : "MISSING"}
+                          </span>
+                        </div>
+                        <p className="font-mono-num text-[9.5px] text-sky-300">{doc.path}</p>
+                        <p className="text-[10px] text-slate-300 leading-snug">{doc.summary_es}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Live Commercial Keys Status */}
               <div className="rounded-xl bg-slate-900/80 p-3.5 ring-1 ring-slate-700/70">
                 <p className="font-mono-num text-[10px] uppercase tracking-wider text-sky-400 mb-2">

@@ -111,21 +111,31 @@ class SecurityAndRateLimitMiddleware(BaseHTTPMiddleware):
             resp = await call_next(request)
             return _apply_security_headers(resp)
 
-        # Optional Planner RBAC for compute/data exports
-        if path.startswith(PROTECTED_EXPORT_PREFIX) and require_auth_for_exports():
+        # Optional Planner RBAC for compute/data exports and moderation endpoints
+        requires_export_auth = path.startswith(PROTECTED_EXPORT_PREFIX) and require_auth_for_exports()
+        requires_moderation_auth = bool(get_planner_api_tokens()) and (
+            (path.startswith("/api/twin/participation/") and path.endswith("/moderate"))
+            or (
+                path == "/api/twin/participation"
+                and request.query_params.get("include_pending", "").strip().lower() in {"1", "true", "yes"}
+            )
+        )
+        if requires_export_auth or requires_moderation_auth:
             candidate = _extract_planner_token(request)
             valid_tokens = get_planner_api_tokens()
             if not _is_valid_planner_token(candidate, valid_tokens):
                 err = JSONResponse(
                     status_code=401,
                     content={
-                        "detail": "Authentication required for export endpoints (missing or invalid Bearer / X-BCS-Planner-Token)."
+                        "detail": "Authentication required for protected municipal/moderation endpoints (missing or invalid Bearer / X-BCS-Planner-Token)."
                     },
                 )
                 return _apply_security_headers(err)
 
         heavy_limit, read_limit = get_rate_limits()
-        is_heavy = any(path.startswith(prefix) for prefix in HEAVY_PATH_PREFIXES)
+        is_heavy = any(path.startswith(prefix) for prefix in HEAVY_PATH_PREFIXES) or (
+            request.method == "POST" and path.startswith("/api/twin/participation")
+        )
         bucket = "heavy" if is_heavy else "read"
         limit = heavy_limit if is_heavy else read_limit
         client_ip = _extract_client_ip(request)

@@ -262,14 +262,16 @@ export const StrategistChatDrawer: React.FC<Props> = ({
       >
         <input
           type="text"
+          aria-label={isEn ? "Ask a territorial question" : "Escribir consulta territorial"}
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder={isEn ? "Ask a territorial question on BCS2050..." : "Consulta territorial sobre BCS2050..."}
-          className="flex-1 rounded-lg bg-slate-900 px-3 py-1.5 text-xs text-white placeholder-slate-500 ring-1 ring-slate-700 focus:outline-none focus:ring-sky-400"
+          className="flex-1 rounded-lg bg-slate-900 px-3 py-1.5 text-xs text-white placeholder-slate-400 ring-1 ring-slate-700 focus:outline-none focus:ring-sky-400"
         />
         <button
           type="submit"
           disabled={loading}
+          aria-label={isEn ? "Send question" : "Enviar consulta"}
           className="rounded-lg bg-emerald-500 p-2 text-slate-950 hover:bg-emerald-400 disabled:opacity-50 cursor-pointer"
         >
           <Send className="h-3.5 w-3.5" />

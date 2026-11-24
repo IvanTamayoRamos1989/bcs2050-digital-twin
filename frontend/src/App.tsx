@@ -2,6 +2,8 @@ import React, { Suspense, lazy, useCallback, useEffect, useRef, useState } from 
 import { TwinAPI } from "./api/client";
 import { AnalyticsMap3D } from "./components/AnalyticsMap3D";
 import { ChallengeLayerDock } from "./components/ChallengeLayerDock";
+import { CitizenScorecardPanel } from "./components/CitizenScorecardPanel";
+import { ParticipationPanel } from "./components/ParticipationPanel";
 import { PhaseTelemetryPanel } from "./components/PhaseTelemetryPanel";
 import { TopCommandBar } from "./components/TopCommandBar";
 import { WebGLErrorBoundary } from "./components/WebGLErrorBoundary";
@@ -23,6 +25,7 @@ import type {
   BasemapMode,
   CameraPreset,
   ChallengeId,
+  CitizenPin,
   CorridorPreset,
   EngineMode,
   GoalGapResponse,
@@ -32,9 +35,12 @@ import type {
   OgcPhysicsJobStatus,
   OgcPhysicsProcessId,
   OverviewResponse,
+  ParticipationCategoryMeta,
+  PmduConsultationPeriod,
   RecommendationsResponse,
   SensorThingRecord,
   SimulationResponse,
+  ViewMode,
 } from "./types/twin";
 
 const INITIAL_LAYERS: LayerVisibility = {
@@ -51,25 +57,39 @@ const INITIAL_LAYERS: LayerVisibility = {
   corridorArcs: true,
   plannedProjects: true,
   liveTelemetry: true,
+  citizenPins: true,
 };
+
+const isSmallViewport = () => typeof window !== "undefined" && window.innerWidth < 1024;
 
 export const App: React.FC = () => {
   const [overview, setOverview] = useState<OverviewResponse | null>(null);
   const [liveTelemetry, setLiveTelemetry] = useState<LiveTelemetrySummary | null>(null);
   const [sensorThings, setSensorThings] = useState<SensorThingRecord[]>([]);
   const [phase, setPhase] = useState<AretianPhase>("diagnostics");
+  const [viewMode, setViewMode] = useState<ViewMode>("technical");
+  const [colorblindSafe, setColorblindSafe] = useState<boolean>(true);
   const [scopeId, setScopeId] = useState<string>("03");
   const [activeCitySlug, setActiveCitySlug] = useState<string>("");
   const [engineMode, setEngineMode] = useState<EngineMode>("deck3d");
   const [basemapMode, setBasemapMode] = useState<BasemapMode>("obsidian");
 
-  const [leftCollapsed, setLeftCollapsed] = useState(false);
-  const [rightCollapsed, setRightCollapsed] = useState(false);
+  const [leftCollapsed, setLeftCollapsed] = useState<boolean>(isSmallViewport);
+  const [rightCollapsed, setRightCollapsed] = useState<boolean>(isSmallViewport);
   const [archOpen, setArchOpen] = useState(false);
   const [archMounted, setArchMounted] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const [chatMounted, setChatMounted] = useState(false);
   const [language, setLanguage] = useState<"es" | "en">("es");
+
+  // Moderated Citizen Participation PMDU State
+  const [participationOpen, setParticipationOpen] = useState(false);
+  const [pinPlacementMode, setPinPlacementMode] = useState(false);
+  const [pendingPinCoords, setPendingPinCoords] = useState<{ lon: number; lat: number } | null>(null);
+  const [citizenPins, setCitizenPins] = useState<CitizenPin[]>([]);
+  const [sessionSubmittedPins, setSessionSubmittedPins] = useState<CitizenPin[]>([]);
+  const [pmduPeriods, setPmduPeriods] = useState<PmduConsultationPeriod[]>([]);
+  const [participationCategories, setParticipationCategories] = useState<ParticipationCategoryMeta[]>([]);
 
   const [activeChallenge, setActiveChallenge] = useState<ChallengeId>("urban_form_15m");
   const [activeMetric, setActiveMetric] = useState<AgebMetricKey>("city_science_index");
@@ -110,6 +130,20 @@ export const App: React.FC = () => {
   const [physicsJobStatus, setPhysicsJobStatus] = useState<OgcPhysicsJobStatus | null>(null);
   const [physicsOverlay, setPhysicsOverlay] = useState<ActivePhysicsOverlay | null>(null);
   const physicsRunTokenRef = useRef<number>(0);
+
+  useEffect(() => {
+    document.documentElement.lang = language;
+  }, [language]);
+
+  const refreshParticipationPins = useCallback(() => {
+    TwinAPI.getParticipationPins()
+      .then((res) => {
+        setCitizenPins(res.pins || []);
+        setPmduPeriods(res.pmdu_periods || []);
+        setParticipationCategories(res.categories || []);
+      })
+      .catch(() => {});
+  }, []);
 
   const handleRunPhysicsProcess = useCallback(
     async (processId: OgcPhysicsProcessId, customInputs?: Record<string, unknown>) => {
@@ -180,7 +214,7 @@ export const App: React.FC = () => {
     [activeCitySlug, customLevers, scopeId, simulation],
   );
 
-  // Initial Overview Load & Live Telemetry Polling
+  // Initial Overview Load, Participation Pins & Live Telemetry Polling
   useEffect(() => {
     TwinAPI.getOverview()
       .then((res) => {
@@ -193,6 +227,7 @@ export const App: React.FC = () => {
         setCorridors(res.corridors || {});
       })
       .catch(() => {});
+    refreshParticipationPins();
     const fetchLive = () => {
       TwinAPI.getLiveTelemetry().then(setLiveTelemetry).catch(() => {});
       TwinAPI.getSensorThings()
@@ -202,7 +237,7 @@ export const App: React.FC = () => {
     fetchLive();
     const timer = window.setInterval(fetchLive, 60000);
     return () => window.clearInterval(timer);
-  }, []);
+  }, [refreshParticipationPins]);
 
   // Refresh Goal Gap when scope or goalTargets change
   useEffect(() => {
@@ -279,11 +314,14 @@ export const App: React.FC = () => {
         .then((res) => {
           setInspection(res);
           setRightCollapsed(false);
-          if (phase !== "diagnostics") setPhase("diagnostics");
+          if (typeof window !== "undefined" && window.innerWidth < 768) {
+            setLeftCollapsed(true);
+          }
+          if (viewMode === "technical" && phase !== "diagnostics") setPhase("diagnostics");
         })
         .catch(() => {});
     },
-    [phase],
+    [phase, viewMode],
   );
 
   const handleSelectScenario = useCallback((name: string) => {
@@ -309,15 +347,46 @@ export const App: React.FC = () => {
     [tours],
   );
 
+  const handleMapClickForPin = useCallback((lon: number, lat: number) => {
+    setPendingPinCoords({ lon, lat });
+    setPinPlacementMode(false);
+    setParticipationOpen(true);
+  }, []);
+
+  const handleToggleLeft = useCallback(() => {
+    setLeftCollapsed((c) => {
+      const next = !c;
+      if (!next && typeof window !== "undefined" && window.innerWidth < 768) {
+        setRightCollapsed(true);
+      }
+      return next;
+    });
+  }, []);
+
+  const handleToggleRight = useCallback(() => {
+    setRightCollapsed((c) => {
+      const next = !c;
+      if (!next && typeof window !== "undefined" && window.innerWidth < 768) {
+        setLeftCollapsed(true);
+      }
+      return next;
+    });
+  }, []);
+
   const selectedAgebId =
     inspection?.ageb && typeof inspection.ageb.cvegeo_ageb === "string"
       ? inspection.ageb.cvegeo_ageb
       : null;
 
   return (
-    <div className="relative h-screen w-screen overflow-hidden bg-[#050811] select-none">
+    <div className="relative flex h-screen w-screen flex-col overflow-hidden bg-[#050811] select-none">
+      {/* WCAG 2.1 AA Skip Navigation Link */}
+      <a href="#main-content" className="skip-link">
+        {language === "en" ? "Skip to 3D map content" : "Saltar al mapa 3D principal"}
+      </a>
+
       {/* Top Executive Navigation */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 z-30">
+      <div className="relative z-30 shrink-0">
         <TopCommandBar
           overview={overview}
           liveTelemetry={liveTelemetry}
@@ -334,6 +403,19 @@ export const App: React.FC = () => {
           onEngineModeChange={setEngineMode}
           basemapMode={basemapMode}
           onBasemapModeChange={setBasemapMode}
+          viewMode={viewMode}
+          onViewModeChange={(m) => {
+            setViewMode(m);
+            setRightCollapsed(false);
+            if (typeof window !== "undefined" && window.innerWidth < 768) {
+              setLeftCollapsed(true);
+            }
+          }}
+          colorblindSafe={colorblindSafe}
+          onToggleColorblindSafe={() => setColorblindSafe((v) => !v)}
+          participationOpen={participationOpen}
+          onToggleParticipation={() => setParticipationOpen((v) => !v)}
+          citizenPinsCount={citizenPins.length}
           onOpenArchitecture={() => {
             setArchMounted(true);
             setArchOpen(true);
@@ -348,106 +430,151 @@ export const App: React.FC = () => {
         />
       </div>
 
-      {/* Full-Bleed Dual-Engine 3D Viewport */}
-      <main className="h-full w-full">
-        {engineMode === "deck3d" ? (
-          <WebGLErrorBoundary fallbackTitle="Visor 3D Analítico (MapLibre + deck.gl)">
-            <AnalyticsMap3D
-              cameraTarget={cameraTarget}
-              basemapMode={basemapMode}
-              activeMetric={activeMetric}
-              layers={layers}
-              extrusionScale={extrusionScale}
-              agebs3dMode={agebs3dMode}
-              phase={phase}
-              simulation={simulation}
-              corridorArcs={overview?.corridor_arcs || []}
-              liveTelemetry={liveTelemetry}
-              sensorThings={sensorThings}
-              physicsOverlay={physicsOverlay}
-              selectedAgebId={selectedAgebId}
-              tours={tours}
-              activeTourId={activeTourId}
-              onStartTour={handleStartTour}
-              onStopTour={() => setActiveTourId(null)}
-              onViewportChange={(bbox, z) => {
-                setViewportBbox(bbox);
-                setViewportZoom(z);
-              }}
-              onOpenExportModal={() => {
-                setArchMounted(true);
-                setArchOpen(true);
-              }}
-              onInspectLocation={handleInspectLocation}
-              onQuickJumpCity={handleCityJump}
-            />
-          </WebGLErrorBoundary>
-        ) : (
-          <WebGLErrorBoundary fallbackTitle="Globo 3D CesiumJS">
-            <Suspense
-              fallback={
-                <div className="flex h-full w-full items-center justify-center bg-[#050811] text-xs font-semibold text-sky-300">
-                  {language === "en" ? "Loading 3D CesiumJS Globe..." : "Cargando Globo 3D CesiumJS..."}
-                </div>
-              }
-            >
-              <CesiumGlobe3D
+      {/* Main Viewport Container Below Dynamic Header */}
+      <div className="relative flex-1 min-h-0 w-full overflow-hidden">
+        {/* Full-Bleed Dual-Engine 3D Viewport */}
+        <main id="main-content" tabIndex={-1} className="h-full w-full">
+          {engineMode === "deck3d" ? (
+            <WebGLErrorBoundary fallbackTitle="Visor 3D Analítico (MapLibre + deck.gl)">
+              <AnalyticsMap3D
                 cameraTarget={cameraTarget}
-                activeCitySlug={activeCitySlug || "la_paz"}
+                basemapMode={basemapMode}
                 activeMetric={activeMetric}
+                colorblindSafe={colorblindSafe}
+                language={language}
+                layers={layers}
                 extrusionScale={extrusionScale}
+                agebs3dMode={agebs3dMode}
+                phase={phase}
+                simulation={simulation}
+                corridorArcs={overview?.corridor_arcs || []}
+                liveTelemetry={liveTelemetry}
+                sensorThings={sensorThings}
+                physicsOverlay={physicsOverlay}
+                citizenPins={citizenPins}
+                pendingPinCoords={pendingPinCoords}
+                pinPlacementMode={pinPlacementMode}
+                onMapClickForPin={handleMapClickForPin}
+                onCancelPinPlacement={() => setPinPlacementMode(false)}
+                selectedAgebId={selectedAgebId}
+                tours={tours}
+                activeTourId={activeTourId}
+                onStartTour={handleStartTour}
+                onStopTour={() => setActiveTourId(null)}
+                onViewportChange={(bbox, z) => {
+                  setViewportBbox(bbox);
+                  setViewportZoom(z);
+                }}
+                onOpenExportModal={() => {
+                  setArchMounted(true);
+                  setArchOpen(true);
+                }}
                 onInspectLocation={handleInspectLocation}
+                onQuickJumpCity={handleCityJump}
               />
-            </Suspense>
-          </WebGLErrorBoundary>
+            </WebGLErrorBoundary>
+          ) : (
+            <WebGLErrorBoundary fallbackTitle="Globo 3D CesiumJS">
+              <Suspense
+                fallback={
+                  <div className="flex h-full w-full items-center justify-center bg-[#050811] text-xs font-semibold text-sky-300">
+                    {language === "en" ? "Loading 3D CesiumJS Globe..." : "Cargando Globo 3D CesiumJS..."}
+                  </div>
+                }
+              >
+                <CesiumGlobe3D
+                  cameraTarget={cameraTarget}
+                  activeCitySlug={activeCitySlug || "la_paz"}
+                  activeMetric={activeMetric}
+                  extrusionScale={extrusionScale}
+                  onInspectLocation={handleInspectLocation}
+                />
+              </Suspense>
+            </WebGLErrorBoundary>
+          )}
+        </main>
+
+        {/* Floating Left Challenge & Layer Dock */}
+        <ChallengeLayerDock
+          collapsed={leftCollapsed}
+          onToggleCollapse={handleToggleLeft}
+          activeChallenge={activeChallenge}
+          onSelectChallenge={setActiveChallenge}
+          activeMetric={activeMetric}
+          onSelectMetric={setActiveMetric}
+          colorblindSafe={colorblindSafe}
+          onToggleColorblindSafe={() => setColorblindSafe((v) => !v)}
+          language={language}
+          layers={layers}
+          onToggleLayer={handleToggleLayer}
+          extrusionScale={extrusionScale}
+          onExtrusionScaleChange={setExtrusionScale}
+          agebs3dMode={agebs3dMode}
+          onToggleAgebs3d={() => setAgebs3dMode((v) => !v)}
+        />
+
+        {/* Floating Right Panel: Citizen Plain-Language Scorecard vs 4-Phase Technical Simulator */}
+        {viewMode === "citizen" ? (
+          <CitizenScorecardPanel
+            collapsed={rightCollapsed}
+            onToggleCollapse={handleToggleRight}
+            scopeId={scopeId}
+            overview={overview}
+            inspection={inspection}
+            liveTelemetry={liveTelemetry}
+            language={language}
+            onOpenParticipation={() => setParticipationOpen(true)}
+            onSwitchToTechnical={() => setViewMode("technical")}
+          />
+        ) : (
+          <PhaseTelemetryPanel
+            collapsed={rightCollapsed}
+            onToggleCollapse={handleToggleRight}
+            phase={phase}
+            scopeId={scopeId}
+            overview={overview}
+            inspection={inspection}
+            onClearInspection={() => setInspection(null)}
+            goalTargets={goalTargets}
+            onGoalTargetChange={(k, v) => setGoalTargets((prev) => ({ ...prev, [k]: v }))}
+            goalGap={goalGap}
+            onApplyOptimalLevers={handleApplyOptimalLevers}
+            scenarioName={scenarioName}
+            onSelectScenario={handleSelectScenario}
+            targetYear={targetYear}
+            onTargetYearChange={setTargetYear}
+            customLevers={customLevers}
+            onLeverChange={(k, v) => setCustomLevers((prev) => ({ ...prev, [k]: v }))}
+            simulation={simulation}
+            recommendations={recommendations}
+            physicsOverlay={physicsOverlay}
+            physicsJobStatus={physicsJobStatus}
+            onRunPhysicsProcess={handleRunPhysicsProcess}
+            onClearPhysicsOverlay={() => {
+              physicsRunTokenRef.current += 1;
+              setPhysicsOverlay(null);
+              setPhysicsJobStatus(null);
+            }}
+            onFlyTo={(cam) => setCameraTarget({ ...cam })}
+          />
         )}
-      </main>
+      </div>
 
-      {/* Floating Left Challenge & Layer Dock */}
-      <ChallengeLayerDock
-        collapsed={leftCollapsed}
-        onToggleCollapse={() => setLeftCollapsed((c) => !c)}
-        activeChallenge={activeChallenge}
-        onSelectChallenge={setActiveChallenge}
-        activeMetric={activeMetric}
-        onSelectMetric={setActiveMetric}
-        layers={layers}
-        onToggleLayer={handleToggleLayer}
-        extrusionScale={extrusionScale}
-        onExtrusionScaleChange={setExtrusionScale}
-        agebs3dMode={agebs3dMode}
-        onToggleAgebs3d={() => setAgebs3dMode((v) => !v)}
-      />
-
-      {/* Floating Right 4-Phase Telemetry & Simulator Panel */}
-      <PhaseTelemetryPanel
-        collapsed={rightCollapsed}
-        onToggleCollapse={() => setRightCollapsed((c) => !c)}
-        phase={phase}
-        scopeId={scopeId}
-        overview={overview}
-        inspection={inspection}
-        onClearInspection={() => setInspection(null)}
-        goalTargets={goalTargets}
-        onGoalTargetChange={(k, v) => setGoalTargets((prev) => ({ ...prev, [k]: v }))}
-        goalGap={goalGap}
-        onApplyOptimalLevers={handleApplyOptimalLevers}
-        scenarioName={scenarioName}
-        onSelectScenario={handleSelectScenario}
-        targetYear={targetYear}
-        onTargetYearChange={setTargetYear}
-        customLevers={customLevers}
-        onLeverChange={(k, v) => setCustomLevers((prev) => ({ ...prev, [k]: v }))}
-        simulation={simulation}
-        recommendations={recommendations}
-        physicsOverlay={physicsOverlay}
-        physicsJobStatus={physicsJobStatus}
-        onRunPhysicsProcess={handleRunPhysicsProcess}
-        onClearPhysicsOverlay={() => {
-          physicsRunTokenRef.current += 1;
-          setPhysicsOverlay(null);
-          setPhysicsJobStatus(null);
-        }}
+      {/* Moderated Citizen Participation PMDU Dialog */}
+      <ParticipationPanel
+        open={participationOpen}
+        onClose={() => setParticipationOpen(false)}
+        language={language}
+        pins={citizenPins}
+        sessionSubmittedPins={sessionSubmittedPins}
+        pmduPeriods={pmduPeriods}
+        categories={participationCategories}
+        pinPlacementMode={pinPlacementMode}
+        onTogglePinPlacementMode={() => setPinPlacementMode((v) => !v)}
+        pendingPinCoords={pendingPinCoords}
+        onSetManualCoords={setPendingPinCoords}
+        onPinSubmitted={(pin) => setSessionSubmittedPins((prev) => [pin, ...prev])}
+        onPinsUpdated={refreshParticipationPins}
         onFlyTo={(cam) => setCameraTarget({ ...cam })}
       />
 
@@ -465,7 +592,7 @@ export const App: React.FC = () => {
         </Suspense>
       )}
 
-      {/* Executive Architecture & Commercial Stack Modal */}
+      {/* Executive Governance, Architecture & Commercial Stack Modal */}
       {archMounted && (
         <Suspense fallback={null}>
           <ArchitectureModal

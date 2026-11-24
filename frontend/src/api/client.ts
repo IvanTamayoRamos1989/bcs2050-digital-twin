@@ -3,8 +3,10 @@ import type {
   ArchitectureResponse,
   BuildingRecord,
   ChatResponse,
+  CitizenPin,
   CorridorPreset,
   GoalGapResponse,
+  GovernanceSummaryResponse,
   InspectResponse,
   LiveTelemetrySummary,
   MetadataCatalogResponse,
@@ -12,6 +14,7 @@ import type {
   OgcPhysicsJobStatus,
   OgcPhysicsProcessId,
   OverviewResponse,
+  ParticipationResponse,
   RecommendationsResponse,
   SensorThingsCollectionResponse,
   SimulationResponse,
@@ -89,6 +92,56 @@ export const TwinAPI = {
   chat: (payload: { query: string; scope_id: string; scenario_name: string; language?: "es" | "en" }) =>
     apiFetch<ChatResponse>("/api/twin/chat", { method: "POST", body: JSON.stringify(payload) }),
   getArchitecture: () => apiFetch<ArchitectureResponse>("/api/twin/architecture"),
+  getGovernanceSummary: () => apiFetch<GovernanceSummaryResponse>("/api/twin/governance/summary"),
+  getParticipationPins: (opts?: {
+    pmdu_period?: string;
+    category?: string;
+    include_pending?: boolean;
+    plannerToken?: string;
+  }) => {
+    const qs = new URLSearchParams();
+    if (opts?.pmdu_period) qs.set("pmdu_period", opts.pmdu_period);
+    if (opts?.category) qs.set("category", opts.category);
+    if (opts?.include_pending) qs.set("include_pending", "true");
+    const suffix = qs.toString() ? `?${qs.toString()}` : "";
+    const headers: Record<string, string> = {};
+    if (opts?.plannerToken) headers["X-BCS-Planner-Token"] = opts.plannerToken;
+    return apiFetch<ParticipationResponse>(`/api/twin/participation${suffix}`, { headers });
+  },
+  submitParticipationPin: (payload: {
+    lon: number;
+    lat: number;
+    category: string;
+    title: string;
+    comment: string;
+    pmdu_period: string;
+    author_alias?: string;
+  }) =>
+    apiFetch<{
+      pin: CitizenPin;
+      persistence_backend: string;
+      message_es: string;
+      message_en: string;
+    }>("/api/twin/participation", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  moderateParticipationPin: (
+    pinId: string,
+    payload: { action: "approve" | "reject"; moderator_note?: string },
+    plannerToken?: string,
+  ) => {
+    const headers: Record<string, string> = {};
+    if (plannerToken) headers["X-BCS-Planner-Token"] = plannerToken;
+    return apiFetch<{ pin: CitizenPin; persistence_backend: string }>(
+      `/api/twin/participation/${encodeURIComponent(pinId)}/moderate`,
+      {
+        method: "POST",
+        headers,
+        body: JSON.stringify(payload),
+      },
+    );
+  },
   get3DTilesInfo: () => apiFetch<Tiles3DInfoResponse>("/api/twin/3dtiles/info"),
   getMetadata: () => apiFetch<MetadataCatalogResponse>("/api/twin/metadata"),
   getLiveTelemetry: () => apiFetch<LiveTelemetrySummary>("/api/twin/live/summary"),

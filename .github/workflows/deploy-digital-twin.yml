@@ -6,6 +6,7 @@ on:
     paths:
       - "backend/**"
       - "workers/**"
+      - "docs/**"
       - "frontend/**"
       - "Dockerfile"
       - ".github/workflows/deploy-digital-twin.yml"

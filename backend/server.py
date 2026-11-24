@@ -34,6 +34,12 @@ from backend.metadata_catalog import (
 )
 from backend.ogc_api import router as ogc_router
 from backend.ai_strategist import answer_strategist_chat_grounded
+from backend.participation import (
+    create_citizen_pin,
+    get_governance_summary,
+    list_citizen_pins,
+    moderate_citizen_pin,
+)
 from backend.security import SecurityAndRateLimitMiddleware
 from backend.sensorthings import get_pilot_schemas_catalog, router as sensorthings_router
 from backend.simulation_bridge import (
@@ -104,6 +110,21 @@ class ChatRequest(BaseModel):
     scope_id: str = "03"
     scenario_name: str = "COMPACT_SUSTAINABLE_2050"
     language: str = Field(default="es", pattern="^(es|en)$")
+
+
+class CitizenPinCreateRequest(BaseModel):
+    lon: float
+    lat: float
+    category: str = Field(min_length=2, max_length=40)
+    title: str = Field(min_length=3, max_length=140)
+    comment: str = Field(min_length=10, max_length=700)
+    pmdu_period: str = Field(default="PMDU-LPZ-2026", min_length=3, max_length=40)
+    author_alias: str | None = Field(default="Ciudadano BCS", max_length=60)
+
+
+class CitizenPinModerateRequest(BaseModel):
+    action: str = Field(pattern="^(approve|reject)$")
+    moderator_note: str = Field(default="", max_length=240)
 
 
 @app.get("/api/twin/health")
@@ -304,6 +325,54 @@ def twin_3dtiles_info() -> dict[str, Any]:
 
 app.include_router(sensorthings_router)
 app.include_router(ogc_router)
+
+
+@app.get("/api/twin/governance/summary")
+def twin_governance_summary() -> dict[str, Any]:
+    return get_governance_summary()
+
+
+@app.get("/api/twin/participation")
+def twin_participation_list(
+    pmdu_period: str | None = Query(default=None),
+    category: str | None = Query(default=None),
+    include_pending: bool = Query(default=False),
+) -> dict[str, Any]:
+    return list_citizen_pins(
+        pmdu_period=pmdu_period,
+        category=category,
+        include_pending=include_pending,
+    )
+
+
+@app.post("/api/twin/participation", status_code=201)
+def twin_participation_create(req: CitizenPinCreateRequest) -> dict[str, Any]:
+    try:
+        return create_citizen_pin(
+            lon=req.lon,
+            lat=req.lat,
+            category=req.category,
+            title=req.title,
+            comment=req.comment,
+            pmdu_period=req.pmdu_period,
+            author_alias=req.author_alias,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.post("/api/twin/participation/{pin_id}/moderate")
+def twin_participation_moderate(pin_id: str, req: CitizenPinModerateRequest) -> dict[str, Any]:
+    try:
+        return moderate_citizen_pin(
+            pin_id=pin_id,
+            action=req.action,
+            moderator_note=req.moderator_note,
+        )
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 @app.get("/api/twin/tours")

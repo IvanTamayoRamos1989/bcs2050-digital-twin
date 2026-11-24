@@ -14,6 +14,7 @@ import type {
   BasemapMode,
   BuildingRecord,
   CameraPreset,
+  CitizenPin,
   CorridorArc,
   LayerVisibility,
   LiveTelemetrySummary,
@@ -24,6 +25,7 @@ import type {
 import {
   METRIC_CATALOG,
   ZONING_CATEGORY_COLORS,
+  ZONING_CATEGORY_COLORS_COLORBLIND,
   getBuildingColor,
   interpolateMetricColor,
 } from "../utils/colorScales";
@@ -32,6 +34,8 @@ interface Props {
   cameraTarget: CameraPreset | null;
   basemapMode: BasemapMode;
   activeMetric: AgebMetricKey;
+  colorblindSafe?: boolean;
+  language?: "es" | "en";
   layers: LayerVisibility;
   extrusionScale: number;
   agebs3dMode: boolean;
@@ -41,6 +45,11 @@ interface Props {
   liveTelemetry: LiveTelemetrySummary | null;
   sensorThings?: SensorThingRecord[];
   physicsOverlay?: ActivePhysicsOverlay | null;
+  citizenPins?: CitizenPin[];
+  pendingPinCoords?: { lon: number; lat: number } | null;
+  pinPlacementMode?: boolean;
+  onMapClickForPin?: (lon: number, lat: number) => void;
+  onCancelPinPlacement?: () => void;
   selectedAgebId: string | null;
   tours?: AerialTour[];
   activeTourId?: string | null;
@@ -131,6 +140,8 @@ export const AnalyticsMap3D: React.FC<Props> = ({
   cameraTarget,
   basemapMode,
   activeMetric,
+  colorblindSafe = true,
+  language = "es",
   layers,
   extrusionScale,
   agebs3dMode,
@@ -140,6 +151,11 @@ export const AnalyticsMap3D: React.FC<Props> = ({
   liveTelemetry,
   sensorThings = [],
   physicsOverlay = null,
+  citizenPins = [],
+  pendingPinCoords = null,
+  pinPlacementMode = false,
+  onMapClickForPin,
+  onCancelPinPlacement,
   selectedAgebId,
   tours,
   activeTourId,
@@ -150,6 +166,7 @@ export const AnalyticsMap3D: React.FC<Props> = ({
   onInspectLocation,
   onQuickJumpCity,
 }) => {
+  const isEn = language === "en";
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const overlayRef = useRef<MapboxOverlay | null>(null);
@@ -160,6 +177,16 @@ export const AnalyticsMap3D: React.FC<Props> = ({
   const onViewportChangeRef = useRef(onViewportChange);
   const phaseRef = useRef<AretianPhase>(phase);
   const tilesetErrorRef = useRef<boolean>(false);
+  const pinPlacementModeRef = useRef<boolean>(pinPlacementMode);
+  const onMapClickForPinRef = useRef(onMapClickForPin);
+
+  useEffect(() => {
+    pinPlacementModeRef.current = pinPlacementMode;
+  }, [pinPlacementMode]);
+
+  useEffect(() => {
+    onMapClickForPinRef.current = onMapClickForPin;
+  }, [onMapClickForPin]);
 
   useEffect(() => {
     activeTourRef.current = activeTourId ?? null;
@@ -319,6 +346,11 @@ export const AnalyticsMap3D: React.FC<Props> = ({
     };
     map.on("dragstart", stopActiveTourOnUserInput);
     map.on("wheel", stopActiveTourOnUserInput);
+    map.on("click", (ev) => {
+      if (pinPlacementModeRef.current && onMapClickForPinRef.current) {
+        onMapClickForPinRef.current(ev.lngLat.lng, ev.lngLat.lat);
+      }
+    });
 
     mapRef.current = map;
     overlayRef.current = overlay;
@@ -524,7 +556,7 @@ export const AnalyticsMap3D: React.FC<Props> = ({
             const p = f.properties || {};
             const val = Number(p[activeMetric] ?? 0);
             const alpha = buildingsVisible ? 55 : 175;
-            return interpolateMetricColor(val, metricMeta, alpha);
+            return interpolateMetricColor(val, metricMeta, alpha, colorblindSafe);
           },
           getLineColor: (f: GeoJSON.Feature) =>
             f.properties?.cvegeo_ageb === selectedAgebId ? [255, 255, 255, 255] : [15, 23, 42, 160],
@@ -542,7 +574,7 @@ export const AnalyticsMap3D: React.FC<Props> = ({
           autoHighlight: true,
           highlightColor: [56, 189, 248, 120],
           updateTriggers: {
-            getFillColor: [activeMetric, buildingsVisible, zoom],
+            getFillColor: [activeMetric, buildingsVisible, zoom, colorblindSafe],
             getElevation: [activeMetric, extrusionScale, extrudeAgebs, phase, simulation],
             getLineColor: [selectedAgebId],
           },
@@ -579,7 +611,13 @@ export const AnalyticsMap3D: React.FC<Props> = ({
           filled: true,
           extruded: false,
           getPolygon: (d) => d.polygon,
-          getFillColor: (d) => ZONING_CATEGORY_COLORS[d.category] || [148, 163, 184, 110],
+          getFillColor: (d) => {
+            const palette = colorblindSafe ? ZONING_CATEGORY_COLORS_COLORBLIND : ZONING_CATEGORY_COLORS;
+            return palette[d.category] || [148, 163, 184, 110];
+          },
+          updateTriggers: {
+            getFillColor: [colorblindSafe],
+          },
           getLineColor: [255, 255, 255, 45],
           getLineWidth: 0.6,
           lineWidthUnits: "pixels",
@@ -655,7 +693,7 @@ export const AnalyticsMap3D: React.FC<Props> = ({
           },
           getFillColor: (d) => {
             const mult = deltas[d.ageb_cvegeo]?.height_multiplier ?? 1.0;
-            return getBuildingColor(d, activeMetric, mult);
+            return getBuildingColor(d, activeMetric, mult, colorblindSafe);
           },
           material: {
             ambient: 0.42,
@@ -668,7 +706,7 @@ export const AnalyticsMap3D: React.FC<Props> = ({
           highlightColor: [250, 204, 21, 220],
           updateTriggers: {
             getElevation: [extrusionScale, phase, simulation],
-            getFillColor: [activeMetric, phase, simulation],
+            getFillColor: [activeMetric, phase, simulation, colorblindSafe],
           },
           onHover: ({ x, y, object }) => {
             if (!object) return setHoverInfo(null);
@@ -1053,16 +1091,79 @@ export const AnalyticsMap3D: React.FC<Props> = ({
       );
     }
 
+    // 16. Moderated Citizen Participation PMDU Pins
+    if (layers.citizenPins && citizenPins.length > 0) {
+      list.push(
+        new ScatterplotLayer<CitizenPin>({
+          id: "citizen-participation-pins",
+          data: citizenPins,
+          getPosition: (d) => [d.lon, d.lat],
+          getRadius: 220,
+          radiusMinPixels: 7,
+          radiusMaxPixels: 15,
+          getFillColor: (d) => {
+            if (d.category === "water") return [0, 114, 178, 245];
+            if (d.category === "flood_heat") return [213, 94, 0, 245];
+            if (d.category === "mobility") return [86, 180, 233, 245];
+            if (d.category === "housing") return [204, 121, 167, 245];
+            if (d.category === "solar_energy") return [240, 228, 66, 245];
+            return [0, 158, 115, 245];
+          },
+          getLineColor: [255, 255, 255, 250],
+          lineWidthMinPixels: 2,
+          stroked: true,
+          pickable: true,
+          onHover: ({ x, y, object }) => {
+            if (!object) return setHoverInfo(null);
+            setHoverInfo({
+              x,
+              y,
+              title: `${object.title}`,
+              lines: [
+                `${object.pmdu_period} · ${object.author_alias}`,
+                `${object.comment.slice(0, 110)}${object.comment.length > 110 ? "..." : ""}`,
+              ],
+            });
+          },
+          onClick: ({ object }) => {
+            if (!object) return;
+            onInspectLocation(object.lon, object.lat, null, null);
+          },
+        }),
+      );
+    }
+
+    if (pendingPinCoords) {
+      list.push(
+        new ScatterplotLayer({
+          id: "citizen-pin-draft",
+          data: [pendingPinCoords],
+          getPosition: (d) => [d.lon, d.lat],
+          getRadius: 260,
+          radiusMinPixels: 9,
+          radiusMaxPixels: 18,
+          getFillColor: [250, 204, 21, 245],
+          getLineColor: [15, 23, 42, 255],
+          lineWidthMinPixels: 2.5,
+          stroked: true,
+          pickable: false,
+        }),
+      );
+    }
+
     return list;
   }, [
     activeMetric,
     agebs3dMode,
     buildings,
+    citizenPins,
+    colorblindSafe,
     corridorArcs,
     extrusionScale,
     geoCache,
     layers,
     liveTelemetry,
+    pendingPinCoords,
     sensorThings,
     physicsOverlay,
     onInspectLocation,
@@ -1080,8 +1181,33 @@ export const AnalyticsMap3D: React.FC<Props> = ({
   }, [deckLayers]);
 
   return (
-    <div className="relative h-full w-full overflow-hidden">
-      <div ref={containerRef} className="h-full w-full" />
+    <div className={`relative h-full w-full overflow-hidden ${pinPlacementMode ? "cursor-crosshair" : ""}`}>
+      <div
+        ref={containerRef}
+        aria-label={isEn ? "Interactive 3D map of Baja California Sur" : "Mapa 3D interactivo de Baja California Sur"}
+        className="h-full w-full"
+      />
+
+      {pinPlacementMode && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="glass-panel pointer-events-auto absolute left-1/2 top-3 z-40 flex max-w-[calc(100vw-24px)] -translate-x-1/2 items-center gap-3 rounded-full border border-amber-400/60 bg-slate-950/95 px-4 py-2 text-xs text-amber-200 shadow-2xl"
+        >
+          <span className="font-semibold">
+            {isEn
+              ? "Click anywhere on the 3D map to drop your PMDU consultation pin"
+              : "Haz clic en cualquier punto del mapa 3D para ubicar tu pin PMDU"}
+          </span>
+          <button
+            type="button"
+            onClick={onCancelPinPlacement}
+            className="rounded-full bg-slate-800 px-2.5 py-0.5 text-[11px] font-bold text-white hover:bg-slate-700 cursor-pointer"
+          >
+            {isEn ? "Cancel" : "Cancelar"}
+          </button>
+        </div>
+      )}
 
       {/* Hover Tooltip */}
       {hoverInfo && (
@@ -1099,7 +1225,7 @@ export const AnalyticsMap3D: React.FC<Props> = ({
       )}
 
       {/* Bottom Live Viewport Telemetry, Aerial Tours & CAD/BIM Export Trigger */}
-      <div className="glass-panel pointer-events-auto absolute bottom-4 left-1/2 z-20 flex max-w-[94vw] -translate-x-1/2 items-center gap-2 rounded-full px-3 py-1.5 text-[11px] whitespace-nowrap">
+      <div className="glass-panel pointer-events-auto absolute bottom-3 left-3 sm:left-1/2 z-20 flex max-w-[calc(100vw-74px)] sm:max-w-[calc(100vw-130px)] sm:-translate-x-1/2 items-center gap-2 overflow-x-auto rounded-full px-3 py-1.5 text-[11px] whitespace-nowrap">
         <span className="flex items-center gap-1 font-mono-num text-slate-300">
           <Compass className="h-3.5 w-3.5 text-sky-400" />
           Z {zoom.toFixed(1)}

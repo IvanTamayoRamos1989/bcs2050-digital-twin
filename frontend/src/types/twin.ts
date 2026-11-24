@@ -1,5 +1,7 @@
 export type AretianPhase = "diagnostics" | "goals" | "scenarios" | "recommendations";
 
+export type ViewMode = "technical" | "citizen";
+
 export type EngineMode = "deck3d" | "cesium3d";
 
 export type BasemapMode = "obsidian" | "satellite" | "terrain";
@@ -573,4 +575,73 @@ export interface LayerVisibility {
   corridorArcs: boolean;
   plannedProjects: boolean;
   liveTelemetry: boolean;
+  citizenPins: boolean;
+}
+
+export interface CitizenPin {
+  pin_id: string;
+  lon: number;
+  lat: number;
+  municipality_code: string;
+  pmdu_period: string;
+  category: string;
+  title: string;
+  comment: string;
+  author_alias: string;
+  status: "approved" | "pending_moderation" | "rejected" | string;
+  created_at: string;
+  moderated_at: string;
+  moderator_note: string;
+  seeded_example: boolean;
+  pii_redacted: boolean;
+}
+
+export interface PmduConsultationPeriod {
+  id: string;
+  municipality_code: string;
+  label_es: string;
+  label_en: string;
+  window: string;
+  status: string;
+}
+
+export interface ParticipationCategoryMeta {
+  id: string;
+  label_es: string;
+  label_en: string;
+}
+
+export interface ParticipationResponse {
+  count: number;
+  approved_count: number;
+  pending_count: number;
+  include_pending: boolean;
+  persistence_backend: string;
+  moderation_rbac_mode: string;
+  pmdu_periods: PmduConsultationPeriod[];
+  categories: ParticipationCategoryMeta[];
+  privacy_notice_es: string;
+  privacy_notice_en: string;
+  pins: CitizenPin[];
+}
+
+export interface GovernanceDocumentSpec {
+  id: string;
+  category: string;
+  path: string;
+  title_es: string;
+  title_en: string;
+  summary_es: string;
+  summary_en: string;
+  exists: boolean;
+  size_bytes: number;
+}
+
+export interface GovernanceSummaryResponse {
+  framework: string;
+  legal_frameworks: string[];
+  steering_committee: { entity: string; role: string }[];
+  data_classification_tiers: { tier: string; license: string; scope: string }[];
+  technical_controls: Record<string, boolean>;
+  documents: GovernanceDocumentSpec[];
 }
