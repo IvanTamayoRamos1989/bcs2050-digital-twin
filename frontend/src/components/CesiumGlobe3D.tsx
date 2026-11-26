@@ -451,22 +451,22 @@ export const CesiumGlobe3D: React.FC<Props> = ({
         aria-label={isEn ? "CesiumJS 3D Globe of Baja California Sur" : "Globo 3D CesiumJS de Baja California Sur"}
         className="h-full w-full"
       />
-      <div className="glass-panel pointer-events-auto absolute bottom-3 left-1/2 z-20 flex max-w-[calc(100vw-24px)] -translate-x-1/2 items-center gap-2.5 overflow-x-auto rounded-full px-3.5 py-1.5 text-[11px] whitespace-nowrap">
-        <span className="flex items-center gap-1.5 text-sky-300 font-semibold">
+      <div className="ios-glass pointer-events-auto absolute bottom-4 left-1/2 z-20 flex max-w-[calc(100vw-32px)] -translate-x-1/2 items-center gap-2.5 overflow-x-auto rounded-full px-4 py-2 text-[11.5px] whitespace-nowrap">
+        <span className="flex items-center gap-1.5 text-[#64D2FF] font-semibold">
           <Globe2 className="h-3.5 w-3.5" aria-hidden="true" />
           CesiumJS 3D · {activeModeLabel}
         </span>
 
         {googleTilesLoaded && (
           <>
-            <span className="h-3 w-px bg-slate-700" />
-            <div role="group" aria-label={isEn ? "Cesium 3D mode switcher" : "Selector modo 3D Cesium"} className="flex items-center rounded-full bg-slate-900/90 p-0.5 ring-1 ring-slate-700">
+            <span className="h-3 w-px bg-white/[0.14]" />
+            <div role="group" aria-label={isEn ? "Cesium 3D mode switcher" : "Selector modo 3D Cesium"} className="ios-segmented flex items-center">
               <button
                 type="button"
                 onClick={() => setCesiumViewMode("photorealistic")}
                 aria-pressed={cesiumViewMode === "photorealistic"}
-                className={`rounded-full px-2 py-0.5 text-[10px] font-bold cursor-pointer ${
-                  cesiumViewMode === "photorealistic" ? "bg-emerald-400 text-slate-950" : "text-slate-200 hover:text-white"
+                className={`rounded-full px-2.5 py-0.5 text-[10.5px] font-semibold transition-all cursor-pointer ${
+                  cesiumViewMode === "photorealistic" ? "bg-[#30D158] text-[#050507]" : "text-[#EBEBF5]/75 hover:text-white"
                 }`}
               >
                 {isEn ? "Photorealistic 3D" : "Fotorrealista 3D"}
@@ -475,8 +475,8 @@ export const CesiumGlobe3D: React.FC<Props> = ({
                 type="button"
                 onClick={() => setCesiumViewMode("analytical")}
                 aria-pressed={cesiumViewMode === "analytical"}
-                className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold cursor-pointer ${
-                  cesiumViewMode === "analytical" ? "bg-sky-400 text-slate-950" : "text-slate-200 hover:text-white"
+                className={`flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10.5px] font-semibold transition-all cursor-pointer ${
+                  cesiumViewMode === "analytical" ? "ios-segment-active" : "text-[#EBEBF5]/75 hover:text-white"
                 }`}
               >
                 <Layers className="h-2.5 w-2.5" aria-hidden="true" />
@@ -486,8 +486,8 @@ export const CesiumGlobe3D: React.FC<Props> = ({
           </>
         )}
 
-        <span className="h-3 w-px bg-slate-700" />
-        <span className="font-mono-num text-emerald-200">
+        <span className="h-3 w-px bg-white/[0.14]" />
+        <span className="font-mono-num text-[#30D158]">
           {streaming3DTiles
             ? `${buildingCount.toLocaleString()} ${isEn ? "3D bldgs" : "edif. 3D"}`
             : `${buildingCount.toLocaleString()} ${isEn ? "bldgs" : "edif."} (${activeCitySlug || "la_paz"})`}
@@ -495,23 +495,23 @@ export const CesiumGlobe3D: React.FC<Props> = ({
 
         {cesiumViewMode === "analytical" && (
           <>
-            <span className="hidden sm:inline-flex h-3 w-px bg-slate-700" />
-            <span className="hidden sm:flex items-center gap-2 text-[10px] text-slate-200">
+            <span className="hidden sm:inline-flex h-3 w-px bg-white/[0.14]" />
+            <span className="hidden sm:flex items-center gap-2 text-[10.5px] text-[#EBEBF5]/80">
               <span className="inline-flex items-center gap-1">
-                <span className="h-2 w-2 rounded-xs bg-slate-100 ring-1 ring-slate-500" /> &lt;6m
+                <span className="h-2 w-2 rounded-full bg-[#F5F5F7] ring-1 ring-white/30" /> &lt;6m
               </span>
               <span className="inline-flex items-center gap-1">
-                <span className="h-2 w-2 rounded-xs bg-blue-400" /> 9–15m
+                <span className="h-2 w-2 rounded-full bg-[#0A84FF]" /> 9–15m
               </span>
               <span className="inline-flex items-center gap-1">
-                <span className="h-2 w-2 rounded-xs bg-sky-400" /> 16m+
+                <span className="h-2 w-2 rounded-full bg-[#64D2FF]" /> 16m+
               </span>
             </span>
           </>
         )}
 
         {!googleKey && (
-          <span className="hidden lg:flex items-center gap-1 text-[10px] text-amber-200">
+          <span className="hidden lg:flex items-center gap-1 text-[10px] text-[#FF9F0A]">
             <KeyRound className="h-3 w-3" aria-hidden="true" />
             VITE_GOOGLE_MAPS_API_KEY
           </span>

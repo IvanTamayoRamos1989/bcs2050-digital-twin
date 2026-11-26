@@ -1,18 +1,16 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
-  Activity,
   Bot,
+  ChevronRight,
   Compass,
-  Eye,
   ExternalLink,
   Globe2,
   Layers,
   MapPin,
   MessageSquarePlus,
   Radio,
+  ShieldCheck,
   SlidersHorizontal,
-  Sparkles,
-  Target,
   Users,
   X,
 } from "lucide-react";
@@ -26,6 +24,7 @@ import type {
   SensorThingRecord,
   ViewMode,
 } from "../types/twin";
+import { IosSwitch } from "./IosSwitch";
 
 interface Props {
   overview: OverviewResponse | null;
@@ -57,21 +56,14 @@ interface Props {
   onLanguageChange: (lang: "es" | "en") => void;
 }
 
-const PHASES: { id: AretianPhase; num: string; labelEs: string; labelEn: string; icon: React.ReactNode }[] = [
-  { id: "diagnostics", num: "01", labelEs: "Diagnóstico", labelEn: "Diagnostics", icon: <Activity className="h-3.5 w-3.5" /> },
-  { id: "goals", num: "02", labelEs: "Metas 2050", labelEn: "2050 Goals", icon: <Target className="h-3.5 w-3.5" /> },
-  { id: "scenarios", num: "03", labelEs: "Escenarios", labelEn: "Scenarios", icon: <SlidersHorizontal className="h-3.5 w-3.5" /> },
-  { id: "recommendations", num: "04", labelEs: "Acciones", labelEn: "Actions", icon: <Sparkles className="h-3.5 w-3.5" /> },
-];
-
 export const TopCommandBar: React.FC<Props> = ({
   overview,
   liveTelemetry,
   sensorThings = [],
   liveActive,
   onToggleLive,
-  phase,
-  onPhaseChange,
+  phase: _phase,
+  onPhaseChange: _onPhaseChange,
   scopeId,
   onScopeChange,
   activeCitySlug,
@@ -93,7 +85,12 @@ export const TopCommandBar: React.FC<Props> = ({
   language,
   onLanguageChange,
 }) => {
+  void _phase;
+  void _onPhaseChange;
+
   const [livePopoverOpen, setLivePopoverOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+
   const cities = overview ? Object.values(overview.cities) : [];
   const totalBuildings = overview?.state.buildings_3d_count ?? 396823;
   const isEn = language === "en";
@@ -101,113 +98,61 @@ export const TopCommandBar: React.FC<Props> = ({
   const overallStatus = liveTelemetry?.overall_status || weatherFeed?.status || "CACHED";
   const statusDotClass =
     overallStatus === "LIVE"
-      ? "bg-emerald-400"
+      ? "bg-[#30D158]"
       : overallStatus === "OFFLINE"
-        ? "bg-rose-400"
-        : "bg-amber-400";
-  const freshnessPillText = weatherFeed
-    ? isEn
-      ? weatherFeed.freshness_en
-      : weatherFeed.freshness_es
-    : overallStatus;
+        ? "bg-[#FF453A]"
+        : "bg-[#FF9F0A]";
+  const shortStatus =
+    overallStatus === "LIVE"
+      ? isEn
+        ? "Live"
+        : "Vivo"
+      : overallStatus === "OFFLINE"
+        ? isEn
+          ? "Offline"
+          : "Sin red"
+        : isEn
+          ? "Cached"
+          : "Caché";
   const sensorCount = sensorThings.length || 14;
 
+  useEffect(() => {
+    if (!livePopoverOpen && !settingsOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setLivePopoverOpen(false);
+        setSettingsOpen(false);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [livePopoverOpen, settingsOpen]);
+
   return (
-    <header className="glass-panel pointer-events-auto relative z-30 flex flex-wrap items-center justify-between gap-2 px-3 py-2 border-b border-sky-400/20 max-w-full">
-      {/* Brand + Scale Counter */}
-      <div className="flex items-center gap-2.5">
-        <div
-          aria-hidden="true"
-          className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-sky-400 to-emerald-400 text-slate-950 font-bold text-xs shadow-lg shadow-sky-500/25"
-        >
-          BCS
-        </div>
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-xs font-bold tracking-wider text-white uppercase">
-              BCS2050 · City Digital Twin
-            </h1>
-            <span className="hidden sm:inline-flex items-center rounded-full bg-emerald-500/15 px-2 py-0.5 font-mono-num text-[10px] font-semibold text-emerald-200 ring-1 ring-emerald-400/35">
-              LIVE · {totalBuildings.toLocaleString()} {isEn ? "3D BUILDINGS" : "EDIFICIOS 3D"}
-            </span>
+    <header className="ios-topbar pointer-events-auto relative z-30 flex h-14 w-full max-w-full flex-nowrap items-center justify-between gap-1.5 px-3 sm:px-4 whitespace-nowrap">
+      {/* Left: Machined Anodized Brand Squircle + Scope & 3D City Jump */}
+      <div className="flex min-w-0 items-center gap-1.5 overflow-hidden">
+        <div className="flex items-center gap-2 shrink-0">
+          <div
+            aria-hidden="true"
+            className="flex h-8 w-8 items-center justify-center rounded-[10px] bg-gradient-to-b from-[#2E2E35] to-[#17171B] text-[10.5px] font-semibold tracking-tight text-[#F5F5F7] ring-1 ring-white/15 shadow-[inset_0_1px_0_rgba(255,255,255,0.22),0_4px_12px_rgba(0,0,0,0.45)]"
+          >
+            BCS
           </div>
-          <p className="text-[10px] text-slate-300 hidden xl:block">
-            {isEn
-              ? "City Science (Aretian Benchmark) · Esri Digital Thread · Ontology v3.0"
-              : "City Science (Aretian Benchmark) · Esri Digital Thread · Ontología v3.0"}
-          </p>
-        </div>
-      </div>
-
-      {/* Citizen vs Technical Mode Toggle + 4-Phase Workflow Switcher */}
-      <div className="flex flex-wrap items-center gap-1.5">
-        <div
-          role="group"
-          aria-label={isEn ? "Interface view mode" : "Modo de interfaz"}
-          className="flex items-center rounded-lg bg-slate-900/95 p-0.5 ring-1 ring-slate-700/80"
-        >
-          <button
-            type="button"
-            onClick={() => onViewModeChange("citizen")}
-            aria-pressed={viewMode === "citizen"}
-            className={`flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-semibold transition-all cursor-pointer ${
-              viewMode === "citizen"
-                ? "bg-emerald-400 text-slate-950"
-                : "text-slate-200 hover:bg-slate-800 hover:text-white"
-            }`}
-          >
-            <Users className="h-3.5 w-3.5" />
-            <span>{isEn ? "Citizen Mode" : "Modo Ciudadano"}</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => onViewModeChange("technical")}
-            aria-pressed={viewMode === "technical"}
-            className={`flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-semibold transition-all cursor-pointer ${
-              viewMode === "technical"
-                ? "bg-sky-400 text-slate-950"
-                : "text-slate-200 hover:bg-slate-800 hover:text-white"
-            }`}
-          >
-            <SlidersHorizontal className="h-3 w-3" />
-            <span>{isEn ? "Technical" : "Técnico"}</span>
-          </button>
+          <div className="hidden sm:flex items-center gap-1.5">
+            <h1 className="text-[13.5px] font-semibold tracking-tight text-[#F5F5F7]">
+              BCS 2050
+            </h1>
+            <span
+              title={`${totalBuildings.toLocaleString()} ${isEn ? "3D buildings live" : "edificios 3D en vivo"}`}
+              className={`h-1.5 w-1.5 rounded-full ${statusDotClass} ${overallStatus === "LIVE" ? "animate-pulse" : ""}`}
+            />
+          </div>
         </div>
 
-        {viewMode === "technical" && (
-          <nav
-            aria-label={isEn ? "City Science Phases" : "Fases City Science"}
-            className="hidden lg:flex items-center gap-1 rounded-lg bg-slate-900/95 p-1 ring-1 ring-slate-700/80"
-          >
-            {PHASES.map((p) => {
-              const active = phase === p.id;
-              return (
-                <button
-                  key={p.id}
-                  type="button"
-                  onClick={() => onPhaseChange(p.id)}
-                  aria-pressed={active}
-                  className={`flex items-center gap-1.5 rounded-md px-2 py-1 text-[11px] font-medium transition-all cursor-pointer ${
-                    active
-                      ? "bg-sky-400 text-slate-950 font-semibold shadow-md shadow-sky-500/30"
-                      : "text-slate-200 hover:bg-slate-800 hover:text-white"
-                  }`}
-                >
-                  <span className="font-mono-num opacity-85 text-[10px]">{p.num}</span>
-                  {p.icon}
-                  <span>{isEn ? p.labelEn : p.labelEs}</span>
-                </button>
-              );
-            })}
-          </nav>
-        )}
-      </div>
-
-      {/* Scope, City Jump, Engine, Participation & Tools */}
-      <div className="flex flex-wrap items-center gap-1.5">
-        {/* Scope Selector */}
-        <div className="flex items-center gap-1 rounded-lg bg-slate-900/95 px-2 py-1 ring-1 ring-slate-700/80">
-          <Compass className="h-3.5 w-3.5 text-sky-300" aria-hidden="true" />
+        {/* Scope Selector Pill */}
+        <div className="ios-pill flex items-center gap-1.5 px-2.5 py-1.5 min-w-0 max-w-[144px] overflow-hidden">
+          <Compass className="h-3.5 w-3.5 text-[#0A84FF] shrink-0" aria-hidden="true" />
           <select
             aria-label={isEn ? "Territorial Scope" : "Ámbito Territorial"}
             value={scopeId}
@@ -221,207 +166,240 @@ export const TopCommandBar: React.FC<Props> = ({
                 onScopeChange(val);
               }
             }}
-            className="bg-transparent text-[11px] font-medium text-slate-100 focus:outline-none cursor-pointer"
+            className="w-full min-w-0 truncate bg-transparent text-[11.5px] font-medium text-[#F5F5F7] focus:outline-none cursor-pointer"
           >
-            <option value="03" className="bg-slate-900">Estado BCS (03)</option>
-            <optgroup label={isEn ? "Municipalities (5)" : "Municipios (5)"} className="bg-slate-900">
-              <option value="03003" className="bg-slate-900">La Paz (03003)</option>
-              <option value="03008" className="bg-slate-900">Los Cabos (03008)</option>
-              <option value="03009" className="bg-slate-900">Loreto (03009)</option>
-              <option value="03001" className="bg-slate-900">Comondú (03001)</option>
-              <option value="03002" className="bg-slate-900">Mulegé (03002)</option>
+            <option value="03" className="bg-[#16161A] text-[#F5F5F7]">Estado BCS (03)</option>
+            <optgroup label={isEn ? "Municipalities (5)" : "Municipios (5)"} className="bg-[#16161A] text-[#F5F5F7]">
+              <option value="03003" className="bg-[#16161A] text-[#F5F5F7]">La Paz (03003)</option>
+              <option value="03008" className="bg-[#16161A] text-[#F5F5F7]">Los Cabos (03008)</option>
+              <option value="03009" className="bg-[#16161A] text-[#F5F5F7]">Loreto (03009)</option>
+              <option value="03001" className="bg-[#16161A] text-[#F5F5F7]">Comondú (03001)</option>
+              <option value="03002" className="bg-[#16161A] text-[#F5F5F7]">Mulegé (03002)</option>
             </optgroup>
-            <optgroup label={isEn ? "Strategic Corridors (4)" : "Corredores Estratégicos (4)"} className="bg-slate-900">
-              <option value="CORR-SUR-CABOS" className="bg-slate-900">Corredor Sur · Los Cabos</option>
-              <option value="CORR-CENTRO-LA-PAZ" className="bg-slate-900">Corredor Centro · La Paz</option>
-              <option value="CORR-VALLE-COMONDU" className="bg-slate-900">Corredor Valle · Comondú</option>
-              <option value="CORR-NORTE-LORETO-MULEGE" className="bg-slate-900">Corredor Norte · Loreto–Mulegé</option>
+            <optgroup label={isEn ? "Strategic Corridors (4)" : "Corredores Estratégicos (4)"} className="bg-[#16161A] text-[#F5F5F7]">
+              <option value="CORR-SUR-CABOS" className="bg-[#16161A] text-[#F5F5F7]">Corredor Sur · Los Cabos</option>
+              <option value="CORR-CENTRO-LA-PAZ" className="bg-[#16161A] text-[#F5F5F7]">Corredor Centro · La Paz</option>
+              <option value="CORR-VALLE-COMONDU" className="bg-[#16161A] text-[#F5F5F7]">Corredor Valle · Comondú</option>
+              <option value="CORR-NORTE-LORETO-MULEGE" className="bg-[#16161A] text-[#F5F5F7]">Corredor Norte · Loreto–Mulegé</option>
             </optgroup>
           </select>
         </div>
 
-        {/* 9-City Camera Jump */}
-        <div className="hidden sm:flex items-center gap-1 rounded-lg bg-slate-900/95 px-2 py-1 ring-1 ring-slate-700/80">
-          <MapPin className="h-3.5 w-3.5 text-emerald-300" aria-hidden="true" />
+        {/* 9-City Camera Jump Pill */}
+        <div className="ios-pill hidden xl:flex items-center gap-1.5 px-2.5 py-1.5 min-w-0 max-w-[136px] overflow-hidden">
+          <MapPin className="h-3.5 w-3.5 text-[#30D158] shrink-0" aria-hidden="true" />
           <select
             aria-label={isEn ? "Fly to 3D City" : "Vuelo rápido a Ciudad 3D"}
             value={activeCitySlug}
             onChange={(e) => onCityJump(e.target.value)}
-            className="bg-transparent text-[11px] font-medium text-slate-100 focus:outline-none cursor-pointer"
+            className="w-full min-w-0 truncate bg-transparent text-[11.5px] font-medium text-[#F5F5F7] focus:outline-none cursor-pointer"
           >
-            <option value="" className="bg-slate-900">
-              {isEn ? "Fly to 3D City..." : "Vuelo a Ciudad 3D..."}
+            <option value="" className="bg-[#16161A] text-[#F5F5F7]">
+              {isEn ? "Fly to 3D City..." : "Ciudad 3D..."}
             </option>
             {cities.map((c) => (
-              <option key={c.slug} value={c.slug} className="bg-slate-900">
-                {c.name} ({c.buildings_count.toLocaleString()} {isEn ? "bldgs" : "edif."})
+              <option key={c.slug} value={c.slug} className="bg-[#16161A] text-[#F5F5F7]">
+                {c.name}
               </option>
             ))}
           </select>
         </div>
+      </div>
 
-        {/* Dual 3D Engine Toggle */}
+      {/* Center: Spatial 3D Engine Segmented Pill + Basemap Selector */}
+      <div className="hidden md:flex items-center gap-1.5 shrink-0">
         <div
           role="group"
           aria-label={isEn ? "3D engine switcher" : "Selector de motor 3D"}
-          className="hidden md:flex items-center rounded-lg bg-slate-900/95 p-0.5 ring-1 ring-slate-700/80"
+          className="ios-segmented flex items-center"
         >
           <button
             type="button"
             onClick={() => onEngineModeChange("deck3d")}
             aria-pressed={engineMode === "deck3d"}
-            className={`flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium cursor-pointer ${
-              engineMode === "deck3d" ? "bg-indigo-600 text-white font-semibold" : "text-slate-200 hover:text-white"
+            className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11.5px] font-medium transition-all cursor-pointer whitespace-nowrap ${
+              engineMode === "deck3d"
+                ? "ios-segment-active font-semibold"
+                : "text-[#EBEBF5]/70 hover:text-[#F5F5F7]"
             }`}
           >
-            <Layers className="h-3 w-3" />
+            <Layers className="h-3 w-3" aria-hidden="true" />
             <span>{isEn ? "Analytical 3D" : "3D Analítico"}</span>
           </button>
           <button
             type="button"
             onClick={() => onEngineModeChange("cesium3d")}
             aria-pressed={engineMode === "cesium3d"}
-            className={`flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium cursor-pointer ${
-              engineMode === "cesium3d" ? "bg-indigo-600 text-white font-semibold" : "text-slate-200 hover:text-white"
+            className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11.5px] font-medium transition-all cursor-pointer whitespace-nowrap ${
+              engineMode === "cesium3d"
+                ? "ios-segment-active font-semibold"
+                : "text-[#EBEBF5]/70 hover:text-[#F5F5F7]"
             }`}
           >
-            <Globe2 className="h-3 w-3" />
+            <Globe2 className="h-3 w-3" aria-hidden="true" />
             <span>{isEn ? "Cesium Globe" : "Globo Cesium"}</span>
           </button>
         </div>
 
-        {/* Basemap Mode */}
         {engineMode === "deck3d" && (
-          <select
-            aria-label={isEn ? "Basemap style" : "Estilo de mapa base"}
-            value={basemapMode}
-            onChange={(e) => onBasemapModeChange(e.target.value as BasemapMode)}
-            className="hidden lg:block rounded-lg bg-slate-900/95 px-2 py-1 text-[11px] font-medium text-slate-100 ring-1 ring-slate-700/80 focus:outline-none cursor-pointer"
-          >
-            <option value="obsidian" className="bg-slate-900">
-              {isEn ? "Obsidian Map" : "Mapa Obsidian"}
-            </option>
-            <option value="satellite" className="bg-slate-900">
-              {isEn ? "HD Satellite" : "Satélite HD"}
-            </option>
-            <option value="terrain" className="bg-slate-900">
-              {isEn ? "3D Relief" : "Relieve 3D"}
-            </option>
-          </select>
+          <div className="ios-pill hidden lg:flex items-center px-2.5 py-1.5 shrink-0">
+            <select
+              aria-label={isEn ? "Basemap style" : "Estilo de mapa base"}
+              value={basemapMode}
+              onChange={(e) => onBasemapModeChange(e.target.value as BasemapMode)}
+              className="bg-transparent text-[11.5px] font-medium text-[#F5F5F7] focus:outline-none cursor-pointer whitespace-nowrap"
+            >
+              <option value="obsidian" className="bg-[#16161A] text-[#F5F5F7]">
+                {isEn ? "Obsidian Map" : "Mapa Obsidian"}
+              </option>
+              <option value="satellite" className="bg-[#16161A] text-[#F5F5F7]">
+                {isEn ? "HD Satellite" : "Satélite HD"}
+              </option>
+              <option value="terrain" className="bg-[#16161A] text-[#F5F5F7]">
+                {isEn ? "3D Relief" : "Relieve 3D"}
+              </option>
+            </select>
+          </div>
         )}
+      </div>
 
-        {/* Colorblind-Safe Okabe-Ito / Viridis Toggle */}
-        <button
-          type="button"
-          onClick={onToggleColorblindSafe}
-          aria-pressed={colorblindSafe}
-          aria-label={isEn ? "CVD colorblind-safe Okabe-Ito palette" : "CVD paleta inclusiva para daltonismo Okabe-Ito"}
-          title={isEn ? "Colorblind-safe Okabe-Ito / Viridis palette (WCAG)" : "Paleta segura para daltonismo Okabe-Ito / Viridis (WCAG)"}
-          className={`hidden sm:flex items-center gap-1 rounded-lg px-2 py-1 text-[10.5px] font-semibold transition-all cursor-pointer ${
-            colorblindSafe
-              ? "bg-amber-400 text-slate-950"
-              : "bg-slate-800/90 text-slate-200 ring-1 ring-slate-600 hover:bg-slate-700"
-          }`}
+      {/* Right: Citizen/Tech Segmented Pill, Participation, Telemetry, Apple Intelligence & Control Center */}
+      <div className="flex items-center gap-1.5 shrink-0">
+        {/* Citizen vs Technical Mode Segmented Pill */}
+        <div
+          role="group"
+          aria-label={isEn ? "Interface view mode" : "Modo de interfaz"}
+          className="hidden sm:flex ios-segmented items-center"
         >
-          <Eye className="h-3 w-3" />
-          <span>CVD</span>
-        </button>
+          <button
+            type="button"
+            onClick={() => onViewModeChange("citizen")}
+            aria-pressed={viewMode === "citizen"}
+            className={`flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium transition-all cursor-pointer whitespace-nowrap ${
+              viewMode === "citizen"
+                ? "bg-[#30D158] text-[#050507] font-semibold shadow-sm"
+                : "text-[#EBEBF5]/75 hover:text-[#F5F5F7]"
+            }`}
+          >
+            <Users className="h-3 w-3" aria-hidden="true" />
+            <span>{isEn ? "Citizen" : "Ciudadano"}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => onViewModeChange("technical")}
+            aria-pressed={viewMode === "technical"}
+            className={`flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium transition-all cursor-pointer whitespace-nowrap ${
+              viewMode === "technical"
+                ? "ios-segment-active font-semibold"
+                : "text-[#EBEBF5]/75 hover:text-[#F5F5F7]"
+            }`}
+          >
+            <span>{isEn ? "Technical" : "Técnico"}</span>
+          </button>
+        </div>
 
-        {/* Citizen Participation PMDU Button */}
+        {/* Citizen Participation Pill */}
         <button
           type="button"
           onClick={onToggleParticipation}
           aria-pressed={participationOpen}
           aria-label={isEn ? "Participate in PMDU consultation pins" : "Participación ciudadana PMDU"}
-          className={`flex items-center gap-1 rounded-lg px-2.5 py-1 text-[11px] font-semibold transition-all cursor-pointer ${
+          className={`flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-[11.5px] font-medium transition-all cursor-pointer whitespace-nowrap ${
             participationOpen
-              ? "bg-sky-400 text-slate-950"
-              : "bg-sky-500/20 text-sky-200 ring-1 ring-sky-400/45 hover:bg-sky-500/35"
+              ? "bg-[#0A84FF] text-white font-semibold shadow-sm"
+              : "ios-pill text-[#F5F5F7]"
           }`}
         >
-          <MessageSquarePlus className="h-3.5 w-3.5" />
-          <span className="hidden sm:inline">{isEn ? "Participate" : "Participación"}</span>
-          <span className="font-mono-num rounded-full bg-slate-950/60 px-1.5 text-[9.5px] text-white">
+          <MessageSquarePlus className="h-3.5 w-3.5 text-[#64D2FF]" aria-hidden="true" />
+          <span className="hidden min-[1420px]:inline">{isEn ? "Participate" : "Participación"}</span>
+          <span className="font-mono-num rounded-full bg-white/[0.14] px-1.5 py-0.2 text-[10px] text-[#F5F5F7]">
             {citizenPinsCount}
           </span>
         </button>
 
-        {/* Live Telemetry & SensorThings */}
+        {/* Live Telemetry & SensorThings Pill */}
         <div className="relative">
           <button
             type="button"
-            onClick={() => setLivePopoverOpen((o) => !o)}
+            onClick={() => {
+              setSettingsOpen(false);
+              setLivePopoverOpen((o) => !o);
+            }}
             aria-expanded={livePopoverOpen}
             aria-label={
               isEn
                 ? "Asynchronous telemetry cache and OGC SensorThings v1.1 status"
                 : "Estado de telemetría en caché y OGC SensorThings v1.1"
             }
-            className={`hidden md:flex items-center gap-1.5 rounded-lg px-2 py-1 font-mono-num text-[10.5px] transition-all cursor-pointer ${
+            className={`hidden md:flex items-center gap-1.5 rounded-full px-2.5 py-1.5 font-mono-num text-[11px] font-medium transition-all cursor-pointer whitespace-nowrap ${
               liveActive
-                ? "bg-cyan-500/20 text-cyan-100 ring-1 ring-cyan-400/50"
-                : "bg-slate-800/90 text-slate-200 ring-1 ring-slate-600/70 hover:bg-slate-700"
+                ? "ios-pill text-[#F5F5F7]"
+                : "bg-white/[0.04] border border-white/10 text-[#EBEBF5]/60 hover:bg-white/[0.08]"
             }`}
           >
-            <span className={`h-2 w-2 rounded-full ${statusDotClass} ${overallStatus === "LIVE" ? "animate-pulse" : ""}`} />
-            <Radio className="h-3 w-3 text-cyan-300" aria-hidden="true" />
+            <span className={`h-1.5 w-1.5 rounded-full ${statusDotClass} ${overallStatus === "LIVE" ? "animate-pulse" : ""}`} />
             <span>
               {liveTelemetry?.weather?.la_paz?.temp_c != null
-                ? `${Math.round(liveTelemetry.weather.la_paz.temp_c)}°C`
+                ? `${Math.round(liveTelemetry.weather.la_paz.temp_c)}°`
                 : "BCS"}{" "}
-              · {freshnessPillText} · {sensorCount} OGC
+              · {shortStatus}
             </span>
           </button>
 
           {livePopoverOpen && (
-            <div className="glass-panel absolute right-0 top-10 z-50 w-80 rounded-xl border border-slate-700/80 bg-slate-950/95 p-3 text-left shadow-2xl">
-              <div className="mb-2 flex items-center justify-between border-b border-slate-800 pb-2">
-                <div>
-                  <p className="text-[11px] font-bold text-white">
-                    {isEn ? "Live Telemetry & OGC SensorThings" : "Telemetría en Vivo & OGC SensorThings"}
-                  </p>
-                  <p className="font-mono-num text-[9.5px] text-slate-300">
-                    {liveTelemetry?.cache_backend || "firestore:bcs-studio"} ·{" "}
-                    {liveTelemetry?.ingested_at ? `${liveTelemetry.ingested_at.slice(11, 19)} UTC` : "--"}
-                  </p>
+            <div className="ios-glass absolute right-0 top-11 z-50 w-80 rounded-[22px] p-3.5 text-left whitespace-normal">
+              <div className="mb-2.5 flex items-center justify-between border-b border-white/[0.08] pb-2.5">
+                <div className="flex items-center gap-2">
+                  <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[#64D2FF]/15 text-[#64D2FF]">
+                    <Radio className="h-3.5 w-3.5" aria-hidden="true" />
+                  </div>
+                  <div>
+                    <p className="text-[12px] font-semibold tracking-tight text-[#F5F5F7]">
+                      {isEn ? "Live Telemetry & OGC" : "Telemetría & OGC SensorThings"}
+                    </p>
+                    <p className="font-mono-num text-[10px] text-[#EBEBF5]/60">
+                      {liveTelemetry?.cache_backend || "firestore:bcs-studio"} ·{" "}
+                      {liveTelemetry?.ingested_at ? `${liveTelemetry.ingested_at.slice(11, 19)} UTC` : "--"}
+                    </p>
+                  </div>
                 </div>
                 <button
                   type="button"
                   onClick={() => setLivePopoverOpen(false)}
                   aria-label={isEn ? "Close telemetry details" : "Cerrar detalle telemetría"}
-                  className="rounded p-1 text-slate-300 hover:bg-slate-800 hover:text-white cursor-pointer"
+                  className="flex h-7 w-7 items-center justify-center rounded-full bg-white/[0.08] text-[#EBEBF5]/75 hover:bg-white/[0.15] hover:text-white cursor-pointer"
                 >
                   <X className="h-3.5 w-3.5" />
                 </button>
               </div>
 
-              <div className="space-y-1.5">
+              <div className="ios-surface rounded-2xl divide-y divide-white/[0.06] overflow-hidden">
                 {[
-                  { key: "weather", labelEs: "Clima 5 Municipios (Open-Meteo)", labelEn: "5-Mun Weather (Open-Meteo)", feed: liveTelemetry?.feeds?.weather },
-                  { key: "aircraft", labelEs: "Tráfico Aéreo (OpenSky)", labelEn: "Aircraft ADS-B (OpenSky)", feed: liveTelemetry?.feeds?.aircraft },
-                  { key: "marine", labelEs: "Buques Marítimos (AIS Proxy)", labelEn: "Marine Vessels (AIS Proxy)", feed: liveTelemetry?.feeds?.marine },
-                  { key: "cyclones", labelEs: "Ciclones Pacífico (NOAA NHC)", labelEn: "Pacific Cyclones (NOAA NHC)", feed: liveTelemetry?.feeds?.cyclones },
+                  { key: "weather", labelEs: "Clima 5 Municipios", labelEn: "5-Mun Weather", feed: liveTelemetry?.feeds?.weather },
+                  { key: "aircraft", labelEs: "Tráfico Aéreo (ADS-B)", labelEn: "Aircraft ADS-B", feed: liveTelemetry?.feeds?.aircraft },
+                  { key: "marine", labelEs: "Buques Marítimos (AIS)", labelEn: "Marine Vessels (AIS)", feed: liveTelemetry?.feeds?.marine },
+                  { key: "cyclones", labelEs: "Ciclones Pacífico (NHC)", labelEn: "Pacific Cyclones", feed: liveTelemetry?.feeds?.cyclones },
                 ].map(({ key, labelEs, labelEn, feed }) => {
                   const st = feed?.status || "OFFLINE";
                   const badgeCls =
                     st === "LIVE"
-                      ? "bg-emerald-500/20 text-emerald-200 ring-emerald-400/40"
+                      ? "bg-[#30D158]/20 text-[#30D158]"
                       : st === "CACHED"
-                        ? "bg-amber-500/20 text-amber-200 ring-amber-400/40"
+                        ? "bg-[#FF9F0A]/20 text-[#FF9F0A]"
                         : st === "STALE"
-                          ? "bg-orange-500/20 text-orange-200 ring-orange-400/40"
-                          : "bg-rose-500/20 text-rose-200 ring-rose-400/40";
+                          ? "bg-[#FF9F0A]/25 text-[#FFD60A]"
+                          : "bg-[#FF453A]/20 text-[#FF453A]";
                   return (
-                    <div key={key} className="rounded-lg bg-slate-900/90 px-2.5 py-1.5 ring-1 ring-slate-800">
+                    <div key={key} className="px-3 py-2">
                       <div className="flex items-center justify-between gap-2">
-                        <span className="text-[10.5px] font-medium text-slate-100">{isEn ? labelEn : labelEs}</span>
-                        <span className={`rounded-full px-1.5 py-0.5 font-mono-num text-[9px] font-semibold ring-1 ${badgeCls}`}>
+                        <span className="text-[11.5px] font-medium text-[#F5F5F7]">{isEn ? labelEn : labelEs}</span>
+                        <span className={`rounded-full px-2 py-0.5 font-mono-num text-[9.5px] font-semibold ${badgeCls}`}>
                           {feed ? (isEn ? feed.freshness_en : feed.freshness_es) : "OFFLINE"}
                         </span>
                       </div>
                       {feed && (
-                        <p className="mt-0.5 text-[9.5px] text-slate-300">
-                          {isEn ? "Items" : "Registros"}: <span className="font-mono-num text-white">{feed.count}</span>
+                        <p className="mt-0.5 text-[10px] text-[#EBEBF5]/60">
+                          {isEn ? "Items" : "Registros"}: <span className="font-mono-num text-[#F5F5F7]">{feed.count}</span>
                           {feed.notice ? ` · ${feed.notice}` : ""}
                         </p>
                       )}
@@ -430,11 +408,11 @@ export const TopCommandBar: React.FC<Props> = ({
                 })}
               </div>
 
-              <div className="mt-2.5 flex items-center justify-between border-t border-slate-800 pt-2">
+              <div className="mt-3 flex items-center justify-between gap-2">
                 <button
                   type="button"
                   onClick={onToggleLive}
-                  className="rounded-md bg-cyan-500/20 px-2 py-1 text-[10px] font-semibold text-cyan-200 ring-1 ring-cyan-400/40 hover:bg-cyan-500/30 cursor-pointer"
+                  className="rounded-full bg-[#0A84FF]/20 px-3 py-1.5 text-[10.5px] font-semibold text-[#64D2FF] hover:bg-[#0A84FF]/30 cursor-pointer"
                 >
                   {liveActive
                     ? isEn ? "Hide 3D Sensors" : "Ocultar Sensores 3D"
@@ -444,79 +422,247 @@ export const TopCommandBar: React.FC<Props> = ({
                   href="/FROST-Server/v1.1/Things"
                   target="_blank"
                   rel="noreferrer"
-                  className="font-mono-num text-[10px] text-sky-300 hover:underline"
+                  className="font-mono-num text-[10px] text-[#0A84FF] hover:underline"
                 >
-                  /FROST-Server/v1.1 ({sensorCount})
+                  /FROST-Server ({sensorCount})
                 </a>
               </div>
             </div>
           )}
         </div>
 
-        {/* Language Switcher */}
-        <div
-          role="group"
-          aria-label={isEn ? "Language switcher" : "Selector de idioma"}
-          className="flex items-center rounded-lg bg-slate-900/95 p-0.5 ring-1 ring-slate-700/80"
-        >
-          <button
-            type="button"
-            onClick={() => onLanguageChange("es")}
-            aria-pressed={language === "es"}
-            className={`rounded-md px-1.5 py-0.5 text-[10px] font-bold transition-all cursor-pointer ${
-              language === "es"
-                ? "bg-sky-400 text-slate-950"
-                : "text-slate-300 hover:text-white"
-            }`}
-          >
-            ES
-          </button>
-          <button
-            type="button"
-            onClick={() => onLanguageChange("en")}
-            aria-pressed={language === "en"}
-            className={`rounded-md px-1.5 py-0.5 text-[10px] font-bold transition-all cursor-pointer ${
-              language === "en"
-                ? "bg-sky-400 text-slate-950"
-                : "text-slate-300 hover:text-white"
-            }`}
-          >
-            EN
-          </button>
-        </div>
-
-        <button
-          type="button"
-          onClick={onOpenArchitecture}
-          className="hidden sm:inline-flex rounded-lg bg-slate-800/95 px-2.5 py-1 text-[11px] font-medium text-slate-100 ring-1 ring-slate-600/70 hover:bg-slate-700 cursor-pointer"
-        >
-          {isEn ? "Governance & Stack" : "Gobernanza & Stack"}
-        </button>
-
-        <a
-          href="https://panel.bcs2050.com"
-          target="_blank"
-          rel="noreferrer"
-          className="hidden xl:flex items-center gap-1 rounded-lg bg-slate-800/95 px-2 py-1 text-[11px] font-medium text-slate-100 ring-1 ring-slate-600/70 hover:bg-slate-700"
-        >
-          <span>Panel</span>
-          <ExternalLink className="h-3 w-3" aria-hidden="true" />
-        </a>
-
+        {/* Apple Intelligence AI Strategist Pill */}
         <button
           type="button"
           onClick={onToggleChat}
           aria-pressed={chatOpen}
           aria-label={isEn ? "AI Strategist Territorial Assistant" : "Estratega IA Territorial"}
-          className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11px] font-semibold transition-all cursor-pointer ${
+          className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11.5px] font-semibold transition-all cursor-pointer whitespace-nowrap ${
             chatOpen
-              ? "bg-emerald-400 text-slate-950"
-              : "bg-emerald-500/20 text-emerald-200 ring-1 ring-emerald-400/45 hover:bg-emerald-500/30"
+              ? "bg-[#0A84FF] text-white shadow-md shadow-[#0A84FF]/30"
+              : "ios-ai-pill text-[#F5F5F7]"
           }`}
         >
-          <Bot className="h-3.5 w-3.5" aria-hidden="true" />
+          <Bot className="h-3.5 w-3.5 text-[#64D2FF]" aria-hidden="true" />
           <span className="hidden sm:inline">{isEn ? "AI Strategist" : "Estratega IA"}</span>
         </button>
+
+        {/* Control Center / Settings & Governance Popover Trigger */}
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => {
+              setLivePopoverOpen(false);
+              setSettingsOpen((o) => !o);
+            }}
+            aria-expanded={settingsOpen}
+            aria-label={isEn ? "Settings and governance" : "Ajustes y gobernanza"}
+            className={`flex h-8 w-8 items-center justify-center rounded-full transition-all cursor-pointer ${
+              settingsOpen
+                ? "bg-[#0A84FF] text-white"
+                : "ios-pill text-[#F5F5F7]"
+            }`}
+          >
+            <SlidersHorizontal className="h-3.5 w-3.5" aria-hidden="true" />
+          </button>
+
+          {settingsOpen && (
+            <div className="ios-glass absolute right-0 top-11 z-50 w-76 rounded-[22px] p-3.5 text-left whitespace-normal space-y-3">
+              <div className="flex items-center justify-between border-b border-white/[0.08] pb-2">
+                <p className="text-[12px] font-semibold tracking-tight text-[#F5F5F7]">
+                  {isEn ? "Control Center" : "Centro de Control"}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setSettingsOpen(false)}
+                  aria-label={isEn ? "Close settings" : "Cerrar ajustes"}
+                  className="flex h-6 w-6 items-center justify-center rounded-full bg-white/[0.08] text-[#EBEBF5]/75 hover:bg-white/[0.15] hover:text-white cursor-pointer"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+
+              {/* Mobile/Tablet Viewport Parity Controls */}
+              <div className="xl:hidden ios-surface rounded-2xl p-2.5 space-y-2.5">
+                <div className="sm:hidden flex items-center justify-between gap-2">
+                  <span className="text-[11px] text-[#EBEBF5]/80">{isEn ? "Interface" : "Interfaz"}</span>
+                  <div className="ios-segmented flex items-center">
+                    <button
+                      type="button"
+                      onClick={() => onViewModeChange("citizen")}
+                      className={`rounded-full px-2.5 py-0.5 text-[10.5px] font-medium cursor-pointer ${
+                        viewMode === "citizen" ? "bg-[#30D158] text-[#050507] font-semibold" : "text-[#EBEBF5]/75"
+                      }`}
+                    >
+                      {isEn ? "Citizen" : "Ciudadano"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onViewModeChange("technical")}
+                      className={`rounded-full px-2.5 py-0.5 text-[10.5px] font-medium cursor-pointer ${
+                        viewMode === "technical" ? "ios-segment-active font-semibold" : "text-[#EBEBF5]/75"
+                      }`}
+                    >
+                      {isEn ? "Tech" : "Técnico"}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="md:hidden flex items-center justify-between gap-2">
+                  <span className="text-[11px] text-[#EBEBF5]/80">{isEn ? "3D Engine" : "Motor 3D"}</span>
+                  <div className="ios-segmented flex items-center">
+                    <button
+                      type="button"
+                      onClick={() => onEngineModeChange("deck3d")}
+                      className={`rounded-full px-2 py-0.5 text-[10.5px] font-medium cursor-pointer ${
+                        engineMode === "deck3d" ? "ios-segment-active font-semibold" : "text-[#EBEBF5]/75"
+                      }`}
+                    >
+                      3D Analítico
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onEngineModeChange("cesium3d")}
+                      className={`rounded-full px-2 py-0.5 text-[10.5px] font-medium cursor-pointer ${
+                        engineMode === "cesium3d" ? "ios-segment-active font-semibold" : "text-[#EBEBF5]/75"
+                      }`}
+                    >
+                      Cesium
+                    </button>
+                  </div>
+                </div>
+
+                {engineMode === "deck3d" && (
+                  <div className="lg:hidden flex items-center justify-between gap-2">
+                    <span className="text-[11px] text-[#EBEBF5]/80">{isEn ? "Basemap" : "Mapa Base"}</span>
+                    <select
+                      aria-label={isEn ? "Basemap style (mobile)" : "Estilo de mapa base (móvil)"}
+                      value={basemapMode}
+                      onChange={(e) => onBasemapModeChange(e.target.value as BasemapMode)}
+                      className="ios-input rounded-xl px-2.5 py-1 text-[11px] font-medium cursor-pointer"
+                    >
+                      <option value="obsidian" className="bg-[#16161A] text-[#F5F5F7]">
+                        {isEn ? "Obsidian Map" : "Mapa Obsidian"}
+                      </option>
+                      <option value="satellite" className="bg-[#16161A] text-[#F5F5F7]">
+                        {isEn ? "HD Satellite" : "Satélite HD"}
+                      </option>
+                      <option value="terrain" className="bg-[#16161A] text-[#F5F5F7]">
+                        {isEn ? "3D Relief" : "Relieve 3D"}
+                      </option>
+                    </select>
+                  </div>
+                )}
+
+                <div>
+                  <label htmlFor="mobile-city-jump" className="block text-[10.5px] text-[#EBEBF5]/70 mb-1">
+                    {isEn ? "Fly to 3D City" : "Vuelo a Ciudad 3D"}
+                  </label>
+                  <select
+                    id="mobile-city-jump"
+                    value={activeCitySlug}
+                    onChange={(e) => {
+                      onCityJump(e.target.value);
+                      setSettingsOpen(false);
+                    }}
+                    className="ios-input w-full rounded-xl px-2.5 py-1.5 text-[11px] font-medium cursor-pointer"
+                  >
+                    <option value="" className="bg-[#16161A] text-[#F5F5F7]">
+                      {isEn ? "Select 3D city..." : "Elegir ciudad 3D..."}
+                    </option>
+                    {cities.map((c) => (
+                      <option key={c.slug} value={c.slug} className="bg-[#16161A] text-[#F5F5F7]">
+                        {c.name} ({c.buildings_count.toLocaleString()})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Accessibility, Language & Institutional Links */}
+              <div className="ios-surface rounded-2xl divide-y divide-white/[0.06] overflow-hidden">
+                <div className="flex items-center justify-between px-3 py-2.5">
+                  <div>
+                    <p className="text-[11.5px] font-medium text-[#F5F5F7]">
+                      {isEn ? "Colorblind Palette (CVD)" : "Paleta Inclusiva (CVD)"}
+                    </p>
+                    <p className="text-[10px] text-[#EBEBF5]/55">Okabe-Ito / Viridis</p>
+                  </div>
+                  <IosSwitch
+                    checked={colorblindSafe}
+                    onChange={onToggleColorblindSafe}
+                    ariaLabel={isEn ? "CVD colorblind-safe Okabe-Ito palette" : "CVD paleta inclusiva para daltonismo Okabe-Ito"}
+                    accent="blue"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between px-3 py-2.5">
+                  <span className="text-[11.5px] font-medium text-[#F5F5F7]">
+                    {isEn ? "Language" : "Idioma"}
+                  </span>
+                  <div
+                    role="group"
+                    aria-label={isEn ? "Language switcher" : "Selector de idioma"}
+                    className="ios-segmented flex items-center"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => onLanguageChange("es")}
+                      aria-pressed={language === "es"}
+                      className={`rounded-full px-2.5 py-0.5 text-[10.5px] font-semibold transition-all cursor-pointer ${
+                        language === "es"
+                          ? "ios-segment-active"
+                          : "text-[#EBEBF5]/70 hover:text-[#F5F5F7]"
+                      }`}
+                    >
+                      ES
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onLanguageChange("en")}
+                      aria-pressed={language === "en"}
+                      className={`rounded-full px-2.5 py-0.5 text-[10.5px] font-semibold transition-all cursor-pointer ${
+                        language === "en"
+                          ? "ios-segment-active"
+                          : "text-[#EBEBF5]/70 hover:text-[#F5F5F7]"
+                      }`}
+                    >
+                      EN
+                    </button>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSettingsOpen(false);
+                    onOpenArchitecture();
+                  }}
+                  className="flex w-full items-center justify-between px-3 py-2.5 text-left hover:bg-white/[0.06] transition-colors cursor-pointer"
+                >
+                  <span className="flex items-center gap-2 text-[11.5px] font-medium text-[#F5F5F7]">
+                    <ShieldCheck className="h-3.5 w-3.5 text-[#30D158]" aria-hidden="true" />
+                    <span>{isEn ? "Governance & Stack" : "Gobernanza & Stack"}</span>
+                  </span>
+                  <ChevronRight className="h-3.5 w-3.5 text-[#EBEBF5]/45" aria-hidden="true" />
+                </button>
+
+                <a
+                  href="https://panel.bcs2050.com"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex w-full items-center justify-between px-3 py-2.5 hover:bg-white/[0.06] transition-colors"
+                >
+                  <span className="flex items-center gap-2 text-[11.5px] font-medium text-[#F5F5F7]">
+                    <ExternalLink className="h-3.5 w-3.5 text-[#0A84FF]" aria-hidden="true" />
+                    <span>{isEn ? "Executive Panel (Web)" : "Panel Ejecutivo BCS2050"}</span>
+                  </span>
+                  <ChevronRight className="h-3.5 w-3.5 text-[#EBEBF5]/45" aria-hidden="true" />
+                </a>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </header>
   );

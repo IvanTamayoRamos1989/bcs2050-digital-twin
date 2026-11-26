@@ -103,18 +103,25 @@ export const StrategistChatDrawer: React.FC<Props> = ({
   };
 
   return (
-    <div className="glass-panel pointer-events-auto absolute bottom-16 left-4 z-30 flex h-[510px] w-[420px] max-w-[92vw] flex-col rounded-xl overflow-hidden shadow-2xl">
-      <div className="flex items-center justify-between border-b border-slate-700/70 bg-slate-900/90 px-3.5 py-2.5">
-        <div className="flex items-center gap-2">
-          <Bot className="h-4 w-4 text-emerald-400" />
+    <div
+      role="dialog"
+      aria-label={isEn ? "AI Territorial Strategist" : "Estratega Territorial IA"}
+      className="ios-glass !bg-[rgba(18,18,22,0.94)] pointer-events-auto absolute bottom-16 left-4 z-30 flex h-[510px] w-[410px] max-w-[92vw] flex-col rounded-[24px] overflow-hidden"
+    >
+      {/* Apple Messages Header */}
+      <div className="flex items-center justify-between border-b border-white/[0.08] px-4 py-3">
+        <div className="flex items-center gap-2.5">
+          <div className="ios-ai-pill flex h-8 w-8 items-center justify-center rounded-full">
+            <Bot className="h-4 w-4 text-[#64D2FF]" />
+          </div>
           <div>
-            <p className="text-xs font-bold text-white">
-              {isEn ? "AI Territorial Strategist · BCS2050" : "Estratega Territorial IA · BCS2050"}
+            <p className="text-[13px] font-semibold tracking-tight text-[#F5F5F7]">
+              {isEn ? "AI Strategist · BCS2050" : "Estratega IA · BCS2050"}
             </p>
-            <p className="text-[10px] text-slate-400">
+            <p className="text-[10.5px] text-[#EBEBF5]/60">
               {isEn
-                ? "Vertex AI Gemini · BigQuery RAG + Ontology v3"
-                : "Vertex AI Gemini · RAG BigQuery + Ontología v3"}
+                ? "Vertex AI Gemini · BigQuery RAG"
+                : "Vertex AI Gemini · RAG BigQuery"}
             </p>
           </div>
         </div>
@@ -122,53 +129,53 @@ export const StrategistChatDrawer: React.FC<Props> = ({
           type="button"
           onClick={onClose}
           aria-label={isEn ? "Close AI Strategist" : "Cerrar Estratega IA"}
-          className="rounded-md p-1 text-slate-400 hover:bg-slate-800 hover:text-white cursor-pointer"
+          className="flex h-7 w-7 items-center justify-center rounded-full bg-white/[0.08] text-[#EBEBF5]/75 hover:bg-white/[0.15] hover:text-white transition-colors cursor-pointer"
         >
           <X className="h-4 w-4" />
         </button>
       </div>
 
       {/* Quick Prompts */}
-      <div className="flex gap-1.5 overflow-x-auto border-b border-slate-800 px-3 py-2 twin-scroll">
+      <div className="flex gap-1.5 overflow-x-auto border-b border-white/[0.06] px-3.5 py-2 twin-scroll">
         {QUICK_PROMPTS[language].map((qp) => (
           <button
             key={qp}
             type="button"
             onClick={() => sendQuery(qp)}
-            className="shrink-0 rounded-full bg-slate-800/90 px-2.5 py-1 text-[10px] text-sky-300 ring-1 ring-slate-700 hover:bg-sky-500/20 cursor-pointer"
+            className="ios-pill shrink-0 px-3 py-1 text-[10.5px] font-medium text-[#64D2FF] cursor-pointer"
           >
             {qp}
           </button>
         ))}
       </div>
 
-      {/* Messages */}
-      <div className="twin-scroll flex-1 overflow-y-auto p-3 space-y-2.5">
+      {/* iMessage Bubbles */}
+      <div className="twin-scroll flex-1 overflow-y-auto p-3.5 space-y-3">
         {messages.map((m, i) => (
           <div
             key={i}
-            className={`rounded-lg p-2.5 text-[11.5px] leading-relaxed ${
+            className={`px-3.5 py-2.5 text-[12px] leading-relaxed ${
               m.role === "user"
-                ? "ml-8 bg-sky-500/20 text-sky-100 ring-1 ring-sky-400/30"
-                : "mr-2 bg-slate-900/90 text-slate-200 ring-1 ring-slate-700/70"
+                ? "ml-10 rounded-2xl rounded-br-sm bg-[#0A84FF] text-white shadow-sm"
+                : "mr-4 rounded-2xl rounded-bl-sm bg-white/[0.08] text-[#F5F5F7]"
             }`}
           >
             {/* Engine Mode + Model Badge */}
             {m.role === "assistant" && m.engineMode && (
               <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
                 {m.engineMode === "vertex_gemini_grounded" ? (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[9.5px] font-semibold text-emerald-300 ring-1 ring-emerald-400/35">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-[#30D158]/15 px-2 py-0.5 text-[9.5px] font-semibold text-[#30D158]">
                     <ShieldCheck className="h-3 w-3" />
-                    <span>{isEn ? "Vertex AI Gemini · Grounded" : "Vertex AI Gemini · Fundamentado"}</span>
+                    <span>{isEn ? "Vertex AI · Grounded" : "Vertex AI · Verificado"}</span>
                   </span>
                 ) : (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-[9.5px] font-semibold text-amber-300 ring-1 ring-amber-400/35">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-[#FF9F0A]/15 px-2 py-0.5 text-[9.5px] font-semibold text-[#FF9F0A]">
                     <Cpu className="h-3 w-3" />
-                    <span>{isEn ? "Deterministic Fallback" : "Modo Determinístico Local"}</span>
+                    <span>{isEn ? "Local Deterministic" : "Determinístico Local"}</span>
                   </span>
                 )}
                 {m.modelUsed && (
-                  <span className="rounded bg-slate-800 px-1.5 py-0.5 font-mono-num text-[9px] text-slate-400">
+                  <span className="rounded-full bg-white/[0.08] px-2 py-0.5 font-mono-num text-[9px] text-[#EBEBF5]/65">
                     {m.modelUsed}
                   </span>
                 )}
@@ -181,7 +188,7 @@ export const StrategistChatDrawer: React.FC<Props> = ({
               <button
                 type="button"
                 onClick={() => onFlyTo(m.flyTo!)}
-                className="mt-2 flex items-center gap-1 rounded bg-emerald-500/20 px-2 py-1 text-[10px] font-semibold text-emerald-300 ring-1 ring-emerald-400/30 hover:bg-emerald-500/35 cursor-pointer"
+                className="mt-2 flex items-center gap-1.5 rounded-full bg-[#30D158]/20 px-3 py-1 text-[10.5px] font-semibold text-[#30D158] hover:bg-[#30D158]/30 transition-colors cursor-pointer"
               >
                 <Navigation className="h-3 w-3" />
                 <span>{isEn ? "Fly to site in 3D" : "Volar al sitio en 3D"}</span>
@@ -190,21 +197,21 @@ export const StrategistChatDrawer: React.FC<Props> = ({
 
             {/* Structured RAG & Official Citations */}
             {m.citations && m.citations.length > 0 && (
-              <div className="mt-2 rounded-md border border-slate-800 bg-slate-950/60 p-2">
-                <div className="mb-1 flex items-center gap-1 text-[9.5px] font-semibold uppercase tracking-wider text-sky-300">
+              <div className="mt-2.5 rounded-xl bg-white/[0.04] border border-white/[0.07] p-2.5">
+                <div className="mb-1 flex items-center gap-1 text-[9.5px] font-semibold uppercase tracking-wider text-[#64D2FF]">
                   <BookOpen className="h-3 w-3" />
                   <span>{isEn ? "Cited Sources" : "Fuentes Citadas"}</span>
                 </div>
                 <div className="space-y-1">
                   {m.citations.slice(0, 4).map((cit, idx) => (
-                    <div key={`${cit.doc_id}-${idx}`} className="text-[9.5px] text-slate-400">
-                      <span className="font-mono-num font-semibold text-slate-200">[{cit.doc_id}]</span>
+                    <div key={`${cit.doc_id}-${idx}`} className="text-[10px] text-[#EBEBF5]/75">
+                      <span className="font-mono-num font-semibold text-[#F5F5F7]">[{cit.doc_id}]</span>
                       {cit.page_or_section ? ` · ${cit.page_or_section}` : ""}
                       {typeof cit.distance === "number" ? (
-                        <span className="ml-1 font-mono-num text-emerald-400">cos {cit.distance.toFixed(3)}</span>
+                        <span className="ml-1 font-mono-num text-[#30D158]">cos {cit.distance.toFixed(3)}</span>
                       ) : null}
                       {cit.excerpt && (
-                        <p className="mt-0.5 line-clamp-2 text-[9px] text-slate-500">{cit.excerpt}</p>
+                        <p className="mt-0.5 line-clamp-2 text-[9.5px] text-[#EBEBF5]/55">{cit.excerpt}</p>
                       )}
                     </div>
                   ))}
@@ -214,8 +221,8 @@ export const StrategistChatDrawer: React.FC<Props> = ({
 
             {/* Uncertainty / Scope Note */}
             {m.uncertaintyNote && (
-              <div className="mt-2 flex items-start gap-1.5 rounded border border-amber-500/25 bg-amber-500/5 px-2 py-1.5 text-[9.5px] text-amber-200/80">
-                <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0 text-amber-400" />
+              <div className="mt-2 flex items-start gap-1.5 rounded-xl bg-[#FF9F0A]/10 px-2.5 py-1.5 text-[9.5px] text-[#FF9F0A]">
+                <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
                 <span>{m.uncertaintyNote}</span>
               </div>
             )}
@@ -226,7 +233,7 @@ export const StrategistChatDrawer: React.FC<Props> = ({
                 {(m.toolsUsed || []).slice(0, 3).map((tool) => (
                   <span
                     key={tool}
-                    className="rounded bg-sky-500/10 px-1.5 py-0.5 font-mono-num text-[9px] text-sky-300 ring-1 ring-sky-400/20"
+                    className="rounded-full bg-[#0A84FF]/15 px-2 py-0.5 font-mono-num text-[9px] text-[#64D2FF]"
                   >
                     {tool}
                   </span>
@@ -234,7 +241,7 @@ export const StrategistChatDrawer: React.FC<Props> = ({
                 {(m.lineage || []).slice(0, 2).map((lin) => (
                   <span
                     key={lin}
-                    className="rounded bg-slate-800 px-1.5 py-0.5 font-mono-num text-[9px] text-slate-400"
+                    className="rounded-full bg-white/[0.07] px-2 py-0.5 font-mono-num text-[9px] text-[#EBEBF5]/60"
                   >
                     {lin}
                   </span>
@@ -244,7 +251,7 @@ export const StrategistChatDrawer: React.FC<Props> = ({
           </div>
         ))}
         {loading && (
-          <p className="text-[11px] text-sky-400 animate-pulse">
+          <p className="px-2 text-[11px] font-medium text-[#64D2FF] animate-pulse">
             {isEn
               ? "Querying Vertex AI Gemini + BigQuery RAG..."
               : "Consultando Vertex AI Gemini + RAG BigQuery..."}
@@ -252,27 +259,27 @@ export const StrategistChatDrawer: React.FC<Props> = ({
         )}
       </div>
 
-      {/* Input */}
+      {/* iMessage Pill Composer */}
       <form
         onSubmit={(e) => {
           e.preventDefault();
           sendQuery(input);
         }}
-        className="flex items-center gap-2 border-t border-slate-700/70 bg-slate-950/80 p-2.5"
+        className="flex items-center gap-2 border-t border-white/[0.08] p-3"
       >
         <input
           type="text"
           aria-label={isEn ? "Ask a territorial question" : "Escribir consulta territorial"}
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder={isEn ? "Ask a territorial question on BCS2050..." : "Consulta territorial sobre BCS2050..."}
-          className="flex-1 rounded-lg bg-slate-900 px-3 py-1.5 text-xs text-white placeholder-slate-400 ring-1 ring-slate-700 focus:outline-none focus:ring-sky-400"
+          placeholder={isEn ? "Ask BCS2050..." : "Consulta territorial BCS2050..."}
+          className="ios-input flex-1 rounded-full px-4 py-2 text-[12px] placeholder:text-[#EBEBF5]/45"
         />
         <button
           type="submit"
           disabled={loading}
           aria-label={isEn ? "Send question" : "Enviar consulta"}
-          className="rounded-lg bg-emerald-500 p-2 text-slate-950 hover:bg-emerald-400 disabled:opacity-50 cursor-pointer"
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#0A84FF] hover:bg-[#409CFF] text-white disabled:opacity-50 transition-colors cursor-pointer"
         >
           <Send className="h-3.5 w-3.5" />
         </button>

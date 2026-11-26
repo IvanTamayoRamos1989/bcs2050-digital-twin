@@ -378,6 +378,21 @@ export const App: React.FC = () => {
     });
   }, []);
 
+  const wasCompactRef = useRef<boolean>(typeof window !== "undefined" ? window.innerWidth < 768 : false);
+
+  useEffect(() => {
+    const onResize = () => {
+      const compact = window.innerWidth < 768;
+      if (compact && !wasCompactRef.current) {
+        setLeftCollapsed(true);
+        setRightCollapsed(true);
+      }
+      wasCompactRef.current = compact;
+    };
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
   const handleToggleRight = useCallback(() => {
     setRightCollapsed((c) => {
       const next = !c;
@@ -394,7 +409,7 @@ export const App: React.FC = () => {
       : null;
 
   return (
-    <div className="relative flex h-screen w-screen flex-col overflow-hidden bg-[#050811] select-none">
+    <div className="relative flex h-screen w-screen flex-col overflow-hidden bg-[#0A0A0D] text-[#F5F5F7] select-none">
       {/* WCAG 2.1 AA Skip Navigation Link */}
       <a href="#main-content" className="skip-link">
         {language === "en" ? "Skip to 3D map content" : "Saltar al mapa 3D principal"}
@@ -553,6 +568,8 @@ export const App: React.FC = () => {
             collapsed={rightCollapsed}
             onToggleCollapse={handleToggleRight}
             phase={phase}
+            onPhaseChange={setPhase}
+            language={language}
             scopeId={scopeId}
             overview={overview}
             inspection={inspection}

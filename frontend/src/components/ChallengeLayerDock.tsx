@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import type { AgebMetricKey, ChallengeId, LayerVisibility } from "../types/twin";
 import { METRIC_CATALOG, getMetricGradientCss } from "../utils/colorScales";
+import { IosSwitch } from "./IosSwitch";
 
 interface Props {
   collapsed: boolean;
@@ -35,6 +36,7 @@ const CHALLENGES: {
   labelEs: string;
   labelEn: string;
   icon: React.ReactNode;
+  tintCls: string;
   defaultMetric: AgebMetricKey;
   metrics: AgebMetricKey[];
 }[] = [
@@ -43,6 +45,7 @@ const CHALLENGES: {
     labelEs: "Vivienda y Suelo",
     labelEn: "Housing & Land Use",
     icon: <Building2 className="h-3.5 w-3.5" />,
+    tintCls: "bg-[#0A84FF]/20 text-[#64D2FF]",
     defaultMetric: "infill_homes_potential",
     metrics: ["infill_homes_potential", "density_hab_ha_2025", "city_science_index"],
   },
@@ -51,6 +54,7 @@ const CHALLENGES: {
     labelEs: "Forma Urbana 15-Min",
     labelEn: "15-Min Urban Form",
     icon: <Footprints className="h-3.5 w-3.5" />,
+    tintCls: "bg-[#30D158]/20 text-[#30D158]",
     defaultMetric: "city15_score",
     metrics: ["city15_score", "fractality_score", "harmony_score", "landuse_entropy_score"],
   },
@@ -59,6 +63,7 @@ const CHALLENGES: {
     labelEs: "Economía y Clústeres",
     labelEn: "Economy & Clusters",
     icon: <Factory className="h-3.5 w-3.5" />,
+    tintCls: "bg-[#FF9F0A]/20 text-[#FF9F0A]",
     defaultMetric: "city_science_index",
     metrics: ["city_science_index", "landuse_entropy_score", "density_hab_ha_2025"],
   },
@@ -67,6 +72,7 @@ const CHALLENGES: {
     labelEs: "Agua, Energía y Clima",
     labelEn: "Water, Energy & Climate",
     icon: <Droplets className="h-3.5 w-3.5" />,
+    tintCls: "bg-[#64D2FF]/20 text-[#64D2FF]",
     defaultMetric: "carrying_resilience_score",
     metrics: ["carrying_resilience_score", "solar_mw", "surge_exposed_pct"],
   },
@@ -75,6 +81,7 @@ const CHALLENGES: {
     labelEs: "Movilidad y Corredores",
     labelEn: "Mobility & Corridors",
     icon: <Route className="h-3.5 w-3.5" />,
+    tintCls: "bg-[#BF5AF2]/20 text-[#DA8FFF]",
     defaultMetric: "city15_score",
     metrics: ["city15_score", "fractality_score", "carrying_resilience_score"],
   },
@@ -87,20 +94,20 @@ const LAYER_CONTROLS: {
   count: string;
   dot: string;
 }[] = [
-  { key: "buildings3d", labelEs: "Edificios 3D Reales", labelEn: "3D Real Buildings", count: "396,823", dot: "bg-sky-400" },
-  { key: "agebs", labelEs: "AGEBs City Science", labelEn: "City Science AGEBs", count: "1,155", dot: "bg-emerald-400" },
-  { key: "zoning", labelEs: "Zonificación CUS/COS", labelEn: "PMDU Zoning CUS/COS", count: "79,515", dot: "bg-amber-400" },
-  { key: "citizenPins", labelEs: "Participación PMDU", labelEn: "PMDU Citizen Pins", count: "PMDU", dot: "bg-sky-300" },
-  { key: "aquifers", labelEs: "Acuíferos CONAGUA", labelEn: "CONAGUA Aquifers", count: "40", dot: "bg-cyan-400" },
-  { key: "tandeo", labelEs: "Tandeo OOMSAPAS LPZ", labelEn: "OOMSAPAS Rationing", count: "280", dot: "bg-rose-400" },
-  { key: "powerGrid", labelEs: "Red Eléctrica SIBCS", labelEn: "SIBCS Power Grid", count: "150", dot: "bg-yellow-400" },
-  { key: "plannedProjects", labelEs: "Desaladoras / Proyectos", labelEn: "Desal & Strategic Proj.", count: "9", dot: "bg-fuchsia-400" },
-  { key: "services", labelEs: "Equipamiento Esencial", labelEn: "Essential Services", count: "3,510", dot: "bg-teal-300" },
-  { key: "transit", labelEs: "Paradas y Rutas", labelEn: "Transit Stops & Lines", count: "122", dot: "bg-indigo-400" },
-  { key: "corridorArcs", labelEs: "Arcos Corredores BCS", labelEn: "Corridor Flow Arcs", count: "6", dot: "bg-sky-300" },
-  { key: "poer", labelEs: "UGAs POERBCS", labelEn: "POERBCS Eco Zones", count: "1,990", dot: "bg-lime-400" },
-  { key: "anps", labelEs: "ANPs CONANP", labelEn: "Protected Areas", count: "76", dot: "bg-green-500" },
-  { key: "liveTelemetry", labelEs: "Monitoreo Vivo AIS/Aéreo", labelEn: "Live Telemetry/OGC", count: "LIVE", dot: "bg-cyan-300" },
+  { key: "buildings3d", labelEs: "Edificios 3D Reales", labelEn: "3D Real Buildings", count: "396,823", dot: "bg-[#0A84FF]" },
+  { key: "agebs", labelEs: "AGEBs City Science", labelEn: "City Science AGEBs", count: "1,155", dot: "bg-[#30D158]" },
+  { key: "zoning", labelEs: "Zonificación CUS/COS", labelEn: "PMDU Zoning CUS/COS", count: "79,515", dot: "bg-[#FF9F0A]" },
+  { key: "citizenPins", labelEs: "Participación PMDU", labelEn: "PMDU Citizen Pins", count: "PMDU", dot: "bg-[#64D2FF]" },
+  { key: "aquifers", labelEs: "Acuíferos CONAGUA", labelEn: "CONAGUA Aquifers", count: "40", dot: "bg-[#64D2FF]" },
+  { key: "tandeo", labelEs: "Tandeo OOMSAPAS LPZ", labelEn: "OOMSAPAS Rationing", count: "280", dot: "bg-[#FF453A]" },
+  { key: "powerGrid", labelEs: "Red Eléctrica SIBCS", labelEn: "SIBCS Power Grid", count: "150", dot: "bg-[#FFD60A]" },
+  { key: "plannedProjects", labelEs: "Desaladoras / Proyectos", labelEn: "Desal & Strategic Proj.", count: "9", dot: "bg-[#BF5AF2]" },
+  { key: "services", labelEs: "Equipamiento Esencial", labelEn: "Essential Services", count: "3,510", dot: "bg-[#5AC8FA]" },
+  { key: "transit", labelEs: "Paradas y Rutas", labelEn: "Transit Stops & Lines", count: "122", dot: "bg-[#5E5CE6]" },
+  { key: "corridorArcs", labelEs: "Arcos Corredores BCS", labelEn: "Corridor Flow Arcs", count: "6", dot: "bg-[#64D2FF]" },
+  { key: "poer", labelEs: "UGAs POERBCS", labelEn: "POERBCS Eco Zones", count: "1,990", dot: "bg-[#30D158]" },
+  { key: "anps", labelEs: "ANPs CONANP", labelEn: "Protected Areas", count: "76", dot: "bg-[#32D74B]" },
+  { key: "liveTelemetry", labelEs: "Monitoreo Vivo AIS/Aéreo", labelEn: "Live Telemetry/OGC", count: "LIVE", dot: "bg-[#64D2FF]" },
 ];
 
 export const ChallengeLayerDock: React.FC<Props> = ({
@@ -127,9 +134,9 @@ export const ChallengeLayerDock: React.FC<Props> = ({
       <button
         type="button"
         onClick={onToggleCollapse}
-        className="glass-panel pointer-events-auto absolute left-3 top-3 z-20 flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold text-sky-200 hover:bg-slate-800/90 cursor-pointer"
+        className="ios-glass pointer-events-auto absolute left-4 top-4 z-20 flex items-center gap-1.5 rounded-full px-3.5 py-2 text-[12px] font-semibold text-[#F5F5F7] hover:bg-white/[0.12] transition-colors cursor-pointer"
       >
-        <ChevronRight className="h-4 w-4" aria-hidden="true" />
+        <ChevronRight className="h-4 w-4 text-[#0A84FF]" aria-hidden="true" />
         <span>{isEn ? "Challenges & Layers" : "Retos y Capas"}</span>
       </button>
     );
@@ -141,30 +148,31 @@ export const ChallengeLayerDock: React.FC<Props> = ({
   return (
     <aside
       aria-label={isEn ? "Urban challenges and map layers" : "Retos urbanos y capas del mapa"}
-      className="glass-panel pointer-events-auto absolute left-3 top-3 z-20 flex max-h-[calc(100%-64px)] w-[calc(100vw-24px)] sm:w-[304px] flex-col rounded-xl overflow-hidden"
+      className="ios-glass pointer-events-auto absolute left-4 top-4 z-20 flex max-h-[calc(100%-82px)] w-[calc(100vw-32px)] sm:w-[300px] flex-col rounded-[24px] overflow-hidden"
     >
-      <div className="flex items-center justify-between border-b border-slate-700/70 px-3.5 py-2.5">
+      {/* Apple Sheet Header */}
+      <div className="flex items-center justify-between border-b border-white/[0.08] px-4 py-3">
         <div>
-          <p className="font-mono-num text-[10px] uppercase tracking-widest text-sky-300">
-            {isEn ? "5 Urban Challenges · Layers" : "5 Retos Urbanos · Capas"}
+          <p className="text-[10.5px] font-medium tracking-wide text-[#EBEBF5]/60">
+            {isEn ? "5 Urban Challenges" : "5 Retos Urbanos"}
           </p>
-          <h2 className="text-xs font-bold text-white">
-            {isEn ? "City Science Explorer" : "Explorador City Science"}
+          <h2 className="text-[15px] font-semibold tracking-tight text-[#F5F5F7]">
+            City Science
           </h2>
         </div>
         <button
           type="button"
           onClick={onToggleCollapse}
           aria-label={isEn ? "Collapse left panel" : "Colapsar panel izquierdo"}
-          className="rounded-md p-1.5 text-slate-300 hover:bg-slate-800 hover:text-white cursor-pointer"
+          className="flex h-7 w-7 items-center justify-center rounded-full bg-white/[0.08] text-[#EBEBF5]/75 hover:bg-white/[0.15] hover:text-white transition-colors cursor-pointer"
         >
           <ChevronLeft className="h-4 w-4" aria-hidden="true" />
         </button>
       </div>
 
-      <div className="twin-scroll overflow-y-auto p-3 space-y-3.5">
-        {/* 5 Core Challenges */}
-        <div className="grid grid-cols-1 gap-1">
+      <div className="twin-scroll overflow-y-auto p-3.5 space-y-3.5">
+        {/* 5 Core Challenges — iOS Grouped List */}
+        <div className="ios-surface rounded-2xl divide-y divide-white/[0.06] overflow-hidden">
           {CHALLENGES.map((ch) => {
             const active = ch.id === activeChallenge;
             return (
@@ -176,43 +184,51 @@ export const ChallengeLayerDock: React.FC<Props> = ({
                   onSelectChallenge(ch.id);
                   onSelectMetric(ch.defaultMetric);
                 }}
-                className={`flex items-center justify-between rounded-lg px-2.5 py-1.5 text-left text-[11px] font-medium transition-all cursor-pointer ${
+                className={`flex w-full items-center justify-between px-3 py-2 text-left text-[12px] transition-colors cursor-pointer ${
                   active
-                    ? "bg-sky-500/25 text-white ring-1 ring-sky-400/60"
-                    : "bg-slate-900/60 text-slate-200 hover:bg-slate-800/80 hover:text-white"
+                    ? "bg-[#0A84FF]/18 text-[#F5F5F7] font-semibold"
+                    : "text-[#EBEBF5]/85 hover:bg-white/[0.05] font-medium"
                 }`}
               >
-                <span className="flex items-center gap-2">
-                  <span className={active ? "text-sky-300" : "text-slate-300"} aria-hidden="true">{ch.icon}</span>
-                  {isEn ? ch.labelEn : ch.labelEs}
+                <span className="flex items-center gap-2.5 min-w-0">
+                  <span
+                    className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${ch.tintCls}`}
+                    aria-hidden="true"
+                  >
+                    {ch.icon}
+                  </span>
+                  <span className="truncate">{isEn ? ch.labelEn : ch.labelEs}</span>
                 </span>
-                {active && <span className="h-1.5 w-1.5 rounded-full bg-sky-300" aria-hidden="true" />}
+                {active && (
+                  <span className="h-2 w-2 shrink-0 rounded-full bg-[#0A84FF]" aria-hidden="true" />
+                )}
               </button>
             );
           })}
         </div>
 
-        {/* Active KPI Metric */}
-        <div className="rounded-lg bg-slate-900/80 p-2.5 ring-1 ring-slate-700/80 space-y-2">
+        {/* Active 3D Metric Card */}
+        <div className="ios-surface rounded-2xl p-3.5 space-y-2.5">
           <div className="flex items-center justify-between gap-2">
-            <p className="font-mono-num text-[10px] uppercase tracking-wider text-slate-300">
+            <p className="text-[11px] font-semibold text-[#EBEBF5]/75">
               {isEn ? "Active 3D Metric" : "Variable 3D Activa"}
             </p>
             <button
               type="button"
               onClick={onToggleColorblindSafe}
               aria-pressed={colorblindSafe}
-              className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[9.5px] font-semibold cursor-pointer ${
+              className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold transition-colors cursor-pointer ${
                 colorblindSafe
-                  ? "bg-amber-400 text-slate-950"
-                  : "bg-slate-800 text-slate-200 ring-1 ring-slate-600"
+                  ? "bg-[#FF9F0A]/20 text-[#FF9F0A] ring-1 ring-[#FF9F0A]/40"
+                  : "bg-white/[0.08] text-[#EBEBF5]/75 hover:bg-white/[0.14]"
               }`}
             >
               <Eye className="h-2.5 w-2.5" aria-hidden="true" />
-              <span>{colorblindSafe ? "Okabe-Ito ON" : "Standard"}</span>
+              <span>{colorblindSafe ? "Okabe-Ito" : "Standard"}</span>
             </button>
           </div>
-          <div className="flex flex-wrap gap-1">
+
+          <div className="flex flex-wrap gap-1.5">
             {currentChallenge.metrics.map((mKey) => {
               const mm = METRIC_CATALOG[mKey];
               const isSel = mKey === activeMetric;
@@ -222,10 +238,10 @@ export const ChallengeLayerDock: React.FC<Props> = ({
                   type="button"
                   aria-pressed={isSel}
                   onClick={() => onSelectMetric(mKey)}
-                  className={`rounded-md px-2 py-1 text-[10px] font-semibold cursor-pointer ${
+                  className={`rounded-full px-2.5 py-1 text-[10.5px] font-semibold transition-all cursor-pointer ${
                     isSel
-                      ? "bg-emerald-400 text-slate-950"
-                      : "bg-slate-800 text-slate-200 hover:bg-slate-700"
+                      ? "bg-[#0A84FF] text-white shadow-sm"
+                      : "bg-white/[0.08] text-[#EBEBF5]/80 hover:bg-white/[0.14]"
                   }`}
                 >
                   {isEn ? mm.shortLabelEn : mm.shortLabel}
@@ -233,19 +249,20 @@ export const ChallengeLayerDock: React.FC<Props> = ({
               );
             })}
           </div>
-          <p className="text-[10.5px] leading-snug text-slate-200">
+
+          <p className="text-[11px] leading-snug text-[#EBEBF5]/72">
             {isEn ? metricMeta.descriptionEn : metricMeta.description}
           </p>
 
-          {/* Dynamic Colorblind-Safe / Standard Gradient Legend */}
-          <div className="pt-1">
+          {/* Gradient Scale Legend */}
+          <div className="pt-0.5">
             <div
-              className="h-2 w-full rounded-full ring-1 ring-slate-700"
+              className="h-1.5 w-full rounded-full ring-1 ring-white/10"
               style={{
                 background: getMetricGradientCss(metricMeta, colorblindSafe),
               }}
             />
-            <div className="mt-1 flex justify-between font-mono-num text-[9.5px] text-slate-300">
+            <div className="mt-1.5 flex justify-between font-mono-num text-[10px] text-[#EBEBF5]/60">
               <span>0 {metricMeta.unit}</span>
               <span>{Math.round(metricMeta.maxValue / 2)} {metricMeta.unit}</span>
               <span>{metricMeta.maxValue}+ {metricMeta.unit}</span>
@@ -254,12 +271,14 @@ export const ChallengeLayerDock: React.FC<Props> = ({
         </div>
 
         {/* 3D Extrusion Controls */}
-        <div className="rounded-lg bg-slate-900/80 p-2.5 ring-1 ring-slate-700/80 space-y-2">
+        <div className="ios-surface rounded-2xl p-3.5 space-y-3">
           <div className="flex items-center justify-between">
-            <label htmlFor="extrusion-slider" className="text-[11px] font-medium text-slate-100">
+            <label htmlFor="extrusion-slider" className="text-[12px] font-medium text-[#F5F5F7]">
               {isEn ? "3D Extrusion" : "Extrusión 3D"}
             </label>
-            <span className="font-mono-num text-[11px] text-sky-300">{extrusionScale.toFixed(1)}×</span>
+            <span className="font-mono-num text-[12px] font-semibold text-[#0A84FF]">
+              {extrusionScale.toFixed(1)}×
+            </span>
           </div>
           <input
             id="extrusion-slider"
@@ -270,47 +289,55 @@ export const ChallengeLayerDock: React.FC<Props> = ({
             step={0.1}
             value={extrusionScale}
             onChange={(e) => onExtrusionScaleChange(Number(e.target.value))}
-            className="w-full accent-sky-400 cursor-pointer"
+            className="ios-slider"
           />
-          <label className="flex items-center justify-between text-[11px] text-slate-200 cursor-pointer">
+          <label className="flex items-center justify-between pt-1 border-t border-white/[0.06] text-[12px] text-[#EBEBF5]/85 cursor-pointer">
             <span>{isEn ? "Extrude 3D AGEB Prisms" : "Extruir Prismas AGEB 3D"}</span>
-            <input
-              type="checkbox"
+            <IosSwitch
               checked={agebs3dMode}
               onChange={onToggleAgebs3d}
-              className="accent-sky-400 cursor-pointer"
+              ariaLabel={isEn ? "Extrude 3D AGEB Prisms" : "Extruir Prismas AGEB 3D"}
+              accent="blue"
             />
           </label>
         </div>
 
-        {/* Layer Toggles */}
-        <div className="space-y-1.5">
-          <p className="font-mono-num text-[10px] uppercase tracking-wider text-slate-300">
-            {isEn ? "Geospatial Twin Layers" : "Capas Geoespaciales del Gemelo"}
+        {/* Geospatial Layer Toggles — iOS Settings Grouped List */}
+        <div className="space-y-2">
+          <p className="px-1 text-[11px] font-semibold tracking-wide text-[#EBEBF5]/60">
+            {isEn ? "Geospatial Layers" : "Capas Geoespaciales"}
           </p>
-          {LAYER_CONTROLS.map((lc) => {
-            const on = layers[lc.key];
-            return (
-              <label
-                key={lc.key}
-                className="flex items-center justify-between rounded-md px-2 py-1 text-[11px] hover:bg-slate-800/70 cursor-pointer"
-              >
-                <span className="flex items-center gap-2 text-slate-100">
-                  <span className={`h-2 w-2 rounded-full ${lc.dot} ${on ? "opacity-100" : "opacity-35"}`} aria-hidden="true" />
-                  <span className={on ? "text-slate-100" : "text-slate-300"}>{isEn ? lc.labelEn : lc.labelEs}</span>
-                </span>
-                <span className="flex items-center gap-2">
-                  <span className="font-mono-num text-[9.5px] text-slate-300">{lc.count}</span>
-                  <input
-                    type="checkbox"
-                    checked={on}
-                    onChange={() => onToggleLayer(lc.key)}
-                    className="accent-sky-400 cursor-pointer"
-                  />
-                </span>
-              </label>
-            );
-          })}
+          <div className="ios-surface rounded-2xl divide-y divide-white/[0.06] overflow-hidden">
+            {LAYER_CONTROLS.map((lc) => {
+              const on = layers[lc.key];
+              const labelText = isEn ? lc.labelEn : lc.labelEs;
+              return (
+                <label
+                  key={lc.key}
+                  className="flex items-center justify-between gap-2 px-3 py-2 text-[11.5px] hover:bg-white/[0.04] transition-colors cursor-pointer"
+                >
+                  <span className="flex items-center gap-2.5 min-w-0">
+                    <span
+                      className={`h-2 w-2 shrink-0 rounded-full ${lc.dot} ${on ? "opacity-100" : "opacity-35"}`}
+                      aria-hidden="true"
+                    />
+                    <span className={`truncate ${on ? "text-[#F5F5F7] font-medium" : "text-[#EBEBF5]/65"}`}>
+                      {labelText}
+                    </span>
+                  </span>
+                  <span className="flex items-center gap-2 shrink-0">
+                    <span className="font-mono-num text-[10px] text-[#EBEBF5]/50">{lc.count}</span>
+                    <IosSwitch
+                      checked={on}
+                      onChange={() => onToggleLayer(lc.key)}
+                      ariaLabel={labelText}
+                      accent="green"
+                    />
+                  </span>
+                </label>
+              );
+            })}
+          </div>
         </div>
       </div>
     </aside>
