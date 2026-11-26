@@ -156,9 +156,12 @@ export const ParticipationPanel: React.FC<Props> = ({
       role="dialog"
       aria-modal="true"
       aria-labelledby="participation-dialog-title"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/25 backdrop-blur-md p-3 sm:p-5"
     >
-      <div className="hig-glass-sidebar flex max-h-[90vh] w-full max-w-2xl flex-col rounded-[28px] overflow-hidden">
+      <div className="hig-glass-popover flex max-h-[90vh] w-full max-w-2xl flex-col rounded-[28px] overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-[var(--hig-divider)] px-5 py-4">
           <div className="flex items-center gap-3">
@@ -182,7 +185,7 @@ export const ParticipationPanel: React.FC<Props> = ({
             type="button"
             onClick={onClose}
             aria-label={isEn ? "Close citizen participation panel" : "Cerrar panel de participación"}
-            className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--hig-pill-bg)] text-[var(--hig-ink-2)] hover:text-[var(--hig-ink)] transition-colors cursor-pointer"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[var(--hig-pill-bg)] text-[var(--hig-ink-2)] hover:text-[var(--hig-ink)] transition-colors cursor-pointer"
           >
             <X className="h-4 w-4" />
           </button>
@@ -190,7 +193,7 @@ export const ParticipationPanel: React.FC<Props> = ({
 
         <div className="twin-scroll overflow-y-auto p-5 space-y-4 text-xs">
           {/* Submission Form */}
-          <form onSubmit={handleSubmit} className="hig-content-group rounded-2xl p-4 space-y-3.5">
+          <form id="pmdu-pin-form" onSubmit={handleSubmit} className="hig-content-group rounded-2xl p-4 space-y-3.5">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-[12.5px] font-semibold text-[var(--hig-ink)]">
                 {isEn ? "1. Locate & Submit Your Neighborhood Proposal" : "1. Ubica y Envía tu Propuesta Ciudadana"}
@@ -202,7 +205,7 @@ export const ParticipationPanel: React.FC<Props> = ({
                   if (!pinPlacementMode) onClose();
                 }}
                 aria-pressed={pinPlacementMode}
-                className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors cursor-pointer ${
+                className={`flex min-h-[44px] items-center gap-1.5 rounded-full px-3.5 py-2 text-[11px] font-semibold transition-colors cursor-pointer ${
                   pinPlacementMode
                     ? "bg-[#FF9F0A] text-[#050507]"
                     : "bg-[#0A84FF]/18 text-[var(--hig-accent)] hover:bg-[#0A84FF]/28"
@@ -357,16 +360,6 @@ export const ParticipationPanel: React.FC<Props> = ({
                 {submitError}
               </div>
             )}
-
-            <button
-              type="submit"
-              disabled={submitting}
-              className="hig-lift w-full rounded-full bg-[var(--hig-accent)] hover:bg-[var(--hig-accent-hover)] py-2.5 text-[12px] font-semibold text-white disabled:opacity-50 transition-colors cursor-pointer"
-            >
-              {submitting
-                ? isEn ? "Submitting..." : "Enviando aporte..."
-                : isEn ? "Submit to PMDU Moderation Queue" : "Enviar Aporte a Consulta PMDU"}
-            </button>
           </form>
 
           {/* Session Pending Submissions Preview */}
@@ -397,31 +390,40 @@ export const ParticipationPanel: React.FC<Props> = ({
                 : `Pines Públicos Aprobados (${pins.length})`}
             </h3>
             <div className="grid sm:grid-cols-2 gap-2.5">
-              {pins.map((pin) => (
-                <div key={pin.pin_id} className="hig-content-group rounded-2xl p-3 space-y-2">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="rounded-full bg-[#0A84FF]/15 px-2 py-0.5 font-mono-num text-[9.5px] font-semibold text-[var(--hig-accent)]">
-                      {pin.pmdu_period}
-                    </span>
-                    <span className="text-[10px] text-[var(--hig-ink-3)]">
-                      {pin.seeded_example ? (isEn ? "Reference Example" : "Ejemplo Referencia") : pin.author_alias}
-                    </span>
+              {pins.map((pin) => {
+                const pinTitle = isEn ? pin.title_en || pin.title : pin.title;
+                const pinComment = isEn ? pin.comment_en || pin.comment : pin.comment;
+                const pinAlias = isEn
+                  ? pin.seeded_example
+                    ? pin.author_alias_en || "Reference Example"
+                    : pin.author_alias
+                  : pin.seeded_example
+                    ? "Ejemplo Referencia"
+                    : pin.author_alias;
+                return (
+                  <div key={pin.pin_id} className="hig-content-group rounded-2xl p-3 space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="rounded-full bg-[#0A84FF]/15 px-2 py-0.5 font-mono-num text-[9.5px] font-semibold text-[var(--hig-accent)]">
+                        {pin.pmdu_period}
+                      </span>
+                      <span className="text-[10px] text-[var(--hig-ink-3)]">{pinAlias}</span>
+                    </div>
+                    <h4 className="text-[12px] font-semibold text-[var(--hig-ink)] leading-snug">{pinTitle}</h4>
+                    <p className="text-[11px] text-[var(--hig-ink-2)] leading-snug">{pinComment}</p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onFlyTo({ lon: pin.lon, lat: pin.lat, zoom: 14.5, pitch: 52, bearing: -12 });
+                        onClose();
+                      }}
+                      className="ios-pill flex min-h-[44px] items-center gap-1.5 px-3.5 py-1.5 text-[10.5px] font-semibold text-[var(--hig-accent)] cursor-pointer"
+                    >
+                      <MapPin className="h-3 w-3" />
+                      <span>{isEn ? "Fly to Pin on 3D Map" : "Ir al Pin en el Mapa"}</span>
+                    </button>
                   </div>
-                  <h4 className="text-[12px] font-semibold text-[var(--hig-ink)] leading-snug">{pin.title}</h4>
-                  <p className="text-[11px] text-[var(--hig-ink-2)] leading-snug">{pin.comment}</p>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onFlyTo({ lon: pin.lon, lat: pin.lat, zoom: 14.5, pitch: 52, bearing: -12 });
-                      onClose();
-                    }}
-                    className="ios-pill flex items-center gap-1.5 px-2.5 py-1 text-[10.5px] font-semibold text-[var(--hig-accent)] cursor-pointer"
-                  >
-                    <MapPin className="h-3 w-3" />
-                    <span>{isEn ? "Fly to Pin on 3D Map" : "Ir al Pin en el Mapa"}</span>
-                  </button>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
 
@@ -435,7 +437,7 @@ export const ParticipationPanel: React.FC<Props> = ({
                 type="button"
                 onClick={() => setModOpen((v) => !v)}
                 aria-expanded={modOpen}
-                className="ios-pill px-3 py-1 text-[10.5px] font-semibold text-[var(--hig-accent)] cursor-pointer"
+                className="ios-pill min-h-[44px] px-4 py-2 text-[10.5px] font-semibold text-[var(--hig-accent)] cursor-pointer"
               >
                 {modOpen ? (isEn ? "Hide" : "Ocultar") : isEn ? "Open" : "Abrir"}
               </button>
@@ -501,6 +503,20 @@ export const ParticipationPanel: React.FC<Props> = ({
               </div>
             )}
           </div>
+        </div>
+
+        {/* Sticky Frosted Submit Footer (Always Reachable on Mobile 390x844 & Desktop) */}
+        <div className="border-t border-[var(--hig-divider)] bg-[var(--hig-popover-bg)] px-5 py-3 shrink-0">
+          <button
+            type="submit"
+            form="pmdu-pin-form"
+            disabled={submitting}
+            className="hig-lift min-h-[44px] w-full rounded-full bg-[var(--hig-accent)] hover:bg-[var(--hig-accent-hover)] py-2.5 text-[12px] font-semibold text-white disabled:opacity-50 transition-colors cursor-pointer"
+          >
+            {submitting
+              ? isEn ? "Submitting..." : "Enviando aporte..."
+              : isEn ? "Submit to PMDU Moderation Queue" : "Enviar Aporte a Consulta PMDU"}
+          </button>
         </div>
       </div>
     </div>

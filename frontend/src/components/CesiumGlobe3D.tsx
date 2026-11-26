@@ -6,7 +6,15 @@ import { TwinAPI } from "../api/client";
 import type { AgebMetricKey, CameraPreset, LayerVisibility, LiveTelemetrySummary } from "../types/twin";
 import { METRIC_CATALOG, interpolateMetricColor } from "../utils/colorScales";
 
+import { fmtNumber } from "../utils/formatters";
+
 (window as unknown as { CESIUM_BASE_URL?: string }).CESIUM_BASE_URL = "/cesium";
+
+const CESIUM_CITY_COORDS: Record<string, { lon: number; lat: number; label: string }> = {
+  la_paz: { lon: -110.3128, lat: 24.1426, label: "La Paz" },
+  cabo_san_lucas: { lon: -109.9134, lat: 22.8905, label: "Los Cabos" },
+  loreto: { lon: -111.3433, lat: 26.0116, label: "Loreto" },
+};
 
 interface Props {
   cameraTarget: CameraPreset | null;
@@ -20,8 +28,10 @@ interface Props {
   liveTelemetry?: LiveTelemetrySummary | null;
   colorblindSafe?: boolean;
   language?: "es" | "en";
+  theme?: "dark" | "light";
   googleMapsApiKey?: string;
   cesiumIonToken?: string;
+  onQuickJumpCity?: (citySlug: string) => void;
   onInspectLocation: (
     lon: number,
     lat: number,
@@ -86,8 +96,10 @@ export const CesiumGlobe3D: React.FC<Props> = ({
   liveTelemetry = null,
   colorblindSafe = true,
   language = "en",
+  theme = "light",
   googleMapsApiKey = "",
   cesiumIonToken = "",
+  onQuickJumpCity,
   onInspectLocation,
 }) => {
   const isEn = language === "en";
@@ -102,6 +114,7 @@ export const CesiumGlobe3D: React.FC<Props> = ({
 
   const [cesiumViewMode, setCesiumViewMode] = useState<"photorealistic" | "analytical">("analytical");
   const [googleTilesLoaded, setGoogleTilesLoaded] = useState<boolean>(false);
+  const [googleTilesReady, setGoogleTilesReady] = useState<boolean>(false);
   const [worldTerrainLoaded, setWorldTerrainLoaded] = useState<boolean>(false);
   const [streaming3DTiles, setStreaming3DTiles] = useState<boolean>(false);
   const [buildingCount, setBuildingCount] = useState<number>(0);
@@ -175,26 +188,33 @@ export const CesiumGlobe3D: React.FC<Props> = ({
     labelLayer.alpha = 0.85;
 
     viewer.scene.globe.depthTestAgainstTerrain = false;
+    viewer.scene.globe.enableLighting = false;
+    viewer.scene.globe.show = true;
+    viewer.scene.backgroundColor =
+      theme === "light" ? Cesium.Color.fromCssColorString("#DCE8F5") : Cesium.Color.fromCssColorString("#0B1220");
+    if (viewer.scene.skyBox) {
+      viewer.scene.skyBox.show = theme === "dark";
+    }
     if (viewer.scene.skyAtmosphere) {
       viewer.scene.skyAtmosphere.show = true;
     }
 
     if (cameraTarget) {
-      const altitudeM = Math.max(650, 320000 / Math.pow(1.9, Math.max(0, cameraTarget.zoom - 6)));
+      const altitudeM = Math.max(650, 260000 / Math.pow(1.9, Math.max(0, cameraTarget.zoom - 6)));
       viewer.camera.setView({
         destination: Cesium.Cartesian3.fromDegrees(cameraTarget.lon, cameraTarget.lat - 0.012, altitudeM),
         orientation: {
           heading: Cesium.Math.toRadians(cameraTarget.bearing ?? -15),
-          pitch: Cesium.Math.toRadians(-38),
+          pitch: Cesium.Math.toRadians(-42),
           roll: 0,
         },
       });
     } else {
       viewer.camera.setView({
-        destination: Cesium.Cartesian3.fromDegrees(-111.55, 24.5, 480000),
+        destination: Cesium.Cartesian3.fromDegrees(-111.35, 24.45, 240000),
         orientation: {
-          heading: Cesium.Math.toRadians(-10),
-          pitch: Cesium.Math.toRadians(-55),
+          heading: Cesium.Math.toRadians(-12),
+          pitch: Cesium.Math.toRadians(-48),
           roll: 0,
         },
       });
@@ -286,16 +306,33 @@ export const CesiumGlobe3D: React.FC<Props> = ({
     )
       .then((tileset) => {
         if (cancelled || viewer.isDestroyed()) return;
+        tileset.show = false;
+        tileset.initialTilesLoaded.addEventListener(() => {
+          if (!cancelled) setGoogleTilesReady(true);
+        });
+        tileset.allTilesLoaded.addEventListener(() => {
+          if (!cancelled) setGoogleTilesReady(true);
+        });
         viewer.scene.primitives.add(tileset);
         googleTilesetRef.current = tileset;
         setGoogleTilesLoaded(true);
-        setCesiumViewMode("photorealistic");
       })
       .catch(() => {});
     return () => {
       cancelled = true;
     };
   }, [googleKey]);
+
+  // Keep skyBox / background synchronized with light vs dark appearance
+  useEffect(() => {
+    const viewer = viewerRef.current;
+    if (!viewer || viewer.isDestroyed()) return;
+    viewer.scene.backgroundColor =
+      theme === "light" ? Cesium.Color.fromCssColorString("#DCE8F5") : Cesium.Color.fromCssColorString("#0B1220");
+    if (viewer.scene.skyBox) {
+      viewer.scene.skyBox.show = theme === "dark";
+    }
+  }, [theme]);
 
   // Dynamically load Cesium ion World Terrain whenever runtime or build-time token is present
   useEffect(() => {
@@ -321,9 +358,14 @@ export const CesiumGlobe3D: React.FC<Props> = ({
     const viewer = viewerRef.current;
     if (!viewer || viewer.isDestroyed()) return;
     if ("verticalExaggeration" in viewer.scene) {
-      viewer.scene.verticalExaggeration = terrain3dEnabled ? Math.max(1.0, terrainExaggeration) : 1.0;
+      viewer.scene.verticalExaggeration =
+        cesiumViewMode === "photorealistic"
+          ? 1.0
+          : terrain3dEnabled
+            ? Math.max(1.0, terrainExaggeration)
+            : 1.0;
     }
-  }, [terrain3dEnabled, terrainExaggeration, worldTerrainLoaded]);
+  }, [cesiumViewMode, terrain3dEnabled, terrainExaggeration, worldTerrainLoaded]);
 
   // Sync Real-Time Air Traffic (ADS-B) & Marine Traffic (AIS) entities onto Cesium Globe
   useEffect(() => {
@@ -386,10 +428,28 @@ export const CesiumGlobe3D: React.FC<Props> = ({
     if (!viewer || viewer.isDestroyed()) return;
     const isPhoto = cesiumViewMode === "photorealistic" && googleTilesLoaded && Boolean(googleTilesetRef.current);
 
-    viewer.scene.globe.show = !isPhoto;
     if (googleTilesetRef.current) {
       googleTilesetRef.current.show = isPhoto;
     }
+    // Keep sunlit Earth globe visible while Google Photorealistic 3D Tiles stream in
+    viewer.scene.globe.show = !isPhoto || !googleTilesReady;
+
+    if (isPhoto) {
+      const camPos = viewer.camera.positionCartographic;
+      if (camPos && camPos.height > 28000) {
+        const city = CESIUM_CITY_COORDS[activeCitySlug] || CESIUM_CITY_COORDS.la_paz;
+        viewer.camera.flyTo({
+          destination: Cesium.Cartesian3.fromDegrees(city.lon, city.lat - 0.015, 4200),
+          orientation: {
+            heading: Cesium.Math.toRadians(-15),
+            pitch: Cesium.Math.toRadians(-35),
+            roll: 0,
+          },
+          duration: 1.3,
+        });
+      }
+    }
+
     if (tilesetRef.current) {
       tilesetRef.current.show = !isPhoto && layers.buildings3d;
       tilesetRef.current.style = buildTilesetStyle(activeMetric, colorblindSafe);
@@ -408,8 +468,10 @@ export const CesiumGlobe3D: React.FC<Props> = ({
       powerDsRef.current.show = !isPhoto && layers.powerGrid;
     }
   }, [
+    activeCitySlug,
     cesiumViewMode,
     googleTilesLoaded,
+    googleTilesReady,
     layers.agebs,
     layers.buildings3d,
     layers.powerGrid,
@@ -567,9 +629,27 @@ export const CesiumGlobe3D: React.FC<Props> = ({
         <span className="h-3 w-px bg-[var(--hig-divider)]" />
         <span className="font-mono-num text-[var(--hig-green)]">
           {streaming3DTiles
-            ? `${buildingCount.toLocaleString()} ${isEn ? "3D bldgs" : "edif. 3D"}`
-            : `${buildingCount.toLocaleString()} ${isEn ? "bldgs" : "edif."} (${activeCitySlug || "la_paz"})`}
+            ? `${fmtNumber(buildingCount, language)} ${isEn ? "3D bldgs" : "edif. 3D"}`
+            : `${fmtNumber(buildingCount, language)} ${isEn ? "bldgs" : "edif."} (${(CESIUM_CITY_COORDS[activeCitySlug]?.label || activeCitySlug || "La Paz")})`}
         </span>
+
+        {onQuickJumpCity && (
+          <>
+            <span className="hidden sm:inline-flex h-3 w-px bg-[var(--hig-divider)]" />
+            <div className="hidden sm:flex items-center gap-1">
+              {Object.entries(CESIUM_CITY_COORDS).map(([slug, c]) => (
+                <button
+                  key={slug}
+                  type="button"
+                  onClick={() => onQuickJumpCity(slug)}
+                  className="rounded-full bg-[var(--hig-pill-bg)] hover:bg-[var(--hig-pill-hover)] px-2.5 py-0.5 text-[10.5px] font-semibold text-[var(--hig-ink)] transition-colors cursor-pointer"
+                >
+                  {c.label}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
 
         {cesiumViewMode === "analytical" && (
           <>

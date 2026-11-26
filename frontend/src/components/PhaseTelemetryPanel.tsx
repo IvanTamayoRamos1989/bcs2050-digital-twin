@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import {
   AlertTriangle,
   ArrowRight,
@@ -10,6 +10,7 @@ import {
   Loader2,
   MapPin,
   Navigation,
+  RotateCcw,
   Route,
   ShieldAlert,
   Trash2,
@@ -44,6 +45,52 @@ import type {
   RecommendationsResponse,
   SimulationResponse,
 } from "../types/twin";
+import {
+  fmtCurrencyMdp,
+  fmtNumber,
+  formatTandeoSchedule,
+  humanizeCityName,
+  humanizeHazardSeverity,
+  humanizePoer,
+  humanizeZoning,
+} from "../utils/formatters";
+
+interface Props {
+  collapsed: boolean;
+  onToggleCollapse: () => void;
+  phase: AretianPhase;
+  onPhaseChange?: (p: AretianPhase) => void;
+  language?: "es" | "en";
+  scopeId: string;
+  overview: OverviewResponse | null;
+  inspection: InspectResponse | null;
+  onClearInspection: () => void;
+  goalTargets: {
+    target_city15_score: number;
+    target_infill_share_pct: number;
+    target_ptar_reuse_pct: number;
+    target_rooftop_solar_pct: number;
+    target_suds_coverage_pct: number;
+  };
+  onGoalTargetChange: (k: keyof Props["goalTargets"], val: number) => void;
+  goalGap: GoalGapResponse | null;
+  onApplyOptimalLevers: (levers: Record<string, number>) => void;
+  scenarioName: string;
+  onSelectScenario: (name: string) => void;
+  targetYear: number;
+  onTargetYearChange: (yr: number) => void;
+  customLevers: Record<string, number>;
+  onLeverChange: (k: string, val: number) => void;
+  onResetLevers?: () => void;
+  simulation: SimulationResponse | null;
+  simLoading?: boolean;
+  recommendations: RecommendationsResponse | null;
+  physicsOverlay?: ActivePhysicsOverlay | null;
+  physicsJobStatus?: OgcPhysicsJobStatus | null;
+  onRunPhysicsProcess?: (processId: OgcPhysicsProcessId) => void;
+  onClearPhysicsOverlay?: () => void;
+  onFlyTo: (cam: CameraPreset) => void;
+}
 
 interface Props {
   collapsed: boolean;
@@ -125,7 +172,9 @@ export const PhaseTelemetryPanel: React.FC<Props> = ({
   onTargetYearChange,
   customLevers,
   onLeverChange,
+  onResetLevers,
   simulation,
+  simLoading = false,
   recommendations,
   physicsOverlay,
   physicsJobStatus,
@@ -134,6 +183,13 @@ export const PhaseTelemetryPanel: React.FC<Props> = ({
   onFlyTo,
 }) => {
   const isEn = language === "en";
+  const scrollBodyRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (inspection && phase === "diagnostics") {
+      scrollBodyRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  }, [inspection, phase]);
 
   if (collapsed) {
     return null;
@@ -223,7 +279,7 @@ export const PhaseTelemetryPanel: React.FC<Props> = ({
           ? "Technical telemetry, 2050 simulator and physics models inspector"
           : "Panel técnico de telemetría, simulador 2050 y modelos físicos"
       }
-      className="hig-glass-sidebar pointer-events-auto absolute z-30 sm:z-20 flex flex-col overflow-hidden max-sm:inset-x-0 max-sm:bottom-0 max-sm:top-auto max-sm:w-full max-sm:max-h-[76vh] max-sm:rounded-b-none max-sm:rounded-t-[28px] sm:right-4 sm:top-[72px] sm:w-[388px] sm:max-h-[calc(100%-240px)] sm:rounded-[24px]"
+      className="hig-glass-sidebar pointer-events-auto absolute z-30 sm:z-20 flex flex-col overflow-hidden max-sm:inset-x-0 max-sm:bottom-0 max-sm:top-auto max-sm:w-full max-sm:max-h-[76vh] max-sm:rounded-b-none max-sm:rounded-t-[28px] sm:right-4 sm:top-[72px] sm:w-[388px] sm:max-h-[calc(100%-176px)] sm:rounded-[24px]"
     >
       {/* Mobile iOS Sheet Grabber */}
       <div
@@ -290,10 +346,149 @@ export const PhaseTelemetryPanel: React.FC<Props> = ({
         </div>
       </div>
 
-      <div className="twin-scroll overflow-y-auto p-3.5 space-y-3.5">
+      <div ref={scrollBodyRef} className="twin-scroll hig-scroll-fade overflow-y-auto p-3.5 space-y-3.5">
         {/* PHASE 1: DIAGNOSTICS */}
         {phase === "diagnostics" && (
           <>
+            {/* Deep Click-to-Inspect Territorial Dossier (Pinned at Top When Selected!) */}
+            {inspection ? (
+              <div className="hig-content-group rounded-2xl p-3.5 ring-1 ring-[var(--hig-accent)]/40 space-y-2.5">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="flex items-center gap-1.5 font-mono-num text-[11px] font-semibold text-[var(--hig-cyan)]">
+                    <MapPin className="h-3.5 w-3.5 shrink-0" />
+                    <span>
+                      {inspection.coordinates.lon.toFixed(4)}, {inspection.coordinates.lat.toFixed(4)}
+                    </span>
+                  </span>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {(inspection.terrain_elevation_m != null || inspection.building?.ground_elev_m != null) && (
+                      <span className="font-mono-num rounded-full bg-[#30D158]/15 px-2 py-0.5 text-[10px] font-semibold text-[var(--hig-green)]">
+                        {fmtNumber(
+                          Math.round(Number(inspection.terrain_elevation_m ?? inspection.building?.ground_elev_m)),
+                          language,
+                        )}{" "}
+                        {isEn ? "m ASL" : "msnm"}
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={onClearInspection}
+                      className="rounded-full bg-[var(--hig-pill-bg)] px-2.5 py-0.5 text-[10.5px] font-medium text-[var(--hig-ink-2)] hover:text-[var(--hig-ink)] cursor-pointer"
+                    >
+                      {isEn ? "Close" : "Cerrar"}
+                    </button>
+                  </div>
+                </div>
+
+                {inspection.building && (
+                  <div className="rounded-xl bg-[var(--hig-pill-bg)] p-2.5 text-[11px] space-y-0.5">
+                    <p className="font-semibold text-[var(--hig-amber)]">
+                      {isEn ? "3D Building" : "Edificio 3D"} · {humanizeCityName(String(inspection.building.city_name || ""))}
+                    </p>
+                    <p className="font-mono-num text-[var(--hig-ink)]">
+                      {isEn ? "Height" : "Altura"}: {String(inspection.building.height_m)} m ({String(inspection.building.floors)}{" "}
+                      {isEn ? "floors" : "niveles"}) · GFA: {fmtNumber(Number(inspection.building.gfa_m2 || 0), language)} m²
+                    </p>
+                    <p className="font-mono-num text-[var(--hig-ink-2)]">
+                      {isEn ? "Rooftop Solar PV" : "Solar PV Techo"}: {String(inspection.building.solar_kwp)} kWp ·{" "}
+                      {isEn ? "Elev" : "Cota"}: {String(inspection.building.ground_elev_m)} {isEn ? "m ASL" : "msnm"}
+                    </p>
+                  </div>
+                )}
+
+                {inspection.ageb && (
+                  <div className="rounded-xl bg-[var(--hig-pill-bg)] p-2.5 text-[11px] space-y-1">
+                    <p className="font-semibold text-[var(--hig-ink)]">
+                      AGEB {String(inspection.ageb.cvegeo_ageb)} · {String(inspection.ageb.municipality_name)}
+                    </p>
+                    <div className="grid grid-cols-3 gap-1 font-mono-num text-[10.5px]">
+                      <span className="text-[var(--hig-green)]">CSI: {String(inspection.ageb.city_science_index)}</span>
+                      <span className="text-[var(--hig-accent)]">15m: {String(inspection.ageb.city15_score)}</span>
+                      <span className="text-[var(--hig-cyan)]">Frac: {String(inspection.ageb.fractality_score)}</span>
+                    </div>
+                    <p className="text-[10.5px] text-[var(--hig-ink-2)]">
+                      {isEn ? "2025 Pop" : "Pob 2025"}: {fmtNumber(Number(inspection.ageb.pobtot_2025_eic_calibrated || 0), language)}{" "}
+                      {isEn ? "res" : "hab"} · Infill: +{fmtNumber(Number(inspection.ageb.infill_homes_potential || 0), language)}{" "}
+                      {isEn ? "homes" : "viv"} · Solar: {fmtNumber(Number(inspection.ageb.solar_mw || 0), language, 1)} MW
+                    </p>
+                  </div>
+                )}
+
+                {inspection.zoning && (() => {
+                  const z = humanizeZoning(inspection.zoning.category, inspection.zoning.land_use_code, isEn);
+                  return (
+                    <div className="rounded-xl bg-[var(--hig-pill-bg)] p-2.5 text-[11px] text-[var(--hig-ink-2)]">
+                      <span className="font-semibold text-[var(--hig-amber)]">{isEn ? "Zoning:" : "Zonificación:"}</span>{" "}
+                      {z.categoryLabel} ({z.codeLabel}) · COS{" "}
+                      {String(inspection.zoning.cos_max ?? (isEn ? "N/A" : "N/D"))} / CUS{" "}
+                      {String(inspection.zoning.cus_max ?? (isEn ? "N/A" : "N/D"))}
+                    </div>
+                  );
+                })()}
+
+                <div className="rounded-xl bg-[var(--hig-pill-bg)] p-2.5 text-[11px] space-y-1">
+                  {inspection.aquifer && (
+                    <p className="text-[var(--hig-cyan)]">
+                      <strong>{isEn ? "Aquifer" : "Acuífero"} {String(inspection.aquifer.aquifer_code)}:</strong>{" "}
+                      {String(inspection.aquifer.aquifer_name)} · DMA{" "}
+                      <span className="font-mono-num font-semibold">{String(inspection.aquifer.dma_2023_hm3)} hm³/yr</span>
+                    </p>
+                  )}
+                  {inspection.tandeo_lapaz && (
+                    <p className="text-[var(--hig-red)] font-medium">
+                      {isEn ? "OOMSAPAS Rationing:" : "Tandeo OOMSAPAS:"}{" "}
+                      {String(inspection.tandeo_lapaz.nombre)} ({formatTandeoSchedule(inspection.tandeo_lapaz.dias, isEn)})
+                    </p>
+                  )}
+                  {inspection.poer_uga && (
+                    <p className="text-[var(--hig-green)]">
+                      <strong>POERBCS:</strong> {humanizePoer(inspection.poer_uga.environmental_policy, inspection.poer_uga.macro_zone_class, isEn)}
+                    </p>
+                  )}
+                  {inspection.protected_area && (
+                    <p className="text-[var(--hig-green)] font-medium">
+                      {isEn ? "CONANP Protected Area" : "ANP CONANP"}: {String(inspection.protected_area.area_name)}
+                    </p>
+                  )}
+                  {inspection.ejido_or_reserve && (
+                    <p className="text-[var(--hig-amber)] font-medium">
+                      {isEn ? "Land Tenure:" : "Tenencia Suelo:"}{" "}
+                      {String(inspection.ejido_or_reserve.name || "Ejido / Reserve")} (
+                      {String(inspection.ejido_or_reserve.legal_regime || inspection.ejido_or_reserve.tenure_type || "RAN")})
+                    </p>
+                  )}
+                  {inspection.hazard_zone && (
+                    <p className="text-[var(--hig-red)] font-medium">
+                      {isEn ? "Hazard Atlas:" : "Atlas Riesgo:"}{" "}
+                      {String(inspection.hazard_zone.name || inspection.hazard_zone.hazard_type)}
+                      {inspection.hazard_zone.severity
+                        ? ` · ${humanizeHazardSeverity(inspection.hazard_zone.severity, isEn)}`
+                        : ""}
+                    </p>
+                  )}
+                  {inspection.nearest_services?.health?.[0] && (
+                    <p className="text-[var(--hig-ink-2)]">
+                      <strong>{isEn ? "Nearest Health:" : "Salud cercana:"}</strong> {inspection.nearest_services.health[0].name} (
+                      {fmtNumber(inspection.nearest_services.health[0].walk_m, language)} m ·{" "}
+                      {inspection.nearest_services.health[0].walk_min} min)
+                    </p>
+                  )}
+                  {inspection.nearest_services?.education?.[0] && (
+                    <p className="text-[var(--hig-ink-2)]">
+                      <strong>{isEn ? "Nearest School:" : "Escuela cercana:"}</strong> {inspection.nearest_services.education[0].name} (
+                      {fmtNumber(inspection.nearest_services.education[0].walk_m, language)} m)
+                    </p>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-dashed border-[var(--hig-border)] px-3.5 py-2.5 text-center text-[10.5px] text-[var(--hig-ink-3)] leading-snug">
+                {isEn
+                  ? "Click any 3D building, AGEB, flight, or vessel on the map to inspect its territorial dossier."
+                  : "Haz clic en cualquier edificio 3D, AGEB, vuelo o buque del mapa para inspeccionar su expediente."}
+              </div>
+            )}
+
             <div className="grid grid-cols-2 gap-2.5">
               <div className="hig-content-group rounded-2xl p-3">
                 <p className="text-[10.5px] font-medium text-[var(--hig-ink-2)]">
@@ -318,13 +513,13 @@ export const PhaseTelemetryPanel: React.FC<Props> = ({
                   {isEn ? "3D Buildings · Pop." : "Edificios 3D · Pob."}
                 </p>
                 <p className="font-mono-num mt-1 text-[15px] font-semibold tracking-tight text-[var(--hig-ink)]">
-                  {activeStats.buildings.toLocaleString()}
+                  {fmtNumber(activeStats.buildings, language)}
                 </p>
                 <p className="font-mono-num mt-0.5 text-[10px] text-[var(--hig-green)]">
-                  {activeStats.popOfficial2020.toLocaleString()} INEGI 2020
+                  {fmtNumber(activeStats.popOfficial2020, language)} INEGI 2020
                 </p>
                 <p className="font-mono-num text-[10px] text-[var(--hig-cyan)]">
-                  {activeStats.pop.toLocaleString()} {isEn ? "2025 Proj." : "Proy. 2025"}
+                  {fmtNumber(activeStats.pop, language)} {isEn ? "2025 Proj." : "Proy. 2025"}
                 </p>
               </div>
               <div className="hig-content-group rounded-2xl p-3">
@@ -332,10 +527,10 @@ export const PhaseTelemetryPanel: React.FC<Props> = ({
                   {isEn ? "2050 Infill Capacity" : "Capacidad Infill 2050"}
                 </p>
                 <p className="font-mono-num mt-1 text-[15px] font-semibold tracking-tight text-[var(--hig-green)]">
-                  +{activeStats.infill.toLocaleString()} {isEn ? "homes" : "viv"}
+                  +{fmtNumber(activeStats.infill, language)} {isEn ? "homes" : "viv"}
                 </p>
                 <p className="font-mono-num mt-0.5 text-[10px] text-[var(--hig-ink-2)]">
-                  Solar: {activeStats.solarMw.toLocaleString()} MW
+                  Solar: {fmtNumber(activeStats.solarMw, language, 1)} MW
                 </p>
               </div>
             </div>
@@ -374,140 +569,6 @@ export const PhaseTelemetryPanel: React.FC<Props> = ({
                 </ResponsiveContainer>
               </div>
             </div>
-
-            {/* Deep Click-to-Inspect Telemetry Card */}
-            {inspection ? (
-              <div className="hig-content-group rounded-2xl p-3.5 ring-1 ring-[var(--hig-accent)]/35 space-y-2.5">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="flex items-center gap-1.5 font-mono-num text-[11px] font-semibold text-[var(--hig-cyan)]">
-                    <MapPin className="h-3.5 w-3.5 shrink-0" />
-                    <span>
-                      {inspection.coordinates.lon}, {inspection.coordinates.lat}
-                    </span>
-                  </span>
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    {(inspection.terrain_elevation_m != null || inspection.building?.ground_elev_m != null) && (
-                      <span className="font-mono-num rounded-full bg-[#30D158]/15 px-2 py-0.5 text-[10px] font-semibold text-[var(--hig-green)]">
-                        {Math.round(
-                          Number(inspection.terrain_elevation_m ?? inspection.building?.ground_elev_m),
-                        ).toLocaleString()}{" "}
-                        {isEn ? "m ASL" : "msnm"}
-                      </span>
-                    )}
-                    <button
-                      type="button"
-                      onClick={onClearInspection}
-                      className="rounded-full bg-[var(--hig-pill-bg)] px-2.5 py-0.5 text-[10.5px] font-medium text-[var(--hig-ink-2)] hover:text-[var(--hig-ink)] cursor-pointer"
-                    >
-                      {isEn ? "Close" : "Cerrar"}
-                    </button>
-                  </div>
-                </div>
-
-                {inspection.building && (
-                  <div className="rounded-xl bg-[var(--hig-pill-bg)] p-2.5 text-[11px] space-y-0.5">
-                    <p className="font-semibold text-[var(--hig-amber)]">
-                      {isEn ? "3D Building" : "Edificio 3D"} · {String(inspection.building.city_name || "")}
-                    </p>
-                    <p className="font-mono-num text-[var(--hig-ink)]">
-                      {isEn ? "Height" : "Altura"}: {String(inspection.building.height_m)} m ({String(inspection.building.floors)}{" "}
-                      {isEn ? "floors" : "niveles"}) · GFA: {Number(inspection.building.gfa_m2 || 0).toLocaleString()} m²
-                    </p>
-                    <p className="font-mono-num text-[var(--hig-ink-2)]">
-                      {isEn ? "Rooftop Solar PV" : "Solar PV Techo"}: {String(inspection.building.solar_kwp)} kWp ·{" "}
-                      {isEn ? "Elev" : "Cota"}: {String(inspection.building.ground_elev_m)} {isEn ? "masl" : "msnm"}
-                    </p>
-                  </div>
-                )}
-
-                {inspection.ageb && (
-                  <div className="rounded-xl bg-[var(--hig-pill-bg)] p-2.5 text-[11px] space-y-1">
-                    <p className="font-semibold text-[var(--hig-ink)]">
-                      AGEB {String(inspection.ageb.cvegeo_ageb)} · {String(inspection.ageb.municipality_name)}
-                    </p>
-                    <div className="grid grid-cols-3 gap-1 font-mono-num text-[10.5px]">
-                      <span className="text-[var(--hig-green)]">CSI: {String(inspection.ageb.city_science_index)}</span>
-                      <span className="text-[var(--hig-accent)]">15m: {String(inspection.ageb.city15_score)}</span>
-                      <span className="text-[var(--hig-cyan)]">Frac: {String(inspection.ageb.fractality_score)}</span>
-                    </div>
-                    <p className="text-[10.5px] text-[var(--hig-ink-2)]">
-                      {isEn ? "2025 Pop" : "Pob 2025"}: {Number(inspection.ageb.pobtot_2025_eic_calibrated || 0).toLocaleString()}{" "}
-                      {isEn ? "res" : "hab"} · Infill: +{Number(inspection.ageb.infill_homes_potential || 0).toLocaleString()}{" "}
-                      {isEn ? "homes" : "viv"} · Solar: {String(inspection.ageb.solar_mw)} MW
-                    </p>
-                  </div>
-                )}
-
-                {inspection.zoning && (
-                  <div className="rounded-xl bg-[var(--hig-pill-bg)] p-2.5 text-[11px] text-[var(--hig-ink-2)]">
-                    <span className="font-semibold text-[var(--hig-amber)]">{isEn ? "Zoning:" : "Zonificación:"}</span>{" "}
-                    {String(inspection.zoning.category)} ({String(inspection.zoning.land_use_code || (isEn ? "N/A" : "N/D"))}) · COS{" "}
-                    {String(inspection.zoning.cos_max ?? (isEn ? "N/A" : "N/D"))} / CUS{" "}
-                    {String(inspection.zoning.cus_max ?? (isEn ? "N/A" : "N/D"))}
-                  </div>
-                )}
-
-                <div className="rounded-xl bg-[var(--hig-pill-bg)] p-2.5 text-[11px] space-y-1">
-                  {inspection.aquifer && (
-                    <p className="text-[var(--hig-cyan)]">
-                      <strong>{isEn ? "Aquifer" : "Acuífero"} {String(inspection.aquifer.aquifer_code)}:</strong>{" "}
-                      {String(inspection.aquifer.aquifer_name)} · DMA{" "}
-                      <span className="font-mono-num font-semibold">{String(inspection.aquifer.dma_2023_hm3)} hm³/yr</span>
-                    </p>
-                  )}
-                  {inspection.tandeo_lapaz && (
-                    <p className="text-[var(--hig-red)] font-medium">
-                      {isEn ? "OOMSAPAS Rationing Alert: Sector" : "Alerta Tandeo OOMSAPAS: Sector"}{" "}
-                      {String(inspection.tandeo_lapaz.nombre)} ({String(inspection.tandeo_lapaz.dias)})
-                    </p>
-                  )}
-                  {inspection.poer_uga && (
-                    <p className="text-[var(--hig-green)]">
-                      <strong>POERBCS:</strong> {String(inspection.poer_uga.environmental_policy)} (
-                      {String(inspection.poer_uga.macro_zone_class)})
-                    </p>
-                  )}
-                  {inspection.protected_area && (
-                    <p className="text-[var(--hig-green)] font-medium">
-                      {isEn ? "CONANP Protected Area" : "ANP CONANP"}: {String(inspection.protected_area.area_name)}
-                    </p>
-                  )}
-                  {inspection.ejido_or_reserve && (
-                    <p className="text-[var(--hig-amber)] font-medium">
-                      {isEn ? "Land Tenure:" : "Tenencia Suelo:"}{" "}
-                      {String(inspection.ejido_or_reserve.name || "Ejido / Reserve")} (
-                      {String(inspection.ejido_or_reserve.legal_regime || inspection.ejido_or_reserve.tenure_type || "RAN")})
-                    </p>
-                  )}
-                  {inspection.hazard_zone && (
-                    <p className="text-[var(--hig-red)] font-medium">
-                      {isEn ? "Hazard Atlas:" : "Atlas Riesgo:"}{" "}
-                      {String(inspection.hazard_zone.name || inspection.hazard_zone.hazard_type)}
-                      {inspection.hazard_zone.severity ? ` · ${String(inspection.hazard_zone.severity)}` : ""}
-                    </p>
-                  )}
-                  {inspection.nearest_services?.health?.[0] && (
-                    <p className="text-[var(--hig-ink-2)]">
-                      <strong>{isEn ? "Nearest Health:" : "Salud cercana:"}</strong> {inspection.nearest_services.health[0].name} (
-                      {inspection.nearest_services.health[0].walk_m} m ·{" "}
-                      {inspection.nearest_services.health[0].walk_min} min)
-                    </p>
-                  )}
-                  {inspection.nearest_services?.education?.[0] && (
-                    <p className="text-[var(--hig-ink-2)]">
-                      <strong>{isEn ? "Nearest School:" : "Escuela cercana:"}</strong> {inspection.nearest_services.education[0].name} (
-                      {inspection.nearest_services.education[0].walk_m} m)
-                    </p>
-                  )}
-                </div>
-              </div>
-            ) : (
-              <div className="rounded-2xl border border-dashed border-[var(--hig-border)] p-3.5 text-center text-[11px] text-[var(--hig-ink-3)] leading-relaxed">
-                {isEn
-                  ? "Click any 3D building, AGEB polygon, or point on the map to inspect its full territorial dossier."
-                  : "Haz clic en cualquier edificio 3D, AGEB o punto del mapa para inspeccionar su expediente completo."}
-              </div>
-            )}
           </>
         )}
 
@@ -554,7 +615,7 @@ export const PhaseTelemetryPanel: React.FC<Props> = ({
                       {isEn ? "New Homes 2050" : "Nuevas Viv. 2050"}
                     </p>
                     <p className="font-mono-num mt-1 text-[16px] font-semibold text-[var(--hig-ink)]">
-                      {goalGap.projected_new_homes_2050.toLocaleString()}
+                      {fmtNumber(goalGap.projected_new_homes_2050, language)}
                     </p>
                     <p className="text-[10.5px] text-[var(--hig-green)]">
                       {isEn ? "Infill coverage:" : "Cobertura infill:"} {goalGap.infill_absorption_coverage_pct}%
@@ -565,10 +626,10 @@ export const PhaseTelemetryPanel: React.FC<Props> = ({
                       {isEn ? "Required CAPEX" : "CAPEX Requerido"}
                     </p>
                     <p className="font-mono-num mt-1 text-[16px] font-semibold text-[var(--hig-amber)]">
-                      ${goalGap.estimated_capex_mdp_mxn.toLocaleString()} MDP
+                      {fmtCurrencyMdp(goalGap.estimated_capex_mdp_mxn, language)}
                     </p>
                     <p className="text-[10.5px] text-[var(--hig-cyan)]">
-                      Desal: +{goalGap.recommended_desal_lps} lps · {goalGap.target_solar_mw} MW
+                      Desal: +{fmtNumber(goalGap.recommended_desal_lps, language)} lps · {fmtNumber(goalGap.target_solar_mw, language, 1)} MW
                     </p>
                   </div>
                 </div>
@@ -658,12 +719,13 @@ export const PhaseTelemetryPanel: React.FC<Props> = ({
 
             {simulation && (
               <>
-                <div className="hig-content-group flex items-center justify-between rounded-2xl px-3 py-2">
-                  <span className="text-[10.5px] font-medium text-[var(--hig-ink-2)] truncate">
-                    {simulation.scenario_meta.title}
+                <div className="hig-content-group flex items-center justify-between gap-2 rounded-2xl px-3 py-2">
+                  <span className="flex items-center gap-1.5 text-[10.5px] font-medium text-[var(--hig-ink-2)] truncate">
+                    {simLoading && <Loader2 className="h-3 w-3 animate-spin text-[var(--hig-accent)] shrink-0" />}
+                    <span className="truncate">{simulation.scenario_meta.title}</span>
                   </span>
                   <span className="rounded-full bg-[#FF9F0A]/15 px-2 py-0.5 font-mono-num text-[9px] font-semibold text-[var(--hig-amber)] shrink-0">
-                    {isEn ? "MODELED" : "MODELADO"}
+                    {simLoading ? (isEn ? "UPDATING" : "ACTUALIZANDO") : isEn ? "MODELED" : "MODELADO"}
                   </span>
                 </div>
 
@@ -704,25 +766,40 @@ export const PhaseTelemetryPanel: React.FC<Props> = ({
                     <p className="text-[10.5px] text-[var(--hig-ink-2)]">
                       {isEn ? "SIBCS Margin" : "Margen SIBCS"}
                     </p>
-                    <p className="font-mono-num mt-0.5 text-[14px] font-semibold text-[var(--hig-cyan)]">
-                      {simulation.active_year_snapshot.sibcs_headroom_mw} MW ({simulation.active_year_snapshot.sibcs_reserve_margin_pct}%)
+                    <p className="font-mono-num mt-0.5 text-[15px] font-semibold text-[var(--hig-cyan)]">
+                      {fmtNumber(simulation.active_year_snapshot.sibcs_headroom_mw, language, 1)} MW
+                    </p>
+                    <p className="font-mono-num text-[10px] text-[var(--hig-ink-3)]">
+                      {fmtNumber(simulation.active_year_snapshot.sibcs_reserve_margin_pct, language, 1)}% {isEn ? "reserve" : "reserva"}
                     </p>
                   </div>
                   <div className="hig-content-group rounded-2xl p-3">
                     <p className="text-[10.5px] text-[var(--hig-ink-2)]">
                       {isEn ? "Deployed Solar" : "Solar Desplegada"}
                     </p>
-                    <p className="font-mono-num mt-0.5 text-[14px] font-semibold text-[var(--hig-amber)]">
-                      {simulation.active_year_snapshot.deployed_rooftop_solar_mw.toLocaleString()} MW
+                    <p className="font-mono-num mt-0.5 text-[15px] font-semibold text-[var(--hig-amber)]">
+                      {fmtNumber(simulation.active_year_snapshot.deployed_rooftop_solar_mw, language, 1)} MW
                     </p>
                   </div>
                 </div>
 
                 {/* Policy Levers */}
                 <div className="hig-content-group rounded-2xl p-3.5 space-y-2.5">
-                  <p className="text-[11px] font-semibold text-[var(--hig-ink-2)]">
-                    {isEn ? "Counterfactual Levers" : "Palancas Contrafactuales"}
-                  </p>
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-[11px] font-semibold text-[var(--hig-ink-2)]">
+                      {isEn ? "Counterfactual Levers" : "Palancas Contrafactuales"}
+                    </p>
+                    {Object.keys(customLevers).length > 0 && onResetLevers && (
+                      <button
+                        type="button"
+                        onClick={onResetLevers}
+                        className="inline-flex items-center gap-1 rounded-full bg-[var(--hig-pill-bg)] px-2 py-0.5 text-[10px] font-semibold text-[var(--hig-accent)] hover:bg-[var(--hig-pill-hover)] cursor-pointer"
+                      >
+                        <RotateCcw className="h-2.5 w-2.5" aria-hidden="true" />
+                        <span>{isEn ? "Reset" : "Restablecer"}</span>
+                      </button>
+                    )}
+                  </div>
                   {[
                     { k: "infill_share_pct", l: isEn ? "Urban Infill Share (%)" : "Infill Intraurbano (%)", min: 10, max: 90, step: 2 },
                     { k: "ptar_reuse_target_pct", l: isEn ? "Purple-Line Reuse (%)" : "Reúso Línea Morada (%)", min: 10, max: 90, step: 2 },
@@ -1026,17 +1103,21 @@ export const PhaseTelemetryPanel: React.FC<Props> = ({
               </div>
             </div>
 
-            {recommendations.contradictions.length > 0 && (
+            {recommendations.contradictions.filter((c) => Boolean(c.message || c.description || c.title)).length > 0 && (
               <div className="rounded-2xl bg-[#FF453A]/12 p-3 ring-1 ring-[#FF453A]/30 space-y-1.5">
                 <p className="flex items-center gap-1.5 text-[11px] font-semibold text-[var(--hig-red)]">
                   <ShieldAlert className="h-3.5 w-3.5" />
                   {isEn ? "Territorial Contradictions Detected" : "Contradicciones Territoriales Detectadas"}
                 </p>
-                {recommendations.contradictions.slice(0, 3).map((c, idx) => (
-                  <p key={idx} className="text-[10.5px] text-[var(--hig-ink-2)] leading-snug">
-                    • {c.message}
-                  </p>
-                ))}
+                {recommendations.contradictions
+                  .map((c) => c.message || c.description || c.title || "")
+                  .filter(Boolean)
+                  .slice(0, 4)
+                  .map((msg, idx) => (
+                    <p key={idx} className="text-[10.5px] text-[var(--hig-ink-2)] leading-snug">
+                      • {msg}
+                    </p>
+                  ))}
               </div>
             )}
           </>

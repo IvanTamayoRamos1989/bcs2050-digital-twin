@@ -102,6 +102,7 @@ export interface CanonicalKpis {
     aquifers_transboundary_code: string;
     bigquery_gold_views: string[];
     reconciliation_notes: string;
+    reconciliation_notes_en?: string;
   };
   municipalities: Record<
     string,
@@ -117,7 +118,9 @@ export interface CanonicalKpis {
     municipality_code: string;
     municipality_name: string;
     water_rationing_status: string;
+    water_rationing_status_en?: string;
     transit_inventory_status: string;
+    transit_inventory_status_en?: string;
     notes: string;
   }[];
 }
@@ -389,7 +392,7 @@ export interface RecommendationsResponse {
     energy: Record<string, unknown>;
     land: Record<string, unknown>;
   };
-  contradictions: { id?: string; severity?: string; message: string }[];
+  contradictions: { id?: string; severity?: string; message?: string; description?: string; title?: string }[];
   decision_lenses: {
     lens_id: string;
     lens_name: string;
@@ -402,6 +405,7 @@ export interface RecommendationsResponse {
 
 export interface ChatCitation {
   doc_id: string;
+  display_title?: string | null;
   chunk_id?: string | null;
   doc_type?: string | null;
   municipality_code?: string | null;
@@ -662,8 +666,11 @@ export interface CitizenPin {
   pmdu_period: string;
   category: string;
   title: string;
+  title_en?: string;
   comment: string;
+  comment_en?: string;
   author_alias: string;
+  author_alias_en?: string;
   status: "approved" | "pending_moderation" | "rejected" | string;
   created_at: string;
   moderated_at: string;

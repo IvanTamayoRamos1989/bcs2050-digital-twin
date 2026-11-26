@@ -103,6 +103,7 @@ class SimulateRequest(BaseModel):
     scenario_name: str = "COMPACT_SUSTAINABLE_2050"
     target_year: int = Field(default=2050, ge=2025, le=2050)
     custom_levers: dict[str, Any] | None = None
+    language: str = Field(default="es", pattern="^(es|en)$")
 
 
 class GoalGapRequest(BaseModel):
@@ -112,6 +113,7 @@ class GoalGapRequest(BaseModel):
     target_ptar_reuse_pct: float = Field(default=72.0, ge=10.0, le=95.0)
     target_rooftop_solar_pct: float = Field(default=38.0, ge=5.0, le=90.0)
     target_suds_coverage_pct: float = Field(default=85.0, ge=10.0, le=100.0)
+    language: str = Field(default="es", pattern="^(es|en)$")
 
 
 class ChatRequest(BaseModel):
@@ -255,6 +257,7 @@ def twin_simulate(req: SimulateRequest) -> dict[str, Any]:
             scenario_name=req.scenario_name,
             custom_levers=req.custom_levers,
             target_year=req.target_year,
+            language=req.language,
         )
     except KeyError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -277,13 +280,17 @@ def twin_goal_gap(req: GoalGapRequest) -> dict[str, Any]:
         target_ptar_reuse_pct=req.target_ptar_reuse_pct,
         target_rooftop_solar_pct=req.target_rooftop_solar_pct,
         target_suds_coverage_pct=req.target_suds_coverage_pct,
+        language=req.language,
     )
 
 
 @app.get("/api/twin/recommendations/{scope_id}")
-def twin_recommendations(scope_id: str) -> dict[str, Any]:
+def twin_recommendations(
+    scope_id: str,
+    language: str = Query(default="es", pattern="^(es|en)$"),
+) -> dict[str, Any]:
     try:
-        return generate_recommendations(scope_id=scope_id)
+        return generate_recommendations(scope_id=scope_id, language=language)
     except KeyError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -299,8 +306,10 @@ def twin_chat(req: ChatRequest) -> dict[str, Any]:
 
 
 @app.get("/api/twin/architecture")
-def twin_architecture() -> dict[str, Any]:
-    return get_architecture_catalog()
+def twin_architecture(
+    language: str = Query(default="es", pattern="^(es|en)$"),
+) -> dict[str, Any]:
+    return get_architecture_catalog(language=language)
 
 
 @app.get("/api/twin/client-config")
@@ -345,8 +354,10 @@ app.include_router(ogc_router)
 
 
 @app.get("/api/twin/governance/summary")
-def twin_governance_summary() -> dict[str, Any]:
-    return get_governance_summary()
+def twin_governance_summary(
+    language: str = Query(default="es", pattern="^(es|en)$"),
+) -> dict[str, Any]:
+    return get_governance_summary(language=language)
 
 
 @app.get("/api/twin/participation")
@@ -495,7 +506,13 @@ if FRONTEND_DIST_DIR.exists():
             or full_path.startswith("ogc/")
         ):
             raise HTTPException(status_code=404, detail="API endpoint not found")
+        no_store_headers = {
+            "Cache-Control": "no-store, no-cache, must-revalidate",
+            "Pragma": "no-cache",
+        }
         candidate: Path = FRONTEND_DIST_DIR / full_path
         if full_path and candidate.exists() and candidate.is_file():
+            if candidate.name == "index.html":
+                return FileResponse(str(candidate), headers=no_store_headers)
             return FileResponse(str(candidate))
-        return FileResponse(str(FRONTEND_DIST_DIR / "index.html"))
+        return FileResponse(str(FRONTEND_DIST_DIR / "index.html"), headers=no_store_headers)

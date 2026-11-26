@@ -15,6 +15,7 @@ import type {
   LiveTelemetrySummary,
   OverviewResponse,
 } from "../types/twin";
+import { fmtNumber, formatTandeoSchedule } from "../utils/formatters";
 
 interface Props {
   collapsed: boolean;
@@ -58,12 +59,8 @@ export const CitizenScorecardPanel: React.FC<Props> = ({
   const weatherKey = scopeId === "03008" ? "los_cabos" : scopeId === "03009" ? "loreto" : "la_paz";
   const tempC = liveTelemetry?.weather?.[weatherKey]?.temp_c ?? liveTelemetry?.weather?.la_paz?.temp_c;
   const tandeoInfo = inspection?.tandeo_lapaz;
-  const tandeoSchedule =
-    typeof tandeoInfo?.dias_tandeo === "string"
-      ? tandeoInfo.dias_tandeo
-      : typeof tandeoInfo?.frecuencia === "string"
-        ? tandeoInfo.frecuencia
-        : null;
+  const rawTandeo = tandeoInfo?.dias_tandeo || tandeoInfo?.dias || tandeoInfo?.frecuencia;
+  const tandeoSchedule = rawTandeo ? formatTandeoSchedule(rawTandeo, isEn) : null;
 
   const nearestHealth = inspection?.nearest_services?.health?.[0];
   const nearestSchool = inspection?.nearest_services?.education?.[0];
@@ -87,7 +84,7 @@ export const CitizenScorecardPanel: React.FC<Props> = ({
   return (
     <aside
       aria-label={isEn ? "Citizen neighborhood scorecard" : "Tarjeta ciudadana de tu colonia"}
-      className="hig-glass-sidebar pointer-events-auto absolute z-30 sm:z-20 flex flex-col overflow-hidden max-sm:inset-x-0 max-sm:bottom-0 max-sm:top-auto max-sm:w-full max-sm:max-h-[76vh] max-sm:rounded-b-none max-sm:rounded-t-[28px] sm:right-4 sm:top-[72px] sm:w-[388px] sm:max-h-[calc(100%-240px)] sm:rounded-[24px]"
+      className="hig-glass-sidebar pointer-events-auto absolute z-30 sm:z-20 flex flex-col overflow-hidden max-sm:inset-x-0 max-sm:bottom-0 max-sm:top-auto max-sm:w-full max-sm:max-h-[76vh] max-sm:rounded-b-none max-sm:rounded-t-[28px] sm:right-4 sm:top-[72px] sm:w-[388px] sm:max-h-[calc(100%-176px)] sm:rounded-[24px]"
     >
       {/* Mobile iOS Sheet Grabber */}
       <div
@@ -220,8 +217,8 @@ export const CitizenScorecardPanel: React.FC<Props> = ({
           <p className="text-[11px] leading-snug text-[var(--hig-ink-2)]">
             {nearestHealth || nearestSchool || nearestTransit
               ? isEn
-                ? `Nearest school: ${nearestSchool ? `${nearestSchool.walk_min} min (${nearestSchool.name})` : "N/A"} · Health: ${nearestHealth ? `${nearestHealth.walk_min} min` : "N/A"} · Bus: ${nearestTransit ? `${Math.round(nearestTransit.walk_m)} m` : "N/A"}.`
-                : `Escuela cercana: ${nearestSchool ? `${nearestSchool.walk_min} min (${nearestSchool.name})` : "N/D"} · Clínica: ${nearestHealth ? `${nearestHealth.walk_min} min` : "N/D"} · Parada: ${nearestTransit ? `${Math.round(nearestTransit.walk_m)} m` : "N/D"}.`
+                ? `Nearest school: ${nearestSchool ? `${nearestSchool.walk_min} min (${nearestSchool.name})` : "N/A"} · Health: ${nearestHealth ? `${nearestHealth.walk_min} min` : "N/A"} · Bus: ${nearestTransit ? `${fmtNumber(Math.round(nearestTransit.walk_m), language)} m` : "N/A"}.`
+                : `Escuela cercana: ${nearestSchool ? `${nearestSchool.walk_min} min (${nearestSchool.name})` : "N/D"} · Clínica: ${nearestHealth ? `${nearestHealth.walk_min} min` : "N/D"} · Parada: ${nearestTransit ? `${fmtNumber(Math.round(nearestTransit.walk_m), language)} m` : "N/D"}.`
               : isEn
                 ? "Measures how easily families can reach schools, clinics, parks, and bus stops on foot."
                 : "Mide qué tan fácil es llegar caminando a escuelas, clínicas, parques y paradas de camión."}
@@ -246,8 +243,8 @@ export const CitizenScorecardPanel: React.FC<Props> = ({
           </div>
           <p className="text-[11px] leading-snug text-[var(--hig-ink-2)]">
             {isEn
-              ? `With BCS high solar irradiance (2,150 kWh/m²/yr), a 3 kWp home array produces ~${typicalHomeSolarKwhYr.toLocaleString()} kWh/yr (*illustrative).`
-              : `Con la alta radiación de BCS (2,150 kWh/m²/año), un sistema de 3 kWp genera ~${typicalHomeSolarKwhYr.toLocaleString()} kWh/año (*referencial).`}
+              ? `With BCS high solar irradiance (2,150 kWh/m²/yr), a 3 kWp home array produces ~${fmtNumber(typicalHomeSolarKwhYr, language)} kWh/yr (*illustrative).`
+              : `Con la alta radiación de BCS (2,150 kWh/m²/año), un sistema de 3 kWp genera ~${fmtNumber(typicalHomeSolarKwhYr, language)} kWh/año (*referencial).`}
           </p>
         </section>
 

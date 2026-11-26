@@ -77,6 +77,7 @@ export const TwinAPI = {
     scenario_name: string;
     target_year: number;
     custom_levers?: Record<string, number> | null;
+    language?: "es" | "en";
   }) => apiFetch<SimulationResponse>("/api/twin/simulate", { method: "POST", body: JSON.stringify(payload) }),
   compareScenarios: (scopeId: string) =>
     apiFetch<Record<string, unknown>>(`/api/twin/scenarios/compare/${encodeURIComponent(scopeId)}`),
@@ -87,14 +88,17 @@ export const TwinAPI = {
     target_ptar_reuse_pct: number;
     target_rooftop_solar_pct: number;
     target_suds_coverage_pct: number;
+    language?: "es" | "en";
   }) => apiFetch<GoalGapResponse>("/api/twin/goal-gap", { method: "POST", body: JSON.stringify(payload) }),
-  getRecommendations: (scopeId: string) =>
-    apiFetch<RecommendationsResponse>(`/api/twin/recommendations/${encodeURIComponent(scopeId)}`),
+  getRecommendations: (scopeId: string, language: "es" | "en" = "es") =>
+    apiFetch<RecommendationsResponse>(`/api/twin/recommendations/${encodeURIComponent(scopeId)}?language=${language}`),
   chat: (payload: { query: string; scope_id: string; scenario_name: string; language?: "es" | "en" }) =>
     apiFetch<ChatResponse>("/api/twin/chat", { method: "POST", body: JSON.stringify(payload) }),
-  getArchitecture: () => apiFetch<ArchitectureResponse>("/api/twin/architecture"),
+  getArchitecture: (language: "es" | "en" = "es") =>
+    apiFetch<ArchitectureResponse>(`/api/twin/architecture?language=${language}`),
   getClientConfig: () => apiFetch<ClientConfigResponse>("/api/twin/client-config"),
-  getGovernanceSummary: () => apiFetch<GovernanceSummaryResponse>("/api/twin/governance/summary"),
+  getGovernanceSummary: (language: "es" | "en" = "es") =>
+    apiFetch<GovernanceSummaryResponse>(`/api/twin/governance/summary?language=${language}`),
   getParticipationPins: (opts?: {
     pmdu_period?: string;
     category?: string;

@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Box, CheckCircle2, CircleDashed, Cpu, Download, FileJson, Film, ShieldCheck, X } from "lucide-react";
 import { TwinAPI } from "../api/client";
 import type { ArchitectureResponse, CorridorPreset, GovernanceSummaryResponse, MetadataCatalogResponse } from "../types/twin";
+import { humanizeCapability } from "../utils/formatters";
 
 interface Props {
   open: boolean;
@@ -10,6 +11,7 @@ interface Props {
   currentBbox?: [number, number, number, number] | null;
   currentZoom?: number;
   corridors?: Record<string, CorridorPreset>;
+  initialSection?: "governance" | "cad";
   onStartTour?: (tourId: string) => void;
 }
 
@@ -20,6 +22,7 @@ export const ArchitectureModal: React.FC<Props> = ({
   currentBbox,
   currentZoom = 6.4,
   corridors,
+  initialSection = "governance",
   onStartTour,
 }) => {
   const isEn = language === "en";
@@ -27,18 +30,28 @@ export const ArchitectureModal: React.FC<Props> = ({
   const [metaCatalog, setMetaCatalog] = useState<MetadataCatalogResponse | null>(null);
   const [governance, setGovernance] = useState<GovernanceSummaryResponse | null>(null);
   const [selectedCorridor, setSelectedCorridor] = useState<string>("el_tezal");
+  const loadedLangRef = useRef<string>("");
+  const cadSectionRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    if (open && !data) {
-      TwinAPI.getArchitecture().then(setData).catch(() => {});
+    if (!open) return;
+    if (loadedLangRef.current !== language) {
+      loadedLangRef.current = language;
+      TwinAPI.getArchitecture(language).then(setData).catch(() => {});
+      TwinAPI.getGovernanceSummary(language).then(setGovernance).catch(() => {});
     }
-    if (open && !metaCatalog) {
+    if (!metaCatalog) {
       TwinAPI.getMetadata().then(setMetaCatalog).catch(() => {});
     }
-    if (open && !governance) {
-      TwinAPI.getGovernanceSummary().then(setGovernance).catch(() => {});
+  }, [open, language, metaCatalog]);
+
+  useEffect(() => {
+    if (open && initialSection === "cad") {
+      window.setTimeout(() => {
+        cadSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 120);
     }
-  }, [open, data, metaCatalog, governance]);
+  }, [open, initialSection, data]);
 
   useEffect(() => {
     if (!open) return;
@@ -135,17 +148,27 @@ export const ArchitectureModal: React.FC<Props> = ({
                     {governance.documents.map((doc) => (
                       <div key={doc.id} className="rounded-xl bg-[var(--hig-pill-bg)] p-3 space-y-1">
                         <div className="flex items-center justify-between gap-2">
-                          <span className="text-[11.5px] font-semibold text-[var(--hig-ink)]">{doc.title_es}</span>
+                          <span className="text-[11.5px] font-semibold text-[var(--hig-ink)]">
+                            {isEn ? doc.title_en : doc.title_es}
+                          </span>
                           <span
-                            className={`rounded-full px-2 py-0.5 font-mono-num text-[9.5px] font-semibold ${
+                            className={`rounded-full px-2 py-0.5 font-mono-num text-[9.5px] font-semibold shrink-0 ${
                               doc.exists ? "bg-[#30D158]/15 text-[var(--hig-green)]" : "bg-[#FF9F0A]/15 text-[var(--hig-amber)]"
                             }`}
                           >
                             {doc.exists ? `${Math.round(doc.size_bytes / 1024)} KB` : "MISSING"}
                           </span>
                         </div>
-                        <p className="font-mono-num text-[9.5px] text-[var(--hig-cyan)]">{doc.path}</p>
-                        <p className="text-[10.5px] text-[var(--hig-ink-2)] leading-snug">{doc.summary_es}</p>
+                        <p className="text-[9.5px] font-semibold uppercase tracking-wider text-[var(--hig-cyan)]">
+                          {doc.category === "governance"
+                            ? isEn ? "Institutional Charter" : "Gobernanza"
+                            : doc.category === "rfp"
+                              ? isEn ? "Technical Standard / RFP" : "Estándar / RFP"
+                              : isEn ? "VVUQ Verification Report" : "Informe VVUQ"}
+                        </p>
+                        <p className="text-[10.5px] text-[var(--hig-ink-2)] leading-snug">
+                          {isEn ? doc.summary_en : doc.summary_es}
+                        </p>
                       </div>
                     ))}
                   </div>
@@ -168,14 +191,14 @@ export const ArchitectureModal: React.FC<Props> = ({
                       ) : (
                         <CircleDashed className="h-3.5 w-3.5 text-[var(--hig-amber)] shrink-0" />
                       )}
-                      <span className="text-[11px] text-[var(--hig-ink)] truncate">{k.replace(/_/g, " ")}</span>
+                      <span className="text-[11px] text-[var(--hig-ink)] truncate">{humanizeCapability(k, isEn)}</span>
                     </div>
                   ))}
                 </div>
               </div>
 
               {/* AEC / Autodesk / BIM / Lumion / Unreal Bridge */}
-              <div className="hig-content-group rounded-2xl p-4 ring-1 ring-[var(--hig-accent)]/25 space-y-3">
+              <div ref={cadSectionRef} className="hig-content-group rounded-2xl p-4 ring-1 ring-[var(--hig-accent)]/25 space-y-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="flex items-center gap-2.5">
                     <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#0A84FF]/18 text-[var(--hig-accent)]">
@@ -465,20 +488,28 @@ export const ArchitectureModal: React.FC<Props> = ({
 
                   <p className="text-[10.5px] text-[var(--hig-ink-2)] leading-snug rounded-xl bg-[var(--hig-pill-bg)] p-3">
                     <strong className="text-[var(--hig-green)]">
-                      {isEn ? "BigQuery Single Source of Truth" : "Verdad Única BigQuery"} (`gold_kpi_state_summary`):
+                      {isEn ? "Canonical KPI Baseline" : "Verdad Única BigQuery"}:
                     </strong>{" "}
-                    {metaCatalog.canonical_kpis.state.reconciliation_notes}
+                    {isEn
+                      ? metaCatalog.canonical_kpis.state.reconciliation_notes_en || metaCatalog.canonical_kpis.state.reconciliation_notes
+                      : metaCatalog.canonical_kpis.state.reconciliation_notes}
                   </p>
 
                   <div className="grid sm:grid-cols-5 gap-2">
                     {metaCatalog.canonical_kpis.municipal_coverage_audit.map((aud) => (
                       <div key={aud.municipality_code} className="rounded-xl bg-[var(--hig-pill-bg)] p-2.5 text-[10px]">
                         <p className="font-semibold text-[var(--hig-ink)]">{aud.municipality_name}</p>
-                        <p className="font-mono-num text-[9px] text-[var(--hig-cyan)] mt-0.5 truncate" title={aud.water_rationing_status}>
-                          {isEn ? "Water:" : "Agua:"} {aud.water_rationing_status}
+                        <p
+                          className="font-mono-num text-[9px] text-[var(--hig-cyan)] mt-0.5 truncate"
+                          title={isEn ? aud.water_rationing_status_en || aud.water_rationing_status : aud.water_rationing_status}
+                        >
+                          {isEn ? "Water:" : "Agua:"} {isEn ? aud.water_rationing_status_en || aud.water_rationing_status : aud.water_rationing_status}
                         </p>
-                        <p className="font-mono-num text-[9px] text-[var(--hig-amber)] truncate" title={aud.transit_inventory_status}>
-                          Bus: {aud.transit_inventory_status}
+                        <p
+                          className="font-mono-num text-[9px] text-[var(--hig-amber)] truncate"
+                          title={isEn ? aud.transit_inventory_status_en || aud.transit_inventory_status : aud.transit_inventory_status}
+                        >
+                          Transit: {isEn ? aud.transit_inventory_status_en || aud.transit_inventory_status : aud.transit_inventory_status}
                         </p>
                       </div>
                     ))}

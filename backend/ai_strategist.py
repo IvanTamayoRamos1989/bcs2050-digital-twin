@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -310,7 +311,118 @@ def _build_uncertainty_note(
     )
 
 
-def _format_citations(rag_chunks: list[dict[str, Any]], implan_ctx: dict[str, Any]) -> list[dict[str, Any]]:
+def _humanize_status(val: Any, language: str = "es") -> str:
+    s = str(val or "").strip()
+    is_en = language == "en"
+    mapping = {
+        "CRITICO_SOBREPASADO": ("Crítico Sobrepasado", "Critical Overdraft"),
+        "SOBREPASADO": ("Sobrepasado", "Over Capacity"),
+        "CONDICIONADO": ("Condicionado", "Constrained"),
+        "VIABLE": ("Viable", "Viable"),
+        "ALERTA": ("Alerta", "Alert"),
+    }
+    if s in mapping:
+        return mapping[s][1 if is_en else 0]
+    return s.replace("_", " ").title() if "_" in s and s.isupper() else s
+
+
+def _sanitize_citation_text(text: Any, language: str = "es") -> str:
+    raw = str(text or "").replace("\n", " ").strip()
+    if not raw:
+        return ""
+    is_en = language == "en"
+    # If BigQuery chunk excerpt is a raw JSON/schema dump or CSV layer table row, render clean summary
+    if (
+        raw.lstrip().startswith(("{", "["))
+        or ('"subgroup":' in raw and '"title":' in raw)
+        or ('"entity_types":' in raw)
+        or (".geojson" in raw and raw.count(",") >= 4)
+        or (",ACTIVA," in raw and raw.count(",") >= 4)
+    ):
+        if "entity_types" in raw or "Territory" in raw:
+            return (
+                "BCS2050 Ontology & Knowledge Graph schema covering territories, aquifers, urban constraints, and scenarios."
+                if is_en
+                else "Esquema de Ontología BCS2050 para territorios, acuíferos, condicionantes urbanas y escenarios."
+            )
+        if ".geojson" in raw or "cimp" in raw.lower() or "tanques" in raw.lower():
+            return (
+                "Curated IMPLAN Los Cabos v3 infrastructure & water network spatial layer catalog."
+                if is_en
+                else "Catálogo espacial curado de infraestructura y red hidráulica IMPLAN Los Cabos v3."
+            )
+        title_m = re.search(r'"title"\s*:\s*"([^"]+)"', raw)
+        if title_m:
+            doc_name = re.sub(r"^\d{4}-\d{2}-\d{2}_", "", title_m.group(1)).replace("_", " ").replace("-", " ")
+            return (
+                f"Official regulatory & technical document: {doc_name}."
+                if is_en
+                else f"Documento técnico y normativo oficial: {doc_name}."
+            )
+        return (
+            "CONAGUA & POERBCS Curated Water and Energy Regulatory Inventory."
+            if is_en
+            else "Inventario Normativo Curado de Agua y Energía (CONAGUA / POERBCS)."
+        )
+    # Strip internal filesystem / hub / GCS bucket path leaks from citations (single or multi-slash)
+    internal_folders = (
+        "11_bcs_hub",
+        "BCS_hub_pack",
+        "01_Steering_Committee",
+        "02_water",
+        "03_bigquery_ndjson",
+        "sources.json",
+        "gs://",
+        ".geojsonl",
+        ".geojson",
+        ".json",
+    )
+    if any(tok in raw for tok in internal_folders) or re.search(r"\b\d{2}_[A-Za-z0-9_]+/\S+", raw):
+        raw = re.sub(r"Sources\s*·\s*\S+", "Curated Reference Repository" if is_en else "Repositorio Oficial Curado", raw)
+        raw = re.sub(r"(?:gs://)?(?:[a-zA-Z0-9_.-]+/)+\S+", "Curated Technical Reference" if is_en else "Referencia Técnica Curada", raw)
+        raw = re.sub(r"\b\S+\.(?:geojsonl|geojson|json|csv|parquet)\b", "Official Dataset" if is_en else "Fuente Oficial", raw)
+    return raw.strip()
+
+
+def _clean_doc_title(doc_id: Any, source_uri: Any = None, language: str = "es") -> str:
+    raw = str(doc_id or "BCS2050-DOC").strip()
+    is_en = language == "en"
+    known: dict[str, tuple[str, str]] = {
+        "DOC-IMPLAN-LCB-V3-COMPENDIO": ("IMPLAN Los Cabos v3 · Compendio Territorial", "IMPLAN Los Cabos v3 · Territorial Compendium"),
+        "DOC-IMPLAN-LCB-V3-CATALOGO": ("IMPLAN Los Cabos v3 · Catálogo GIS", "IMPLAN Los Cabos v3 · Spatial Layer Catalog"),
+        "IMPLAN-LCB-V3-GIS": ("Catastro GIS IMPLAN Los Cabos v3", "IMPLAN Los Cabos v3 GIS Layers"),
+        "CONAGUA-DOF-2023": ("CONAGUA DOF 2023 · Acuíferos BCS", "CONAGUA DOF 2023 · BCS Aquifers"),
+        "INEGI-EIC-2025-CENSO-2020": ("INEGI Censo 2020 & EIC 2025", "INEGI 2020 Census & 2025 Intercensal"),
+        "OPENBUILDINGS-2.5D-GLO30": ("OpenBuildings 2.5D + GLO-30 DEM", "OpenBuildings 2.5D + Copernicus GLO-30 DEM"),
+    }
+    if raw in known:
+        return known[raw][1 if is_en else 0]
+    low = raw.lower()
+    if (
+        raw.startswith("rs_")
+        or len(raw) > 36
+        or "/" in raw
+        or "\\" in raw
+        or any(ext in low for ext in (".json", ".csv", ".md", ".pdf", "steering_committee", "bigquery", "bcs_hub"))
+    ):
+        if "water" in low or "conagua" in low or "acuif" in low or "dma" in low:
+            return "CONAGUA DOF 2023 · BCS Aquifer Balance" if is_en else "CONAGUA DOF 2023 · Balance Hídrico BCS"
+        if "implan" in low or "cabos" in low or "cimp" in low:
+            return "IMPLAN Los Cabos v3 · Spatial Compendium" if is_en else "IMPLAN Los Cabos v3 · Compendio Territorial"
+        if "poer" in low or "anp" in low or "conanp" in low or "semarnat" in low:
+            return "SEMARNAT / POERBCS · Ecological Planning" if is_en else "SEMARNAT / POERBCS · Ordenamiento Ecológico"
+        if "inegi" in low or "censo" in low or "ageb" in low:
+            return "INEGI Census & Geostatistical Baseline" if is_en else "INEGI Marco Geoestadístico y Censo"
+        return "BCS2050 Curated Knowledge Repository" if is_en else "Repositorio Territorial Curado BCS2050"
+    return raw
+
+
+def _format_citations(
+    rag_chunks: list[dict[str, Any]],
+    implan_ctx: dict[str, Any],
+    language: str = "es",
+) -> list[dict[str, Any]]:
+    is_en = language == "en"
     citations: list[dict[str, Any]] = []
     seen_chunks: set[str] = set()
     for ch in rag_chunks:
@@ -318,17 +430,20 @@ def _format_citations(rag_chunks: list[dict[str, Any]], implan_ctx: dict[str, An
         if cid in seen_chunks:
             continue
         seen_chunks.add(cid)
-        excerpt = str(ch.get("chunk_text") or "").replace("\n", " ").strip()
+        excerpt = _sanitize_citation_text(ch.get("chunk_text"), language=language)
         if len(excerpt) > 220:
             excerpt = excerpt[:217] + "..."
+        raw_doc_id = str(ch.get("doc_id") or "DOC-BCS2050")
+        section = _sanitize_citation_text(ch.get("page_or_section"), language=language)
         citations.append(
             {
-                "doc_id": ch.get("doc_id", "DOC-BCS2050"),
+                "doc_id": raw_doc_id,
+                "display_title": _clean_doc_title(raw_doc_id, ch.get("source_uri"), language=language),
                 "chunk_id": ch.get("chunk_id"),
                 "doc_type": ch.get("doc_type"),
                 "municipality_code": ch.get("municipality_code"),
-                "source_uri": ch.get("source_uri"),
-                "page_or_section": ch.get("page_or_section"),
+                "source_uri": None,
+                "page_or_section": section or None,
                 "distance": ch.get("distance"),
                 "excerpt": excerpt,
             }
@@ -338,23 +453,34 @@ def _format_citations(rag_chunks: list[dict[str, Any]], implan_ctx: dict[str, An
         citations.append(
             {
                 "doc_id": "IMPLAN-LCB-V3-GIS",
+                "display_title": _clean_doc_title("IMPLAN-LCB-V3-GIS", language=language),
                 "chunk_id": "bcs2050_gis.implan_los_cabos_cimp*",
                 "doc_type": "OFFICIAL_MUNICIPAL_GIS",
                 "municipality_code": "03008",
                 "source_uri": "gs://bcs2050-intelligence-sandbox/docs/implan_los_cabos_v3/IMPLAN_Los_Cabos_v3_Compendio_Territorial.md",
-                "page_or_section": f"{implan_ctx.get('tables_count', 26)} capas CIMP",
+                "page_or_section": f"{implan_ctx.get('tables_count', 26)} CIMP layers" if is_en else f"{implan_ctx.get('tables_count', 26)} capas CIMP",
                 "distance": None,
                 "excerpt": (
-                    f"Uso de suelo CIMP100 ({implan_ctx.get('key_layer_counts', {}).get('cimp100_uso_de_suelo', 0):,} predios), "
-                    f"condicionantes CIMP106 ({implan_ctx.get('key_layer_counts', {}).get('cimp106_condicionantes_urbanisticas', 0)}), "
-                    f"pozos CIMP112 ({implan_ctx.get('key_layer_counts', {}).get('cimp112_pozos_extraccion', 0)}) y línea morada CIMP117 "
-                    f"({implan_ctx.get('key_layer_counts', {}).get('cimp117_red_morada_agua_tratada', 0)})."
+                    (
+                        f"Land use CIMP100 ({implan_ctx.get('key_layer_counts', {}).get('cimp100_uso_de_suelo', 0):,} parcels), "
+                        f"constraints CIMP106 ({implan_ctx.get('key_layer_counts', {}).get('cimp106_condicionantes_urbanisticas', 0)}), "
+                        f"wells CIMP112 ({implan_ctx.get('key_layer_counts', {}).get('cimp112_pozos_extraccion', 0)}), and purple line CIMP117 "
+                        f"({implan_ctx.get('key_layer_counts', {}).get('cimp117_red_morada_agua_tratada', 0)})."
+                    )
+                    if is_en
+                    else (
+                        f"Uso de suelo CIMP100 ({implan_ctx.get('key_layer_counts', {}).get('cimp100_uso_de_suelo', 0):,} predios), "
+                        f"condicionantes CIMP106 ({implan_ctx.get('key_layer_counts', {}).get('cimp106_condicionantes_urbanisticas', 0)}), "
+                        f"pozos CIMP112 ({implan_ctx.get('key_layer_counts', {}).get('cimp112_pozos_extraccion', 0)}) y línea morada CIMP117 "
+                        f"({implan_ctx.get('key_layer_counts', {}).get('cimp117_red_morada_agua_tratada', 0)})."
+                    )
                 ),
             }
         )
 
     if not citations:
-        citations.extend(DEFAULT_SYSTEM_CITATIONS)
+        for dc in DEFAULT_SYSTEM_CITATIONS:
+            citations.append({**dc, "display_title": _clean_doc_title(dc["doc_id"], language=language)})
     return citations
 
 
@@ -377,8 +503,9 @@ def answer_strategist_chat_grounded(
             scope_id=scope_id,
             scenario_name=scenario_name,
             target_year=2050,
+            language=lang,
         )
-        f_recs = pool.submit(generate_recommendations, scope_id)
+        f_recs = pool.submit(generate_recommendations, scope_id, language=lang)
         f_rag = pool.submit(
             retrieve_bigquery_rag_chunks,
             query,
@@ -395,13 +522,14 @@ def answer_strategist_chat_grounded(
         rag_chunks = f_rag.result()
         implan_ctx = f_implan.result()
 
-    goal_gap = compute_goal_gap(scope_id=scope_id)
+    goal_gap = compute_goal_gap(scope_id=scope_id, language=lang)
     baseline = answer_strategist_chat(
         query=query,
         scope_id=scope_id,
         scenario_name=scenario_name,
         precomputed_recs=recs,
         precomputed_sim=sim,
+        language=lang,
     )
     map_action = resolve_spatial_map_action(query=query, scope_id=scope_id, language=lang)
 
@@ -418,14 +546,22 @@ def answer_strategist_chat_grounded(
     if implan_ctx.get("connected"):
         tools_used.append("bigquery.implan_los_cabos_v3")
 
-    citations = _format_citations(rag_chunks, implan_ctx)
+    citations = _format_citations(rag_chunks, implan_ctx, language=lang)
     lineage = list(baseline.get("lineage") or [])
     if map_action:
         lineage.append(f"Spatial Filter: {map_action['title']} ({map_action['matched_count']} features)")
     if rag_chunks:
-        lineage.append(f"BigQuery VECTOR_SEARCH ({len(rag_chunks)} chunks · text-multilingual-embedding-002)")
+        lineage.append(
+            f"BigQuery Vector RAG ({len(rag_chunks)} chunks)"
+            if lang == "en"
+            else f"BigQuery VECTOR_SEARCH ({len(rag_chunks)} chunks · text-multilingual-embedding-002)"
+        )
     if implan_ctx.get("connected"):
-        lineage.append(f"IMPLAN Los Cabos v3 BigQuery GIS ({implan_ctx.get('tables_count', 26)} capas oficiales 03008)")
+        lineage.append(
+            f"IMPLAN Los Cabos v3 GIS ({implan_ctx.get('tables_count', 26)} layers)"
+            if lang == "en"
+            else f"IMPLAN Los Cabos v3 BigQuery GIS ({implan_ctx.get('tables_count', 26)} capas oficiales 03008)"
+        )
 
     engine_mode = "deterministic_fallback"
     model_used: str | None = None
@@ -478,9 +614,9 @@ def answer_strategist_chat_grounded(
                     "city15_score": st.get("city15_score"),
                     "sdi_score_2031": sim.get("sdi_score_2031"),
                     "sdi_score_2050": sim.get("sdi_score_2050"),
-                    "carrying_capacity_status": recs.get("carrying_capacity", {}).get("overall_status"),
-                    "carrying_capacity_water": recs.get("carrying_capacity", {}).get("water"),
-                    "carrying_capacity_energy": recs.get("carrying_capacity", {}).get("energy"),
+                    "carrying_capacity_status": _humanize_status(recs.get("carrying_capacity", {}).get("overall_status"), lang),
+                    "carrying_capacity_water": _humanize_status(recs.get("carrying_capacity", {}).get("water"), lang),
+                    "carrying_capacity_energy": _humanize_status(recs.get("carrying_capacity", {}).get("energy"), lang),
                     "contradictions": [
                         {
                             "id": c.get("id"),
@@ -522,15 +658,19 @@ def answer_strategist_chat_grounded(
             }
 
             system_instruction = (
-                "You are Estratega IA for the BCS2050 Regional & Urban Digital Twin (Baja California Sur, Mexico). "
-                + ("Respond strictly in English. " if lang == "en" else "Responde estrictamente en Español. ")
+                "You are BCS2050 AI Territorial Strategist for the Regional & Urban Digital Twin (Baja California Sur, Mexico). "
+                + (
+                    "Respond strictly in natural executive English. NEVER include raw file paths, folder slugs, or internal underscore enums (e.g. say 'Critical Overdraft', never 'CRITICO_SOBREPASADO'). "
+                    if lang == "en"
+                    else "Responde estrictamente en Español claro y ejecutivo sin rutas de archivos ni códigos internos. "
+                )
                 + "GROUNDING RULES: "
                 "1. Base every number, place, and factual claim strictly on the JSON context provided. NEVER invent figures, aquifer values, CAPEX amounts, or doc IDs. "
-                "2. Clearly label empirical official baselines as [OFICIAL] (or [OFFICIAL] in English) vs counterfactual 2050 projections as [MODELADO] (or [MODELED] in English). "
-                "3. When spatial_map_visualization is present in context, tell the user briefly what has been visualized on the 3D map right now and summarize the specific matched areas/numbers from spatial_map_visualization.details. "
-                "4. Cite retrieved evidence inline in square brackets using exact doc_id values, e.g. [DOC-IMPLAN-LCB-V3-COMPENDIO] or [CONAGUA-DOF-2023]. "
+                "2. Clearly label empirical official baselines as [OFFICIAL] (or [OFICIAL] in Spanish) vs counterfactual 2050 projections as [MODELED] (or [MODELADO] in Spanish). "
+                "3. When spatial_map_visualization is present in context, briefly explain what has been visualized on the 3D map right now and summarize key matched areas/numbers from spatial_map_visualization.details. "
+                "4. Cite retrieved sources concisely in square brackets using human-readable source names (not raw SHA IDs or filesystem paths). "
                 "5. If the user asks about data not contained in the JSON context, explicitly state the data gap instead of extrapolating. "
-                "6. Keep the structure executive, scannable markdown (3 concise paragraphs or bullet synthesis + one short line on data lineage/limitations)."
+                "6. Keep the structure executive and scannable (2-3 crisp bullets or short paragraphs + one short limitations line)."
             )
 
             prompt = (

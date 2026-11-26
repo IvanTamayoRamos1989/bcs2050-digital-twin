@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Building2, Compass, Film, MapPin, Search, X } from "lucide-react";
 import type { AerialTour, CameraPreset, OverviewResponse } from "../types/twin";
+import { fmtNumber, humanizeCityName } from "../utils/formatters";
 
 interface SearchEntry {
   id: string;
@@ -116,8 +117,8 @@ export const SpatialSearchField: React.FC<Props> = ({
       list.push({
         id: `city:${c.slug}`,
         group: "city",
-        title: c.name,
-        subtitle: `${c.buildings_count.toLocaleString()} ${isEn ? "3D buildings" : "edificios 3D"}`,
+        title: humanizeCityName(c.name),
+        subtitle: `${fmtNumber(c.buildings_count, language)} ${isEn ? "3D buildings" : "edificios 3D"}`,
         run: () => onCityJump(c.slug),
       });
     }
@@ -197,10 +198,10 @@ export const SpatialSearchField: React.FC<Props> = ({
             ? `Search city, municipality or corridor (${triggerLabel})`
             : `Buscar ciudad, municipio o corredor (${triggerLabel})`
         }
-        className="ios-pill hig-lift flex items-center gap-1.5 px-2.5 py-1.5 max-sm:min-h-[38px] text-[11.5px] font-medium text-[var(--hig-ink)] max-w-[84px] sm:max-w-[210px] overflow-hidden cursor-pointer"
+        className="ios-pill hig-lift flex items-center gap-1.5 max-sm:h-11 max-sm:w-11 max-sm:justify-center max-sm:p-0 sm:px-3 sm:py-1.5 text-[11.5px] font-medium text-[var(--hig-ink)] sm:max-w-[220px] overflow-hidden cursor-pointer"
       >
         <Search className="h-3.5 w-3.5 text-[var(--hig-accent)] shrink-0" aria-hidden="true" />
-        <span className="truncate">{triggerLabel}</span>
+        <span className="hidden sm:inline truncate">{triggerLabel}</span>
         <kbd className="hidden lg:inline-flex items-center rounded bg-[var(--hig-pill-bg)] px-1.5 py-0.2 font-mono-num text-[9.5px] font-semibold text-[var(--hig-ink-3)] shrink-0">
           ⌘K
         </kbd>
@@ -212,7 +213,7 @@ export const SpatialSearchField: React.FC<Props> = ({
             ref={dialogRef}
             role="dialog"
             aria-label={isEn ? "Spotlight territorial search" : "Búsqueda territorial Spotlight"}
-            className="hig-glass-sidebar fixed z-50 max-sm:left-2.5 max-sm:right-2.5 max-sm:top-[74px] max-sm:w-auto sm:left-4 sm:top-[70px] sm:w-[340px] rounded-[22px] p-3 text-left whitespace-normal space-y-2.5"
+            className="hig-glass-popover fixed z-50 max-sm:left-2.5 max-sm:right-2.5 max-sm:top-[76px] max-sm:w-auto sm:left-4 sm:top-[70px] sm:w-[340px] rounded-[22px] p-3 text-left whitespace-normal space-y-2.5"
           >
           {/* Search Input Bar */}
           <div className="ios-input flex items-center gap-2 rounded-full px-3 py-2">

@@ -279,3 +279,35 @@ def test_public_client_config_endpoint(monkeypatch) -> None:
     assert set(body.keys()) == {"google_maps_api_key", "cesium_ion_token", "maptiler_key"}
     assert body["google_maps_api_key"] == "AIzaTestOnly123"
     assert "super-secret-planner-token" not in str(body)
+
+
+def test_bilingual_english_endpoints_and_non_empty_contradictions() -> None:
+    recs_en = client.get("/api/twin/recommendations/03?language=en")
+    assert recs_en.status_code == 200
+    rdata = recs_en.json()
+    assert len(rdata["contradictions"]) >= 3
+    for contra in rdata["contradictions"]:
+        assert contra.get("message") and len(contra["message"]) > 15
+    assert rdata["decision_lenses"][0]["verdict"] in {"Critical Alert", "Aligned", "Conditional", "At Risk", "Optimal"}
+
+    sim_en = client.post(
+        "/api/twin/simulate",
+        json={"scope_id": "03", "scenario_name": "BAU_TENDENCIAL", "target_year": 2050, "language": "en"},
+    )
+    assert sim_en.status_code == 200
+    sdata = sim_en.json()
+    assert "Baseline" in sdata["scenario_meta"]["title"]
+    assert "CONAGUA" in sdata["vvuq"]["legal_disclaimer"]
+    assert "Exploratory" in sdata["vvuq"]["legal_disclaimer"]
+
+    arch_en = client.get("/api/twin/architecture?language=en")
+    assert arch_en.status_code == 200
+    assert "Immediate" in arch_en.json()["commercial_tiers"][0]["tier"]
+
+    gov_en = client.get("/api/twin/governance/summary?language=en")
+    assert gov_en.status_code == 200
+    assert "Tier 1" in gov_en.json()["data_classification_tiers"][0]["tier"]
+
+    pins = client.get("/api/twin/participation")
+    assert pins.status_code == 200
+    assert all(p.get("title_en") and p.get("comment_en") for p in pins.json()["pins"] if p.get("seeded_example"))

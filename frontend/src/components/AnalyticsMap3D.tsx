@@ -4,8 +4,9 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import { MapboxOverlay } from "@deck.gl/mapbox";
 import { Tile3DLayer } from "@deck.gl/geo-layers";
 import { ArcLayer, GeoJsonLayer, IconLayer, LineLayer, PolygonLayer, ScatterplotLayer, TextLayer } from "@deck.gl/layers";
-import { Box, Building2, Compass, Film, Mountain, Sparkles, Square, X, ZoomIn } from "lucide-react";
+import { Box, Building2, ChevronUp, Compass, Film, Layers, LocateFixed, Mountain, Sparkles, Square, X } from "lucide-react";
 import { TwinAPI } from "../api/client";
+import { fmtNumber } from "../utils/formatters";
 import type {
   ActivePhysicsOverlay,
   AerialTour,
@@ -64,6 +65,9 @@ interface Props {
   onStopTour?: () => void;
   onViewportChange?: (bbox: [number, number, number, number], zoom: number) => void;
   onOpenExportModal?: () => void;
+  selectedPoint?: { lon: number; lat: number } | null;
+  leftSidebarOpen?: boolean;
+  rightSidebarOpen?: boolean;
   onInspectLocation: (
     lon: number,
     lat: number,
@@ -112,6 +116,66 @@ function buildDemSourceSpec(maptilerKey: string): maplibregl.SourceSpecification
       };
 }
 
+function getHillshadePaint(
+  mode: BasemapMode,
+  theme: "dark" | "light",
+): maplibregl.HillshadeLayerSpecification["paint"] {
+  if (mode === "obsidian" && theme === "light") {
+    return {
+      "hillshade-exaggeration": 0.48,
+      "hillshade-illumination-direction": 315,
+      "hillshade-shadow-color": "#7C8EA6",
+      "hillshade-highlight-color": "#FFFFFF",
+      "hillshade-accent-color": "#CBD5E1",
+    };
+  }
+  if (mode === "obsidian") {
+    return {
+      "hillshade-exaggeration": 0.55,
+      "hillshade-illumination-direction": 315,
+      "hillshade-shadow-color": "#020617",
+      "hillshade-highlight-color": "#64748B",
+      "hillshade-accent-color": "#1E293B",
+    };
+  }
+  if (mode === "terrain") {
+    return {
+      "hillshade-exaggeration": 0.42,
+      "hillshade-illumination-direction": 315,
+      "hillshade-shadow-color": "#64748B",
+      "hillshade-highlight-color": "#FFFFFF",
+      "hillshade-accent-color": "#94A3B8",
+    };
+  }
+  return {
+    "hillshade-exaggeration": 0.24,
+    "hillshade-illumination-direction": 315,
+    "hillshade-shadow-color": "#0F172A",
+    "hillshade-highlight-color": "#F8FAFC",
+    "hillshade-accent-color": "#334155",
+  };
+}
+
+function getSkySpec(theme: "dark" | "light"): maplibregl.SkySpecification {
+  return theme === "light"
+    ? {
+        "sky-color": "#DCE8F5",
+        "sky-horizon-blend": 0.45,
+        "horizon-color": "#F5F7FA",
+        "horizon-fog-blend": 0.5,
+        "fog-color": "#F5F7FA",
+        "fog-ground-blend": 0.45,
+      }
+    : {
+        "sky-color": "#0B1220",
+        "sky-horizon-blend": 0.4,
+        "horizon-color": "#1E293B",
+        "horizon-fog-blend": 0.5,
+        "fog-color": "#0F172A",
+        "fog-ground-blend": 0.45,
+      };
+}
+
 function buildMapStyle(
   mode: BasemapMode,
   maptilerKeyOverride?: string,
@@ -123,152 +187,128 @@ function buildMapStyle(
   const sources: Record<string, maplibregl.SourceSpecification> = {};
   const layers: maplibregl.LayerSpecification[] = [];
 
-  if (mode === "obsidian") {
-    if (theme === "light") {
-      if (maptilerKey) {
-        sources.base = {
-          type: "raster",
-          tiles: [`https://api.maptiler.com/maps/dataviz-light/256/{z}/{x}/{y}@2x.png?key=${maptilerKey}`],
-          tileSize: 256,
-          maxzoom: 19,
-        };
-        layers.push({ id: "base-layer", type: "raster", source: "base" });
-      } else {
-        sources.esriLightBase = {
-          type: "raster",
-          tiles: ["https://services.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}"],
-          tileSize: 256,
-          maxzoom: 16,
-        };
-        sources.esriLightRef = {
-          type: "raster",
-          tiles: ["https://services.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}"],
-          tileSize: 256,
-          maxzoom: 16,
-        };
-        layers.push({ id: "light-base-layer", type: "raster", source: "esriLightBase" });
-        layers.push({
-          id: "light-ref-layer",
-          type: "raster",
-          source: "esriLightRef",
-          paint: { "raster-opacity": 0.78 },
-        });
-      }
-    } else if (maptilerKey) {
-      sources.base = {
-        type: "raster",
-        tiles: [`https://api.maptiler.com/maps/dataviz-dark/256/{z}/{x}/{y}@2x.png?key=${maptilerKey}`],
-        tileSize: 256,
-        maxzoom: 19,
-      };
-      layers.push({ id: "base-layer", type: "raster", source: "base" });
-    } else {
-      sources.esriDarkBase = {
-        type: "raster",
-        tiles: ["https://services.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}"],
-        tileSize: 256,
-        maxzoom: 16,
-      };
-      sources.esriDarkRef = {
-        type: "raster",
-        tiles: ["https://services.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}"],
-        tileSize: 256,
-        maxzoom: 16,
-      };
-      layers.push({
-        id: "dark-base-layer",
-        type: "raster",
-        source: "esriDarkBase",
-        paint: { "raster-brightness-max": 0.45, "raster-contrast": 0.25 },
-      });
-      layers.push({
-        id: "dark-ref-layer",
-        type: "raster",
-        source: "esriDarkRef",
-        paint: { "raster-opacity": 0.72 },
-      });
-    }
-  } else if (mode === "terrain") {
-    if (maptilerKey) {
-      sources.maptilerTopo = {
-        type: "raster",
-        tiles: [`https://api.maptiler.com/maps/outdoor-v2/256/{z}/{x}/{y}@2x.png?key=${maptilerKey}`],
-        tileSize: 256,
-        maxzoom: 20,
-      };
-      layers.push({ id: "topo-layer", type: "raster", source: "maptilerTopo" });
-    } else {
-      sources.esriTopo = {
-        type: "raster",
-        tiles: ["https://services.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}"],
-        tileSize: 256,
-        maxzoom: 19,
-      };
-      layers.push({ id: "topo-layer", type: "raster", source: "esriTopo" });
-    }
+  // 1. Light Vector/Raster Basemap
+  if (maptilerKey) {
+    sources.lightBase = {
+      type: "raster",
+      tiles: [`https://api.maptiler.com/maps/dataviz-light/256/{z}/{x}/{y}@2x.png?key=${maptilerKey}`],
+      tileSize: 256,
+      maxzoom: 19,
+    };
+    sources.darkBase = {
+      type: "raster",
+      tiles: [`https://api.maptiler.com/maps/dataviz-dark/256/{z}/{x}/{y}@2x.png?key=${maptilerKey}`],
+      tileSize: 256,
+      maxzoom: 19,
+    };
   } else {
-    if (maptilerKey) {
-      sources.maptilerSat = {
-        type: "raster",
-        tiles: [`https://api.maptiler.com/maps/hybrid/256/{z}/{x}/{y}@2x.jpg?key=${maptilerKey}`],
-        tileSize: 256,
-        maxzoom: 20,
-      };
-      layers.push({ id: "sat-layer", type: "raster", source: "maptilerSat" });
-    } else {
-      sources.esriSat = {
-        type: "raster",
-        tiles: ["https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"],
-        tileSize: 256,
-        maxzoom: 19,
-      };
-      sources.labels = {
-        type: "raster",
-        tiles: ["https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}"],
-        tileSize: 256,
-        maxzoom: 19,
-      };
-      layers.push({ id: "sat-layer", type: "raster", source: "esriSat" });
-      layers.push({ id: "labels-layer", type: "raster", source: "labels", paint: { "raster-opacity": 0.85 } });
-    }
+    sources.lightBase = {
+      type: "raster",
+      tiles: ["https://services.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}"],
+      tileSize: 256,
+      maxzoom: 16,
+    };
+    sources.lightRef = {
+      type: "raster",
+      tiles: ["https://services.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}"],
+      tileSize: 256,
+      maxzoom: 16,
+    };
+    sources.darkBase = {
+      type: "raster",
+      tiles: ["https://services.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}"],
+      tileSize: 256,
+      maxzoom: 16,
+    };
+    sources.darkRef = {
+      type: "raster",
+      tiles: ["https://services.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}"],
+      tileSize: 256,
+      maxzoom: 16,
+    };
   }
+
+  // 2. Always-available HD Satellite (ArcGIS World Imagery) & Shaded Topographic (ArcGIS World Topo)
+  sources.satImagery = {
+    type: "raster",
+    tiles: ["https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"],
+    tileSize: 256,
+    maxzoom: 19,
+  };
+  sources.satLabels = {
+    type: "raster",
+    tiles: ["https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}"],
+    tileSize: 256,
+    maxzoom: 19,
+  };
+  sources.topoBase = {
+    type: "raster",
+    tiles: ["https://services.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}"],
+    tileSize: 256,
+    maxzoom: 19,
+  };
+
+  const showLight = mode === "obsidian" && theme === "light";
+  const showDark = mode === "obsidian" && theme === "dark";
+  const showSat = mode === "satellite";
+  const showTopo = mode === "terrain";
+
+  layers.push({
+    id: "base-light-layer",
+    type: "raster",
+    source: "lightBase",
+    layout: { visibility: showLight ? "visible" : "none" },
+  });
+  if (sources.lightRef) {
+    layers.push({
+      id: "base-light-ref-layer",
+      type: "raster",
+      source: "lightRef",
+      layout: { visibility: showLight ? "visible" : "none" },
+      paint: { "raster-opacity": 0.78 },
+    });
+  }
+
+  layers.push({
+    id: "base-dark-layer",
+    type: "raster",
+    source: "darkBase",
+    layout: { visibility: showDark ? "visible" : "none" },
+    paint: maptilerKey ? {} : { "raster-brightness-max": 0.45, "raster-contrast": 0.25 },
+  });
+  if (sources.darkRef) {
+    layers.push({
+      id: "base-dark-ref-layer",
+      type: "raster",
+      source: "darkRef",
+      layout: { visibility: showDark ? "visible" : "none" },
+      paint: { "raster-opacity": 0.72 },
+    });
+  }
+
+  layers.push({
+    id: "base-sat-layer",
+    type: "raster",
+    source: "satImagery",
+    layout: { visibility: showSat ? "visible" : "none" },
+  });
+  layers.push({
+    id: "base-sat-labels-layer",
+    type: "raster",
+    source: "satLabels",
+    layout: { visibility: showSat ? "visible" : "none" },
+    paint: { "raster-opacity": 0.85 },
+  });
+  layers.push({
+    id: "base-topo-layer",
+    type: "raster",
+    source: "topoBase",
+    layout: { visibility: showTopo ? "visible" : "none" },
+  });
 
   // Distinct DEM sources for 3D terrain displacement & architectural hillshade relief
   sources.terrainDem = buildDemSourceSpec(maptilerKey);
   sources.hillshadeDem = buildDemSourceSpec(maptilerKey);
-
-  const hillshadePaint: maplibregl.HillshadeLayerSpecification["paint"] =
-    mode === "obsidian" && theme === "light"
-      ? {
-          "hillshade-exaggeration": 0.52,
-          "hillshade-illumination-direction": 315,
-          "hillshade-shadow-color": "#7C8EA6",
-          "hillshade-highlight-color": "#FFFFFF",
-          "hillshade-accent-color": "#CBD5E1",
-        }
-      : mode === "obsidian"
-        ? {
-            "hillshade-exaggeration": 0.55,
-            "hillshade-illumination-direction": 315,
-            "hillshade-shadow-color": "#020617",
-            "hillshade-highlight-color": "#64748B",
-            "hillshade-accent-color": "#1E293B",
-          }
-        : mode === "terrain"
-          ? {
-              "hillshade-exaggeration": 0.58,
-              "hillshade-illumination-direction": 315,
-              "hillshade-shadow-color": "#64748B",
-              "hillshade-highlight-color": "#FFFFFF",
-              "hillshade-accent-color": "#94A3B8",
-            }
-          : {
-              "hillshade-exaggeration": 0.28,
-              "hillshade-illumination-direction": 315,
-              "hillshade-shadow-color": "#0F172A",
-              "hillshade-highlight-color": "#F8FAFC",
-              "hillshade-accent-color": "#334155",
-            };
 
   layers.push({
     id: "terrain-hillshade",
@@ -277,33 +317,14 @@ function buildMapStyle(
     layout: {
       visibility: terrain3dEnabled && terrainExaggeration > 0 ? "visible" : "none",
     },
-    paint: hillshadePaint,
+    paint: getHillshadePaint(mode, theme),
   });
-
-  const sky: maplibregl.SkySpecification =
-    theme === "light"
-      ? {
-          "sky-color": "#DCE8F5",
-          "sky-horizon-blend": 0.45,
-          "horizon-color": "#F5F7FA",
-          "horizon-fog-blend": 0.5,
-          "fog-color": "#F5F7FA",
-          "fog-ground-blend": 0.45,
-        }
-      : {
-          "sky-color": "#0B1220",
-          "sky-horizon-blend": 0.4,
-          "horizon-color": "#1E293B",
-          "horizon-fog-blend": 0.5,
-          "fog-color": "#0F172A",
-          "fog-ground-blend": 0.45,
-        };
 
   return {
     version: 8,
     sources,
     layers,
-    sky,
+    sky: getSkySpec(theme),
     ...(terrain3dEnabled && terrainExaggeration > 0
       ? { terrain: { source: "terrainDem", exaggeration: terrainExaggeration } }
       : {}),
@@ -343,10 +364,20 @@ export const AnalyticsMap3D: React.FC<Props> = ({
   onStopTour,
   onViewportChange,
   onOpenExportModal,
+  selectedPoint = null,
+  leftSidebarOpen = false,
+  rightSidebarOpen = false,
   onInspectLocation,
   onQuickJumpCity,
 }) => {
   const isEn = language === "en";
+  const [toursMenuOpen, setToursMenuOpen] = useState(false);
+  const [citiesMenuOpen, setCitiesMenuOpen] = useState(false);
+  const [legendOpen, setLegendOpen] = useState(false);
+  const [isPitchFlat, setIsPitchFlat] = useState(false);
+  const toursPopoverRef = useRef<HTMLDivElement | null>(null);
+  const citiesPopoverRef = useRef<HTMLDivElement | null>(null);
+  const prevMaptilerKeyRef = useRef<string>(maptilerKey);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const overlayRef = useRef<MapboxOverlay | null>(null);
@@ -618,13 +649,87 @@ export const AnalyticsMap3D: React.FC<Props> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Update basemap style dynamically (do not reset style when only terrain slider changes)
+  // Rebuild persistent style ONLY when runtime MapTiler key changes
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
-    map.setStyle(buildMapStyle(basemapMode, maptilerKey, theme, terrain3dEnabled, terrainExaggeration));
+    if (prevMaptilerKeyRef.current === maptilerKey) return;
+    prevMaptilerKeyRef.current = maptilerKey;
+    map.setStyle(buildMapStyle(basemapMode, maptilerKey, theme, terrain3dEnabled, terrainExaggeration), {
+      diff: false,
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [basemapMode, maptilerKey, theme]);
+  }, [maptilerKey]);
+
+  // Instant basemap / theme switching via native layer visibility (preserves terrain DEM drape cleanly)
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    const syncVisibility = () => {
+      const showLight = basemapMode === "obsidian" && theme === "light";
+      const showDark = basemapMode === "obsidian" && theme === "dark";
+      const showSat = basemapMode === "satellite";
+      const showTopo = basemapMode === "terrain";
+
+      const toggle = (id: string, visible: boolean) => {
+        if (map.getLayer(id)) {
+          map.setLayoutProperty(id, "visibility", visible ? "visible" : "none");
+        }
+      };
+
+      toggle("base-light-layer", showLight);
+      toggle("base-light-ref-layer", showLight);
+      toggle("base-dark-layer", showDark);
+      toggle("base-dark-ref-layer", showDark);
+      toggle("base-sat-layer", showSat);
+      toggle("base-sat-labels-layer", showSat);
+      toggle("base-topo-layer", showTopo);
+
+      if (map.getLayer("terrain-hillshade")) {
+        const hs = getHillshadePaint(basemapMode, theme) || {};
+        for (const [k, v] of Object.entries(hs)) {
+          map.setPaintProperty("terrain-hillshade", k, v);
+        }
+      }
+      if (typeof map.setSky === "function") {
+        map.setSky(getSkySpec(theme));
+      }
+      map.triggerRepaint();
+    };
+
+    if (map.isStyleLoaded()) {
+      syncVisibility();
+    } else {
+      map.once("style.load", syncVisibility);
+    }
+  }, [basemapMode, theme, styleVersion]);
+
+  // Dismiss Tours / Cities popovers on outside click or Escape
+  useEffect(() => {
+    if (!toursMenuOpen && !citiesMenuOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setToursMenuOpen(false);
+        setCitiesMenuOpen(false);
+      }
+    };
+    const onDown = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (toursMenuOpen && toursPopoverRef.current && !toursPopoverRef.current.contains(t)) {
+        setToursMenuOpen(false);
+      }
+      if (citiesMenuOpen && citiesPopoverRef.current && !citiesPopoverRef.current.contains(t)) {
+        setCitiesMenuOpen(false);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    document.addEventListener("mousedown", onDown);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.removeEventListener("mousedown", onDown);
+    };
+  }, [toursMenuOpen, citiesMenuOpen]);
 
   // Dynamically toggle 3D Terrain DEM displacement & Hillshade intensity without full style reload
   useEffect(() => {
@@ -2246,6 +2351,38 @@ export const AnalyticsMap3D: React.FC<Props> = ({
       );
     }
 
+    // 18. Glowing Click-to-Inspect Location Selection Ring
+    if (selectedPoint) {
+      list.push(
+        new ScatterplotLayer({
+          id: "selected-inspect-ring-outer",
+          data: [selectedPoint],
+          getPosition: (d: { lon: number; lat: number }) => [d.lon, d.lat],
+          getRadius: 210,
+          radiusMinPixels: 11,
+          radiusMaxPixels: 22,
+          getFillColor: [0, 122, 255, 58],
+          getLineColor: [255, 255, 255, 245],
+          lineWidthMinPixels: 2.5,
+          stroked: true,
+          pickable: false,
+        }),
+        new ScatterplotLayer({
+          id: "selected-inspect-ring-core",
+          data: [selectedPoint],
+          getPosition: (d: { lon: number; lat: number }) => [d.lon, d.lat],
+          getRadius: 85,
+          radiusMinPixels: 5,
+          radiusMaxPixels: 9,
+          getFillColor: [0, 122, 255, 255],
+          getLineColor: [255, 255, 255, 255],
+          lineWidthMinPixels: 2,
+          stroked: true,
+          pickable: false,
+        }),
+      );
+    }
+
     return list;
   }, [
     activeMetric,
@@ -2261,6 +2398,7 @@ export const AnalyticsMap3D: React.FC<Props> = ({
     layers,
     liveTelemetry,
     pendingPinCoords,
+    selectedPoint,
     sensorThings,
     physicsOverlay,
     onInspectLocation,
@@ -2281,7 +2419,11 @@ export const AnalyticsMap3D: React.FC<Props> = ({
   }, [deckLayers]);
 
   return (
-    <div className={`relative h-full w-full overflow-hidden ${pinPlacementMode ? "cursor-crosshair" : ""}`}>
+    <div
+      className={`relative h-full w-full overflow-hidden ${pinPlacementMode ? "cursor-crosshair" : ""} ${
+        rightSidebarOpen ? "telemetry-open" : ""
+      }`}
+    >
       <div
         ref={containerRef}
         aria-label={isEn ? "Interactive 3D map of Baja California Sur" : "Mapa 3D interactivo de Baja California Sur"}
@@ -2341,19 +2483,33 @@ export const AnalyticsMap3D: React.FC<Props> = ({
               type="button"
               onClick={onClearAiHighlight}
               aria-label={isEn ? "Clear AI map visualization" : "Quitar filtro IA del mapa"}
-              className="flex h-5 w-5 items-center justify-center rounded-full bg-[var(--hig-pill-bg)] text-[var(--hig-ink-2)] hover:text-[var(--hig-ink)] cursor-pointer"
+              className="flex h-6 w-6 max-sm:h-11 max-sm:w-11 shrink-0 items-center justify-center rounded-full bg-[var(--hig-pill-bg)] text-[var(--hig-ink-2)] hover:text-[var(--hig-ink)] cursor-pointer"
             >
-              <X className="h-3 w-3" />
+              <X className="h-3.5 w-3.5" />
             </button>
           )}
         </div>
       )}
 
-      {/* Hover Tooltip */}
+      {/* Hover Tooltip (Clamped Inside Canvas & Away from Sidebars) */}
       {hoverInfo && (
         <div
-          className="hig-glass-sidebar pointer-events-none fixed z-40 max-w-xs rounded-2xl px-3.5 py-2.5 text-[11.5px]"
-          style={{ left: Math.min(window.innerWidth - 280, hoverInfo.x + 14), top: Math.max(76, hoverInfo.y + 14) }}
+          className="hig-glass-popover pointer-events-none fixed z-40 max-w-[270px] rounded-2xl px-3.5 py-2.5 text-[11.5px]"
+          style={{
+            left: Math.max(
+              16,
+              Math.min(
+                typeof window !== "undefined"
+                  ? window.innerWidth - (rightSidebarOpen && window.innerWidth >= 640 ? 430 : 290)
+                  : 800,
+                hoverInfo.x + 14,
+              ),
+            ),
+            top: Math.max(
+              76,
+              Math.min(typeof window !== "undefined" ? window.innerHeight - 168 : 600, hoverInfo.y + 14),
+            ),
+          }}
         >
           <p className="font-semibold text-[var(--hig-cyan)]">{hoverInfo.title}</p>
           {hoverInfo.lines.map((ln, idx) => (
@@ -2364,142 +2520,329 @@ export const AnalyticsMap3D: React.FC<Props> = ({
         </div>
       )}
 
+      {/* Compact Floating 2D/3D Pitch & Reset BCS Controls (Right above MapLibre Nav) */}
+      <div
+        className={`pointer-events-auto absolute max-sm:bottom-[272px] max-sm:right-[22px] sm:bottom-[168px] ${
+          rightSidebarOpen ? "sm:right-[428px]" : "sm:right-[26px]"
+        } z-20 flex flex-col gap-1.5 transition-all`}
+      >
+        <button
+          type="button"
+          onClick={() => {
+            const m = mapRef.current;
+            if (!m) return;
+            const nextFlat = !isPitchFlat;
+            setIsPitchFlat(nextFlat);
+            m.easeTo({ pitch: nextFlat ? 0 : 52, duration: 550 });
+          }}
+          aria-pressed={!isPitchFlat}
+          aria-label={isEn ? "Toggle 2D / 3D camera tilt" : "Alternar inclinación 2D / 3D"}
+          title={isEn ? "Toggle 2D / 3D Tilt" : "Inclinación 2D / 3D"}
+          className="hig-glass-toolbar hig-lift flex h-8 w-8 max-sm:h-11 max-sm:w-11 items-center justify-center rounded-full font-mono-num text-[10.5px] font-bold text-[var(--hig-ink)] cursor-pointer"
+        >
+          {isPitchFlat ? "2D" : "3D"}
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            const m = mapRef.current;
+            if (!m) return;
+            setIsPitchFlat(false);
+            m.flyTo({ center: [-111.55, 25.15], zoom: 6.6, pitch: 48, bearing: -14, duration: 1000 });
+          }}
+          aria-label={isEn ? "Reset view to all of Baja California Sur" : "Restablecer vista estatal BCS"}
+          title={isEn ? "Reset Statewide View" : "Vista Estatal BCS"}
+          className="hig-glass-toolbar hig-lift flex h-8 w-8 max-sm:h-11 max-sm:w-11 items-center justify-center rounded-full text-[var(--hig-accent)] cursor-pointer"
+        >
+          <LocateFixed className="h-3.5 w-3.5" aria-hidden="true" />
+        </button>
+      </div>
+
+      {/* Desktop Active Layer Legend Pill (Bottom-Left) */}
+      <div
+        className={`hidden md:block pointer-events-auto absolute bottom-4 z-20 transition-all ${
+          leftSidebarOpen ? "left-[324px]" : "left-4"
+        }`}
+      >
+        {legendOpen && (
+          <div className="hig-glass-popover mb-2 w-64 rounded-2xl p-3 text-[11px] space-y-2">
+            <div className="flex items-center justify-between border-b border-[var(--hig-divider)] pb-1.5">
+              <span className="font-semibold text-[var(--hig-ink)]">
+                {isEn ? "Active Map Legend" : "Leyenda Activa"}
+              </span>
+              <button
+                type="button"
+                onClick={() => setLegendOpen(false)}
+                aria-label={isEn ? "Close legend" : "Cerrar leyenda"}
+                className="flex h-5 w-5 items-center justify-center rounded-full bg-[var(--hig-pill-bg)] text-[var(--hig-ink-2)] hover:text-[var(--hig-ink)] cursor-pointer"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </div>
+            <div className="space-y-1 text-[10.5px] text-[var(--hig-ink-2)]">
+              {layers.agebs && (
+                <div className="flex items-center justify-between gap-2">
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="h-2.5 w-2.5 rounded-full bg-[#30D158]" />
+                    <span>{isEn ? METRIC_CATALOG[activeMetric].shortLabelEn : METRIC_CATALOG[activeMetric].shortLabel}</span>
+                  </span>
+                  <span className="font-mono-num text-[9.5px] text-[var(--hig-ink-3)]">1,155 AGEBs</span>
+                </div>
+              )}
+              {layers.buildings3d && (
+                <div className="flex items-center justify-between gap-2">
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="h-2.5 w-2.5 rounded-full bg-[#007AFF]" />
+                    <span>{isEn ? "3D Buildings" : "Edificios 3D"}</span>
+                  </span>
+                  <span className="font-mono-num text-[9.5px] text-[var(--hig-ink-3)]">396,823</span>
+                </div>
+              )}
+              {layers.airTraffic && (
+                <div className="flex items-center justify-between gap-2">
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="h-2.5 w-2.5 rounded-full bg-[#F59E0B]" />
+                    <span>{isEn ? "Live Aircraft (ADS-B)" : "Aviones (ADS-B)"}</span>
+                  </span>
+                  <span className="font-mono-num text-[9.5px] text-[#D97706]">
+                    {liveTelemetry?.aircraft?.count ?? 0}
+                  </span>
+                </div>
+              )}
+              {layers.marineTraffic && (
+                <div className="flex items-center justify-between gap-2">
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="h-2.5 w-2.5 rounded-full bg-[#007AFF]" />
+                    <span>{isEn ? "Live Vessels (AIS)" : "Buques (AIS)"}</span>
+                  </span>
+                  <span className="font-mono-num text-[9.5px] text-[var(--hig-accent)]">
+                    {liveTelemetry?.marine?.count ?? 0}
+                  </span>
+                </div>
+              )}
+              {layers.aquifers && (
+                <div className="flex items-center justify-between gap-2">
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="h-2.5 w-2.5 rounded-full bg-[#0A84FF]" />
+                    <span>{isEn ? "CONAGUA Aquifers" : "Acuíferos CONAGUA"}</span>
+                  </span>
+                  <span className="font-mono-num text-[9.5px] text-[var(--hig-ink-3)]">40</span>
+                </div>
+              )}
+              {layers.anps && (
+                <div className="flex items-center justify-between gap-2">
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="h-2.5 w-2.5 rounded-full bg-[#28CD41]" />
+                    <span>{isEn ? "Protected Areas (ANPs)" : "Áreas Naturales ANP"}</span>
+                  </span>
+                  <span className="font-mono-num text-[9.5px] text-[var(--hig-ink-3)]">76</span>
+                </div>
+              )}
+              {layers.hazardAtlas && (
+                <div className="flex items-center justify-between gap-2">
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="h-2.5 w-2.5 rounded-full bg-[#FF3B30]" />
+                    <span>{isEn ? "Flood & Surge Risk" : "Atlas de Riesgos"}</span>
+                  </span>
+                  <span className="font-mono-num text-[9.5px] text-[var(--hig-ink-3)]">641</span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+        <button
+          type="button"
+          onClick={() => setLegendOpen((v) => !v)}
+          aria-expanded={legendOpen}
+          className={`hig-glass-toolbar hig-lift flex h-8 items-center gap-1.5 rounded-full px-3 text-[11px] font-semibold cursor-pointer ${
+            legendOpen ? "text-[var(--hig-accent)]" : "text-[var(--hig-ink)]"
+          }`}
+        >
+          <Layers className="h-3.5 w-3.5 text-[var(--hig-accent)]" aria-hidden="true" />
+          <span>{isEn ? "Legend" : "Leyenda"}</span>
+        </button>
+      </div>
+
       {/* Bottom Floating HIG Dynamic Island Telemetry & Quick Actions */}
-      <div className="hig-glass-toolbar pointer-events-auto absolute max-sm:bottom-3 max-sm:left-2.5 max-sm:max-w-[calc(100vw-122px)] max-sm:px-3 max-sm:gap-2 sm:bottom-4 sm:left-1/2 sm:max-w-[calc(100vw-130px)] sm:-translate-x-1/2 sm:px-4 sm:gap-2.5 z-20 flex items-center overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden rounded-full py-2 text-[11.5px] whitespace-nowrap">
-        <span className="flex items-center gap-1.5 font-mono-num text-[var(--hig-ink-2)]">
-          <Compass className="h-3.5 w-3.5 text-[var(--hig-accent)]" />
+      <div className="hig-glass-toolbar pointer-events-auto absolute max-sm:bottom-3 max-sm:left-2.5 max-sm:right-[62px] sm:bottom-4 sm:left-1/2 sm:max-w-[calc(100vw-240px)] sm:-translate-x-1/2 max-sm:px-3 sm:px-3.5 z-20 flex items-center justify-between sm:justify-center gap-2 rounded-full max-sm:min-h-[44px] py-1.5 text-[11.5px] whitespace-nowrap">
+        <span className="flex items-center gap-1.5 font-mono-num text-[var(--hig-ink-2)] shrink-0">
+          <Compass className="h-3.5 w-3.5 text-[var(--hig-accent)]" aria-hidden="true" />
           Z {zoom.toFixed(1)}
         </span>
-        <span className="h-3 w-px bg-[var(--hig-divider)]" />
-        <span className="flex items-center gap-1.5 font-mono-num text-[var(--hig-green)]">
-          <Mountain className="h-3.5 w-3.5" />
+        <span className="h-3 w-px bg-[var(--hig-divider)] shrink-0" />
+        <span className="flex items-center gap-1 font-mono-num text-[var(--hig-green)] shrink-0">
+          <Mountain className="h-3.5 w-3.5" aria-hidden="true" />
           {liveElevationM !== null
-            ? `${liveElevationM.toLocaleString()} ${isEn ? "m ASL" : "msnm"}`
+            ? `${fmtNumber(liveElevationM, language)} ${isEn ? "m ASL" : "msnm"}`
             : isEn ? "— m ASL" : "— msnm"}
         </span>
-        <span className="h-3 w-px bg-[var(--hig-divider)]" />
+
         {activeTourId ? (
-          <div className="flex items-center gap-2">
-            <span className="flex items-center gap-1.5 font-medium text-[#BF5AF2]">
-              <Film className="h-3.5 w-3.5 text-[#BF5AF2] animate-pulse" />
-              <span>{tourStepTitle || (isEn ? "3D Aerial Tour..." : "Recorrido aéreo 3D...")}</span>
-            </span>
-            <button
-              type="button"
-              onClick={() => onStopTour?.()}
-              className="flex items-center gap-1 rounded-full bg-[#FF453A]/20 px-2.5 py-0.5 text-[10.5px] font-semibold text-[var(--hig-red)] hover:bg-[#FF453A]/30 cursor-pointer"
-            >
-              <Square className="h-2.5 w-2.5 fill-current" />
-              <span>{isEn ? "Stop" : "Detener"}</span>
-            </button>
-          </div>
-        ) : terrain3dEnabled && terrainExaggeration > 0 && layers.buildings3d && zoom >= 11.5 ? (
-          <span className="flex items-center gap-1.5 font-mono-num text-[var(--hig-cyan)]">
-            <Building2 className="h-3.5 w-3.5" />
-            {loadingBuildings
-              ? isEn ? "Loading 3D Terrain Bldgs..." : "Cargando Edif. 3D..."
-              : `${buildings.length.toLocaleString()} ${isEn ? "3D bldgs · Terrain" : "edif. 3D · Terreno"}`}
-          </span>
-        ) : zoom >= 11.5 && layers.buildings3d && phase !== "scenarios" && Boolean(tileset3dUrl) && !tilesetError ? (
-          <span className="flex items-center gap-1.5 font-mono-num text-[var(--hig-cyan)]">
-            <Building2 className="h-3.5 w-3.5" />
-            {tilesLoadedCount > 0
-              ? `OGC 3D Tiles 1.1 · ${tilesLoadedCount} .glb tiles`
-              : "OGC 3D Tiles 1.1 · Streaming"}
-          </span>
-        ) : zoom >= 11.8 ? (
-          <span className="flex items-center gap-1.5 font-mono-num text-[var(--hig-green)]">
-            <Building2 className="h-3.5 w-3.5" />
-            {loadingBuildings
-              ? isEn ? "Loading 3D R-Tree..." : "Cargando R-Tree 3D..."
-              : `${buildings.length.toLocaleString()} ${isEn ? "3D bldgs" : "edif. 3D"}`}
-          </span>
-        ) : (
-          <div className="flex items-center gap-1.5">
-            <ZoomIn className="h-3.5 w-3.5 text-[var(--hig-amber)]" />
-            <button
-              type="button"
-              onClick={() => onQuickJumpCity("la_paz")}
-              className="rounded-full bg-[#0A84FF]/15 px-2.5 py-0.5 text-[10.5px] font-semibold text-[var(--hig-accent)] hover:bg-[#0A84FF]/25 transition-colors cursor-pointer"
-            >
-              La Paz 3D
-            </button>
-            <button
-              type="button"
-              onClick={() => onQuickJumpCity("cabo_san_lucas")}
-              className="rounded-full bg-[#30D158]/15 px-2.5 py-0.5 text-[10.5px] font-semibold text-[var(--hig-green)] hover:bg-[#30D158]/25 transition-colors cursor-pointer"
-            >
-              Los Cabos 3D
-            </button>
-            <button
-              type="button"
-              onClick={() => onQuickJumpCity("loreto")}
-              className="rounded-full bg-[#BF5AF2]/15 px-2.5 py-0.5 text-[10.5px] font-semibold text-[#8944AB] hover:bg-[#BF5AF2]/25 transition-colors cursor-pointer"
-            >
-              Loreto 3D
-            </button>
-          </div>
-        )}
-        {!activeTourId && (
           <>
-            <span className="h-3 w-px bg-[var(--hig-divider)]" />
-            <button
-              type="button"
-              onClick={() => onStartTour?.("el_tezal")}
-              title={
-                isEn
-                  ? "Launch InfraWorks / Lumion-style 3D aerial tour over El Tezal"
-                  : "Iniciar recorrido aéreo tipo InfraWorks / Lumion sobre El Tezal"
-              }
-              className="flex items-center gap-1.5 rounded-full bg-[#0A84FF]/15 px-2.5 py-0.5 text-[10.5px] font-semibold text-[var(--hig-accent)] hover:bg-[#0A84FF]/25 transition-colors cursor-pointer"
-            >
-              <Film className="h-3 w-3" />
-              <span>{isEn ? "El Tezal Flight" : "Vuelo El Tezal"}</span>
-            </button>
-            <select
-              aria-label={isEn ? "Select aerial tour" : "Seleccionar recorrido aéreo"}
-              value=""
-              onChange={(e) => {
-                if (e.target.value) onStartTour?.(e.target.value);
-              }}
-              className="rounded-full bg-[var(--hig-pill-bg)] px-2.5 py-0.5 text-[10.5px] font-medium text-[var(--hig-ink)] border border-[var(--hig-divider)] focus:outline-none cursor-pointer"
-            >
-              <option value="" className="bg-[var(--hig-select-bg)] text-[var(--hig-ink)]">Tours ▾</option>
-              {(tours && tours.length > 0
-                ? tours
-                : [
-                    { id: "el_tezal", short_label: isEn ? "El Tezal Flight" : "Vuelo El Tezal" },
-                    { id: "la_paz_malecon", short_label: isEn ? "La Paz Waterfront" : "Vuelo Malecón LPZ" },
-                    { id: "loreto_bahia", short_label: isEn ? "Loreto Bay" : "Vuelo Loreto" },
-                  ]
-              ).map((t) => (
-                <option key={t.id} value={t.id} className="bg-[var(--hig-select-bg)] text-[var(--hig-ink)]">
-                  {isEn
-                    ? t.id === "el_tezal"
-                      ? "El Tezal Flight"
-                      : t.id === "la_paz_malecon"
-                        ? "La Paz Waterfront"
-                        : t.id === "loreto_bahia"
-                          ? "Loreto Bay"
-                          : t.short_label
-                    : t.short_label}
-                </option>
+            <span className="h-3 w-px bg-[var(--hig-divider)] shrink-0" />
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="flex items-center gap-1.5 font-medium text-[#BF5AF2] truncate">
+                <Film className="h-3.5 w-3.5 text-[#BF5AF2] animate-pulse shrink-0" aria-hidden="true" />
+                <span className="truncate">{tourStepTitle || (isEn ? "3D Tour..." : "Vuelo 3D...")}</span>
+              </span>
+              <button
+                type="button"
+                onClick={() => onStopTour?.()}
+                className="flex min-h-[28px] max-sm:min-h-[36px] items-center gap-1 rounded-full bg-[#FF453A]/20 px-2.5 py-0.5 text-[10.5px] font-semibold text-[var(--hig-red)] hover:bg-[#FF453A]/30 cursor-pointer shrink-0"
+              >
+                <Square className="h-2.5 w-2.5 fill-current" />
+                <span>{isEn ? "Stop" : "Detener"}</span>
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            {zoom >= 11.5 && (
+              <>
+                <span className="hidden md:inline-block h-3 w-px bg-[var(--hig-divider)] shrink-0" />
+                <span className="hidden md:inline-flex items-center gap-1 font-mono-num text-[var(--hig-cyan)] shrink-0">
+                  <Building2 className="h-3.5 w-3.5" aria-hidden="true" />
+                  {terrain3dEnabled && terrainExaggeration > 0 && layers.buildings3d
+                    ? loadingBuildings
+                      ? isEn ? "Loading 3D..." : "Cargando 3D..."
+                      : `${fmtNumber(buildings.length, language)} ${isEn ? "3D bldgs" : "edif. 3D"}`
+                    : tilesLoadedCount > 0
+                      ? `${tilesLoadedCount} .glb tiles`
+                      : `${fmtNumber(buildings.length, language)} 3D`}
+                </span>
+              </>
+            )}
+
+            {/* Cities Popover (Mobile) & Inline Quick-Jump Pills (Desktop — Always Accessible!) */}
+            <span className="h-3 w-px bg-[var(--hig-divider)] shrink-0" />
+            <div className="hidden sm:flex items-center gap-1">
+              {[
+                { slug: "la_paz", label: "La Paz", cls: "bg-[#0A84FF]/15 text-[var(--hig-accent)] hover:bg-[#0A84FF]/25" },
+                { slug: "cabo_san_lucas", label: "Los Cabos", cls: "bg-[#30D158]/15 text-[var(--hig-green)] hover:bg-[#30D158]/25" },
+                { slug: "loreto", label: "Loreto", cls: "bg-[#BF5AF2]/15 text-[#8944AB] hover:bg-[#BF5AF2]/25" },
+              ].map((c) => (
+                <button
+                  key={c.slug}
+                  type="button"
+                  onClick={() => onQuickJumpCity(c.slug)}
+                  className={`rounded-full px-2.5 py-0.5 text-[10.5px] font-semibold transition-colors cursor-pointer ${c.cls}`}
+                >
+                  {c.label}
+                </button>
               ))}
-            </select>
+            </div>
+
+            <div ref={citiesPopoverRef} className="relative sm:hidden">
+              <button
+                type="button"
+                onClick={() => {
+                  setToursMenuOpen(false);
+                  setCitiesMenuOpen((v) => !v);
+                }}
+                aria-expanded={citiesMenuOpen}
+                className="flex min-h-[44px] items-center gap-1 rounded-full bg-[#0A84FF]/15 px-3.5 py-1.5 text-[11px] font-semibold text-[var(--hig-accent)] cursor-pointer"
+              >
+                <span>{isEn ? "Cities" : "Ciudades"}</span>
+                <ChevronUp className="h-3 w-3" aria-hidden="true" />
+              </button>
+              {citiesMenuOpen && (
+                <div className="hig-glass-popover fixed bottom-[66px] right-[62px] z-50 w-44 rounded-2xl p-1.5 space-y-1">
+                  {[
+                    { slug: "la_paz", label: "La Paz 3D" },
+                    { slug: "cabo_san_lucas", label: "Los Cabos 3D" },
+                    { slug: "loreto", label: "Loreto 3D" },
+                    { slug: "san_jose_del_cabo", label: "San José del Cabo" },
+                  ].map((c) => (
+                    <button
+                      key={c.slug}
+                      type="button"
+                      onClick={() => {
+                        setCitiesMenuOpen(false);
+                        onQuickJumpCity(c.slug);
+                      }}
+                      className="flex w-full min-h-[40px] items-center rounded-xl px-3 py-1.5 text-left text-[12px] font-medium text-[var(--hig-ink)] hover:bg-[var(--hig-pill-hover)] cursor-pointer"
+                    >
+                      {c.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Custom Frosted Popover Menu for 3D Aerial Tours */}
+            <div ref={toursPopoverRef} className="relative hidden md:block">
+              <button
+                type="button"
+                onClick={() => {
+                  setCitiesMenuOpen(false);
+                  setToursMenuOpen((v) => !v);
+                }}
+                aria-expanded={toursMenuOpen}
+                className={`flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[10.5px] font-semibold transition-colors cursor-pointer ${
+                  toursMenuOpen
+                    ? "bg-[var(--hig-accent)] text-white"
+                    : "bg-[var(--hig-pill-bg)] text-[var(--hig-ink)] hover:bg-[var(--hig-pill-hover)]"
+                }`}
+              >
+                <Film className="h-3 w-3 text-[#BF5AF2]" aria-hidden="true" />
+                <span>{isEn ? "3D Tours" : "Vuelos 3D"}</span>
+                <ChevronUp className="h-3 w-3 opacity-70" aria-hidden="true" />
+              </button>
+              {toursMenuOpen && (
+                <div className="hig-glass-popover fixed bottom-[64px] left-1/2 -translate-x-1/2 z-50 w-56 rounded-2xl p-1.5 space-y-0.5">
+                  <p className="px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--hig-ink-3)]">
+                    {isEn ? "3D Aerial Fly-throughs" : "Recorridos Aéreos 3D"}
+                  </p>
+                  {(tours && tours.length > 0
+                    ? tours
+                    : [
+                        { id: "el_tezal", short_label: "El Tezal Flight" },
+                        { id: "la_paz_malecon", short_label: "La Paz Waterfront" },
+                        { id: "loreto_bahia", short_label: "Loreto Bay" },
+                      ]
+                  ).map((t) => {
+                    const label = isEn
+                      ? t.id === "el_tezal"
+                        ? "El Tezal Flight"
+                        : t.id === "la_paz_malecon"
+                          ? "La Paz Waterfront"
+                          : t.id === "loreto_bahia"
+                            ? "Loreto Bay"
+                            : t.short_label
+                      : t.short_label;
+                    return (
+                      <button
+                        key={t.id}
+                        type="button"
+                        onClick={() => {
+                          setToursMenuOpen(false);
+                          onStartTour?.(t.id);
+                        }}
+                        className="flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-left text-[11.5px] font-medium text-[var(--hig-ink)] hover:bg-[var(--hig-pill-hover)] cursor-pointer"
+                      >
+                        <Film className="h-3.5 w-3.5 text-[#BF5AF2] shrink-0" aria-hidden="true" />
+                        <span className="truncate">{label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </>
         )}
-        <span className="h-3 w-px bg-[var(--hig-divider)]" />
+
+        <span className="hidden lg:inline-block h-3 w-px bg-[var(--hig-divider)] shrink-0" />
         <button
           type="button"
           onClick={() => onOpenExportModal?.()}
           title={
             isEn
-              ? "Export to Civil 3D (.DXF), Lumion/Unreal (.OBJ), and ISO 19650 BIM"
-              : "Exportar a Civil 3D (.DXF), Lumion/Unreal (.OBJ) y BIM ISO 19650"
+              ? "Open CAD (.DXF UTM 12N), .OBJ 3D Mesh & BIM ISO 19650 exporter"
+              : "Abrir exportador CAD (.DXF UTM 12N), Malla .OBJ 3D y BIM ISO 19650"
           }
-          className="flex items-center gap-1.5 rounded-full bg-[#FF9F0A]/15 px-2.5 py-0.5 text-[10.5px] font-semibold text-[var(--hig-amber)] hover:bg-[#FF9F0A]/25 transition-colors cursor-pointer"
+          className="hidden lg:flex items-center gap-1.5 rounded-full bg-[#FF9F0A]/15 px-2.5 py-0.5 text-[10.5px] font-semibold text-[var(--hig-amber)] hover:bg-[#FF9F0A]/25 transition-colors cursor-pointer shrink-0"
         >
-          <Box className="h-3 w-3" />
+          <Box className="h-3 w-3" aria-hidden="true" />
           <span>CAD / BIM / 3D</span>
         </button>
       </div>

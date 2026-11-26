@@ -3,6 +3,7 @@ import {
   Anchor,
   Bot,
   ChevronRight,
+  CloudSun,
   ExternalLink,
   Globe2,
   Layers,
@@ -73,6 +74,8 @@ interface Props {
   language: "es" | "en";
   onLanguageChange: (lang: "es" | "en") => void;
   onFlyTo?: (cam: CameraPreset) => void;
+  onBeforeOpenPopover?: () => void;
+  onTrackTarget?: (lon: number, lat: number, elevM: number | null, label: string) => void;
 }
 
 export const TopCommandBar: React.FC<Props> = ({
@@ -116,6 +119,8 @@ export const TopCommandBar: React.FC<Props> = ({
   language,
   onLanguageChange,
   onFlyTo,
+  onBeforeOpenPopover,
+  onTrackTarget,
 }) => {
   void _phase;
   void _onPhaseChange;
@@ -128,10 +133,10 @@ export const TopCommandBar: React.FC<Props> = ({
   const totalBuildings = overview?.state.buildings_3d_count ?? 396823;
   const isEn = language === "en";
   const weatherFeed = liveTelemetry?.feeds?.weather;
+  const airList = liveTelemetry?.aircraft?.aircraft ?? [];
+  const vesselList = liveTelemetry?.marine?.vessels ?? [];
   const airCount = liveTelemetry?.aircraft?.count ?? 0;
   const marineCount = liveTelemetry?.marine?.count ?? 0;
-  const firstAircraft = liveTelemetry?.aircraft?.aircraft?.[0];
-  const firstVessel = liveTelemetry?.marine?.vessels?.[0];
   const overallStatus = liveTelemetry?.overall_status || weatherFeed?.status || "CACHED";
   const statusDotClass =
     overallStatus === "LIVE"
@@ -182,7 +187,7 @@ export const TopCommandBar: React.FC<Props> = ({
           aria-pressed={!leftCollapsed}
           aria-label={isEn ? "Toggle explorer sidebar" : "Mostrar u ocultar explorador"}
           title={isEn ? "Explorer Sidebar ([)" : "Explorador ([)"}
-          className={`hig-lift flex h-8 w-8 max-sm:h-10 max-sm:w-10 shrink-0 items-center justify-center rounded-full transition-colors cursor-pointer ${
+          className={`hig-lift flex h-8 w-8 max-sm:h-11 max-sm:w-11 shrink-0 items-center justify-center rounded-full transition-colors cursor-pointer ${
             !leftCollapsed
               ? "bg-[var(--hig-accent)]/20 text-[var(--hig-accent)]"
               : "ios-pill text-[var(--hig-ink-2)]"
@@ -323,14 +328,15 @@ export const TopCommandBar: React.FC<Props> = ({
           onClick={onToggleParticipation}
           aria-pressed={participationOpen}
           aria-label={isEn ? "Participate in PMDU consultation pins" : "Participación ciudadana PMDU"}
-          className={`hig-lift flex h-8 max-sm:h-10 items-center gap-1.5 rounded-full px-2.5 text-[11px] font-medium transition-all cursor-pointer whitespace-nowrap ${
+          title={isEn ? "PMDU Citizen Participation Pins" : "Pines de Participación Ciudadana PMDU"}
+          className={`hig-lift flex h-8 max-sm:h-11 items-center gap-1.5 rounded-full px-2.5 max-sm:px-3 text-[11px] font-medium transition-all cursor-pointer whitespace-nowrap ${
             participationOpen
               ? "bg-[var(--hig-accent)] text-white font-semibold"
               : "ios-pill text-[var(--hig-ink)]"
           }`}
         >
           <MessageSquarePlus className="h-3.5 w-3.5 text-[var(--hig-cyan)]" aria-hidden="true" />
-          <span className="hidden min-[1440px]:inline">{isEn ? "Participate" : "Participación"}</span>
+          <span className="hidden xl:inline">{isEn ? "Participate" : "Participación"}</span>
           <span className="font-mono-num rounded-full bg-[var(--hig-pill-bg)] px-1.5 py-0.2 text-[10px] font-semibold">
             {citizenPinsCount}
           </span>
@@ -342,14 +348,16 @@ export const TopCommandBar: React.FC<Props> = ({
             type="button"
             onClick={() => {
               setSettingsOpen(false);
+              if (!livePopoverOpen) onBeforeOpenPopover?.();
               setLivePopoverOpen((o) => !o);
             }}
             aria-expanded={livePopoverOpen}
             aria-label={
               isEn
-                ? "Asynchronous telemetry cache and OGC SensorThings v1.1 status"
-                : "Estado de telemetría en caché y OGC SensorThings v1.1"
+                ? "Live weather, flights, ships and OGC SensorThings telemetry"
+                : "Estado de telemetría en vivo, vuelos, buques y OGC SensorThings"
             }
+            title={isEn ? "Live Weather, Air & Marine Traffic" : "Clima, Tráfico Aéreo y Marítimo en Vivo"}
             className={`hig-lift hidden md:flex h-8 items-center gap-1.5 rounded-full px-2.5 font-mono-num text-[11px] font-medium transition-all cursor-pointer whitespace-nowrap ${
               liveActive
                 ? "ios-pill text-[var(--hig-ink)]"
@@ -357,19 +365,20 @@ export const TopCommandBar: React.FC<Props> = ({
             }`}
           >
             <span className={`h-1.5 w-1.5 rounded-full ${statusDotClass} ${overallStatus === "LIVE" ? "animate-pulse" : ""}`} />
+            <CloudSun className="h-3.5 w-3.5 text-[#FF9F0A]" aria-hidden="true" />
             <span>
               {liveTelemetry?.weather?.la_paz?.temp_c != null
                 ? `${Math.round(liveTelemetry.weather.la_paz.temp_c)}°`
                 : "BCS"}
             </span>
             {airCount > 0 && (
-              <span className="hidden 2xl:inline-flex items-center gap-0.5 text-[10px] font-semibold text-[#D97706]">
+              <span className="hidden xl:inline-flex items-center gap-0.5 text-[10px] font-semibold text-[#D97706]">
                 <Plane className="h-2.5 w-2.5" aria-hidden="true" />
                 {airCount}
               </span>
             )}
             {marineCount > 0 && (
-              <span className="hidden 2xl:inline-flex items-center gap-0.5 text-[10px] font-semibold text-[var(--hig-accent)]">
+              <span className="hidden xl:inline-flex items-center gap-0.5 text-[10px] font-semibold text-[var(--hig-accent)]">
                 <Anchor className="h-2.5 w-2.5" aria-hidden="true" />
                 {marineCount}
               </span>
@@ -377,7 +386,7 @@ export const TopCommandBar: React.FC<Props> = ({
           </button>
 
           {livePopoverOpen && (
-            <div className="hig-glass-sidebar absolute right-0 top-12 z-50 w-80 rounded-[22px] p-3.5 text-left whitespace-normal">
+            <div className="hig-glass-popover absolute right-0 top-12 z-50 w-84 max-w-[calc(100vw-24px)] rounded-[22px] p-3.5 text-left whitespace-normal">
               <div className="mb-2.5 flex items-center justify-between border-b border-[var(--hig-divider)] pb-2.5">
                 <div className="flex items-center gap-2">
                   <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[var(--hig-accent)]/15 text-[var(--hig-cyan)]">
@@ -385,11 +394,10 @@ export const TopCommandBar: React.FC<Props> = ({
                   </div>
                   <div>
                     <p className="text-[12px] font-semibold tracking-tight text-[var(--hig-ink)]">
-                      {isEn ? "Live Telemetry & OGC" : "Telemetría & OGC SensorThings"}
+                      {isEn ? "Live Telemetry & Traffic" : "Telemetría y Tráfico en Vivo"}
                     </p>
                     <p className="font-mono-num text-[10px] text-[var(--hig-ink-3)]">
-                      {liveTelemetry?.cache_backend || "firestore:bcs-studio"} ·{" "}
-                      {liveTelemetry?.ingested_at ? `${liveTelemetry.ingested_at.slice(11, 19)} UTC` : "--"}
+                      {liveTelemetry?.ingested_at ? `${liveTelemetry.ingested_at.slice(11, 19)} UTC` : "OGC SensorThings"}
                     </p>
                   </div>
                 </div>
@@ -418,9 +426,9 @@ export const TopCommandBar: React.FC<Props> = ({
                         ? "bg-[#FF9F0A]/20 text-[var(--hig-amber)]"
                         : "bg-[#FF453A]/20 text-[var(--hig-red)]";
                   return (
-                    <div key={key} className="px-3 py-2">
+                    <div key={key} className="px-3 py-1.5">
                       <div className="flex items-center justify-between gap-2">
-                        <span className="text-[11.5px] font-medium text-[var(--hig-ink)]">{isEn ? labelEn : labelEs}</span>
+                        <span className="text-[11px] font-medium text-[var(--hig-ink)]">{isEn ? labelEn : labelEs}</span>
                         <span className={`rounded-full px-2 py-0.5 font-mono-num text-[9.5px] font-semibold ${badgeCls}`}>
                           {feed ? (isEn ? feed.freshness_en : feed.freshness_es) : "OFFLINE"}
                         </span>
@@ -436,57 +444,74 @@ export const TopCommandBar: React.FC<Props> = ({
                 })}
               </div>
 
-              <div className="mt-2.5 space-y-2">
-                {(firstAircraft || firstVessel) && onFlyTo && (
-                  <div className="flex flex-wrap gap-1.5">
-                    {firstAircraft && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          onFlyTo({ lon: firstAircraft.lon, lat: firstAircraft.lat, zoom: 9.2, pitch: 52, bearing: -12 });
-                          setLivePopoverOpen(false);
-                        }}
-                        className="flex flex-1 items-center justify-center gap-1 rounded-full bg-[#FF9F0A]/15 px-2.5 py-1 text-[10.5px] font-semibold text-[#D97706] hover:bg-[#FF9F0A]/25 cursor-pointer whitespace-nowrap"
-                      >
-                        <Plane className="h-3 w-3" aria-hidden="true" />
-                        <span>{isEn ? `Track ${firstAircraft.callsign || "Flight"}` : `Ver ${firstAircraft.callsign || "Vuelo"}`}</span>
-                      </button>
-                    )}
-                    {firstVessel && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          onFlyTo({ lon: firstVessel.lon, lat: firstVessel.lat, zoom: 9.2, pitch: 48, bearing: -12 });
-                          setLivePopoverOpen(false);
-                        }}
-                        className="flex flex-1 items-center justify-center gap-1 rounded-full bg-[#0A84FF]/15 px-2.5 py-1 text-[10.5px] font-semibold text-[var(--hig-accent)] hover:bg-[#0A84FF]/25 cursor-pointer whitespace-nowrap"
-                      >
-                        <Anchor className="h-3 w-3" aria-hidden="true" />
-                        <span>{isEn ? `Track ${firstVessel.name || "Vessel"}` : `Ver ${firstVessel.name || "Buque"}`}</span>
-                      </button>
-                    )}
-                  </div>
-                )}
-
-                <div className="flex items-center justify-between gap-2">
-                  <button
-                    type="button"
-                    onClick={onToggleLive}
-                    className="rounded-full bg-[var(--hig-accent)]/18 px-3 py-1.5 text-[10.5px] font-semibold text-[var(--hig-accent)] hover:bg-[var(--hig-accent)]/28 cursor-pointer"
-                  >
-                    {liveActive
-                      ? isEn ? "Hide 3D Sensors" : "Ocultar Sensores 3D"
-                      : isEn ? "Show 3D Sensors" : "Mostrar Sensores 3D"}
-                  </button>
-                  <a
-                    href="/FROST-Server/v1.1/Things"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="font-mono-num text-[10px] text-[var(--hig-accent)] hover:underline"
-                  >
-                    /FROST-Server ({sensorCount})
-                  </a>
+              {(airList.length > 0 || vesselList.length > 0) && onFlyTo && (
+                <div className="mt-2.5 hig-content-group rounded-2xl p-2 space-y-1 max-h-40 overflow-y-auto twin-scroll">
+                  <p className="px-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--hig-ink-3)]">
+                    {isEn ? "Click to Track on 3D Map" : "Clic para Seguir en Mapa 3D"}
+                  </p>
+                  {airList.slice(0, 5).map((a) => (
+                    <button
+                      key={`air-${a.icao24}`}
+                      type="button"
+                      onClick={() => {
+                        const cam = { lon: a.lon, lat: a.lat, zoom: 9.8, pitch: 52, bearing: -12 };
+                        onFlyTo(cam);
+                        onTrackTarget?.(a.lon, a.lat, Math.round(a.altitude_m || 0), a.callsign || a.icao24);
+                        setLivePopoverOpen(false);
+                      }}
+                      className="flex w-full items-center justify-between gap-2 rounded-xl px-2 py-1.5 text-left text-[10.5px] hover:bg-[var(--hig-pill-hover)] cursor-pointer"
+                    >
+                      <span className="flex items-center gap-1.5 min-w-0">
+                        <Plane className="h-3 w-3 text-[#D97706] shrink-0" />
+                        <span className="font-semibold text-[var(--hig-ink)] truncate">{a.callsign || a.icao24}</span>
+                      </span>
+                      <span className="font-mono-num text-[9.5px] text-[var(--hig-ink-3)] shrink-0">
+                        {Math.round(a.altitude_m || 0)} m · {a.speed_kt ?? 0} kt
+                      </span>
+                    </button>
+                  ))}
+                  {vesselList.slice(0, 5).map((v) => (
+                    <button
+                      key={`ves-${v.mmsi}`}
+                      type="button"
+                      onClick={() => {
+                        const cam = { lon: v.lon, lat: v.lat, zoom: 10.2, pitch: 48, bearing: -12 };
+                        onFlyTo(cam);
+                        onTrackTarget?.(v.lon, v.lat, 0, v.name || v.mmsi);
+                        setLivePopoverOpen(false);
+                      }}
+                      className="flex w-full items-center justify-between gap-2 rounded-xl px-2 py-1.5 text-left text-[10.5px] hover:bg-[var(--hig-pill-hover)] cursor-pointer"
+                    >
+                      <span className="flex items-center gap-1.5 min-w-0">
+                        <Anchor className="h-3 w-3 text-[var(--hig-accent)] shrink-0" />
+                        <span className="font-semibold text-[var(--hig-ink)] truncate">{v.name || v.mmsi}</span>
+                      </span>
+                      <span className="font-mono-num text-[9.5px] text-[var(--hig-ink-3)] shrink-0">
+                        {v.sog ?? 0} kt · {v.type || "Vessel"}
+                      </span>
+                    </button>
+                  ))}
                 </div>
+              )}
+
+              <div className="mt-2.5 flex items-center justify-between gap-2">
+                <button
+                  type="button"
+                  onClick={onToggleLive}
+                  className="rounded-full bg-[var(--hig-accent)]/18 px-3 py-1.5 text-[10.5px] font-semibold text-[var(--hig-accent)] hover:bg-[var(--hig-accent)]/28 cursor-pointer"
+                >
+                  {liveActive
+                    ? isEn ? "Hide 3D Sensors" : "Ocultar Sensores 3D"
+                    : isEn ? "Show 3D Sensors" : "Mostrar Sensores 3D"}
+                </button>
+                <a
+                  href="/FROST-Server/v1.1/Things"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="font-mono-num text-[10px] text-[var(--hig-accent)] hover:underline"
+                >
+                  OGC Sensors ({sensorCount})
+                </a>
               </div>
             </div>
           )}
@@ -497,8 +522,9 @@ export const TopCommandBar: React.FC<Props> = ({
           type="button"
           onClick={onToggleChat}
           aria-pressed={chatOpen}
-          aria-label={isEn ? "AI Strategist Territorial Assistant" : "Estratega IA Territorial"}
-          className={`hig-lift flex h-8 max-sm:h-10 items-center gap-1.5 rounded-full px-2.5 sm:px-3 text-[11px] font-semibold transition-all cursor-pointer whitespace-nowrap ${
+          aria-label={isEn ? "AI Strategist Territorial Assistant (/)" : "Estratega IA Territorial (/)"}
+          title={isEn ? "AI Strategist (/)" : "Estratega IA (/)"}
+          className={`hig-lift flex h-8 max-sm:h-11 max-sm:w-11 sm:px-3 items-center justify-center gap-1.5 rounded-full text-[11px] font-semibold transition-all cursor-pointer whitespace-nowrap ${
             chatOpen
               ? "bg-[var(--hig-accent)] text-white shadow-md shadow-[var(--hig-accent)]/30"
               : "ios-ai-pill text-[var(--hig-ink)]"
@@ -515,7 +541,7 @@ export const TopCommandBar: React.FC<Props> = ({
           aria-pressed={!rightCollapsed}
           aria-label={isEn ? "Toggle telemetry inspector" : "Mostrar u ocultar inspector"}
           title={isEn ? "Telemetry Inspector (])" : "Inspector (])"}
-          className={`hig-lift flex h-8 w-8 max-sm:h-10 max-sm:w-10 shrink-0 items-center justify-center rounded-full transition-colors cursor-pointer ${
+          className={`hig-lift flex h-8 w-8 max-sm:h-11 max-sm:w-11 shrink-0 items-center justify-center rounded-full transition-colors cursor-pointer ${
             !rightCollapsed
               ? "bg-[var(--hig-accent)]/20 text-[var(--hig-accent)]"
               : "ios-pill text-[var(--hig-ink-2)]"
@@ -530,11 +556,13 @@ export const TopCommandBar: React.FC<Props> = ({
             type="button"
             onClick={() => {
               setLivePopoverOpen(false);
+              if (!settingsOpen) onBeforeOpenPopover?.();
               setSettingsOpen((o) => !o);
             }}
             aria-expanded={settingsOpen}
-            aria-label={isEn ? "Settings and governance" : "Ajustes y gobernanza"}
-            className={`hig-lift flex h-8 w-8 max-sm:h-10 max-sm:w-10 items-center justify-center rounded-full transition-all cursor-pointer ${
+            aria-label={isEn ? "Settings, 3D modes and governance" : "Ajustes, modos 3D y gobernanza"}
+            title={isEn ? "Control Center" : "Centro de Control"}
+            className={`hig-lift flex h-8 w-8 max-sm:h-11 max-sm:w-11 items-center justify-center rounded-full transition-all cursor-pointer ${
               settingsOpen
                 ? "bg-[var(--hig-accent)] text-white"
                 : "ios-pill text-[var(--hig-ink)]"
@@ -544,7 +572,7 @@ export const TopCommandBar: React.FC<Props> = ({
           </button>
 
           {settingsOpen && (
-            <div className="hig-glass-sidebar absolute right-0 top-12 z-50 w-80 max-w-[calc(100vw-32px)] rounded-[22px] p-3.5 text-left whitespace-normal space-y-3">
+            <div className="hig-glass-popover absolute right-0 top-12 z-50 w-80 max-w-[calc(100vw-24px)] rounded-[22px] p-3.5 text-left whitespace-normal space-y-3">
               <div className="flex items-center justify-between border-b border-[var(--hig-divider)] pb-2">
                 <p className="text-[12.5px] font-semibold tracking-tight text-[var(--hig-ink)]">
                   {isEn ? "Control Center" : "Centro de Control"}

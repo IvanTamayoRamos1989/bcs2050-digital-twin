@@ -11,6 +11,7 @@
   --hig-specular: rgba(255, 255, 255, 0.96);
   --hig-toolbar-bg: rgba(255, 255, 255, 0.82);
   --hig-sidebar-bg: rgba(255, 255, 255, 0.90);
+  --hig-popover-bg: rgba(255, 255, 255, 0.97);
   --hig-group-bg: rgba(245, 245, 247, 0.90);
   --hig-pill-bg: rgba(118, 118, 128, 0.10);
   --hig-pill-hover: rgba(118, 118, 128, 0.18);
@@ -40,6 +41,7 @@ html[data-theme="dark"] {
   --hig-specular: rgba(255, 255, 255, 0.14);
   --hig-toolbar-bg: rgba(22, 22, 26, 0.70);
   --hig-sidebar-bg: rgba(22, 22, 26, 0.84);
+  --hig-popover-bg: rgba(28, 28, 32, 0.96);
   --hig-group-bg: rgba(44, 44, 46, 0.72);
   --hig-pill-bg: rgba(255, 255, 255, 0.08);
   --hig-pill-hover: rgba(255, 255, 255, 0.14);
@@ -99,6 +101,21 @@ body {
   box-shadow:
     inset 0 1px 0 var(--hig-specular),
     var(--hig-shadow);
+}
+
+.hig-glass-popover {
+  background: var(--hig-popover-bg);
+  backdrop-filter: blur(48px) saturate(200%);
+  -webkit-backdrop-filter: blur(48px) saturate(200%);
+  border: 1px solid var(--hig-border);
+  box-shadow:
+    inset 0 1px 0 var(--hig-specular),
+    0 20px 50px rgba(0, 0, 0, 0.16);
+}
+
+.hig-scroll-fade {
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 calc(100% - 18px), transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 0%, #000 calc(100% - 18px), transparent 100%);
 }
 
 /* 2. Content Layer: Standard Grouped Surfaces (Non-Glass to Maintain Visual Hierarchy) */
@@ -246,10 +263,48 @@ body {
   background: var(--hig-ink-3);
 }
 
+@media (max-width: 639px) {
+  .maplibregl-ctrl-bottom-right {
+    bottom: 12px !important;
+    right: 10px !important;
+  }
+  .maplibregl-ctrl-group button {
+    width: 44px !important;
+    height: 44px !important;
+  }
+  .maplibregl-ctrl-attrib-button {
+    width: 32px !important;
+    height: 32px !important;
+  }
+}
+
 /* Frosted HIG styling for MapLibre navigation & attribution controls */
 .maplibregl-ctrl-bottom-right {
   bottom: 16px !important;
   right: 16px !important;
+  transition: right 220ms ease;
+}
+
+@media (min-width: 640px) {
+  .telemetry-open .maplibregl-ctrl-bottom-right {
+    right: 418px !important;
+  }
+}
+
+@media (max-width: 639px) {
+  .maplibregl-ctrl-bottom-right {
+    bottom: 68px !important;
+    right: 12px !important;
+  }
+  .maplibregl-ctrl-group button {
+    width: 44px !important;
+    height: 44px !important;
+  }
+  .maplibregl-ctrl-attrib-button {
+    width: 44px !important;
+    height: 44px !important;
+    background-position: center !important;
+  }
 }
 
 .maplibregl-ctrl-group {

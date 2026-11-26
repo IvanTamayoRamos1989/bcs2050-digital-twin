@@ -93,6 +93,7 @@ export const App: React.FC = () => {
   const [rightCollapsed, setRightCollapsed] = useState<boolean>(isSmallViewport);
   const [archOpen, setArchOpen] = useState(false);
   const [archMounted, setArchMounted] = useState(false);
+  const [archInitialSection, setArchInitialSection] = useState<"governance" | "cad">("governance");
   const [chatOpen, setChatOpen] = useState(false);
   const [chatMounted, setChatMounted] = useState(false);
   const [language, setLanguage] = useState<"es" | "en">("en");
@@ -142,6 +143,7 @@ export const App: React.FC = () => {
   const [targetYear, setTargetYear] = useState<number>(2050);
   const [customLevers, setCustomLevers] = useState<Record<string, number>>({});
   const [simulation, setSimulation] = useState<SimulationResponse | null>(null);
+  const [simLoading, setSimLoading] = useState<boolean>(false);
 
   // Phase 4: Recommendations
   const [recommendations, setRecommendations] = useState<RecommendationsResponse | null>(null);
@@ -319,38 +321,41 @@ export const App: React.FC = () => {
     };
   }, [refreshParticipationPins]);
 
-  // Refresh Goal Gap when scope or goalTargets change
+  // Refresh Goal Gap when scope, goalTargets, or language change
   useEffect(() => {
     if (phase !== "goals") return;
     const t = window.setTimeout(() => {
-      TwinAPI.computeGoalGap({ scope_id: scopeId, ...goalTargets })
+      TwinAPI.computeGoalGap({ scope_id: scopeId, ...goalTargets, language })
         .then(setGoalGap)
         .catch(() => {});
     }, 120);
     return () => window.clearTimeout(t);
-  }, [phase, scopeId, goalTargets]);
+  }, [phase, scopeId, goalTargets, language]);
 
-  // Refresh Scenario Simulation when scope, scenario, year, or levers change
+  // Refresh Scenario Simulation when scope, scenario, year, levers, or language change
   useEffect(() => {
+    setSimLoading(true);
     const t = window.setTimeout(() => {
       TwinAPI.simulate({
         scope_id: scopeId,
         scenario_name: scenarioName,
         target_year: targetYear,
         custom_levers: Object.keys(customLevers).length > 0 ? customLevers : null,
+        language,
       })
         .then(setSimulation)
-        .catch(() => {});
+        .catch(() => {})
+        .finally(() => setSimLoading(false));
     }, 120);
     return () => window.clearTimeout(t);
-  }, [scopeId, scenarioName, targetYear, customLevers]);
+  }, [scopeId, scenarioName, targetYear, customLevers, language]);
 
-  // Refresh Recommendations when scope changes
+  // Refresh Recommendations when scope or language changes
   useEffect(() => {
-    TwinAPI.getRecommendations(scopeId)
+    TwinAPI.getRecommendations(scopeId, language)
       .then(setRecommendations)
       .catch(() => {});
-  }, [scopeId]);
+  }, [scopeId, language]);
 
   const handleScopeChange = useCallback(
     (newScope: string, cam?: CameraPreset) => {
@@ -462,12 +467,13 @@ export const App: React.FC = () => {
 
       if ((action.highlight_geojson?.features && action.highlight_geojson.features.length > 0) || (action.legend && action.legend.length > 0)) {
         setAiMapHighlight(action);
+      } else {
+        showToast(`${language === "en" ? "Map synced" : "Mapa actualizado"} · ${action.title}`);
       }
       if (action.fly_to) {
         setEngineMode("deck3d");
         setCameraTarget({ ...action.fly_to });
       }
-      showToast(`${language === "en" ? "Map synced" : "Mapa actualizado"} · ${action.title}`);
     },
     [language, showToast],
   );
@@ -493,8 +499,13 @@ export const App: React.FC = () => {
   const handleToggleLeft = useCallback(() => {
     setLeftCollapsed((c) => {
       const next = !c;
-      if (!next && typeof window !== "undefined" && window.innerWidth < 768) {
-        setRightCollapsed(true);
+      if (!next && typeof window !== "undefined") {
+        if (window.innerWidth < 768) {
+          setRightCollapsed(true);
+          setChatOpen(false);
+        } else if (window.innerWidth < 1180) {
+          setChatOpen(false);
+        }
       }
       return next;
     });
@@ -508,6 +519,7 @@ export const App: React.FC = () => {
       if (compact && !wasCompactRef.current) {
         setLeftCollapsed(true);
         setRightCollapsed(true);
+        setChatOpen(false);
       }
       wasCompactRef.current = compact;
     };
@@ -520,9 +532,35 @@ export const App: React.FC = () => {
       const next = !c;
       if (!next && typeof window !== "undefined" && window.innerWidth < 768) {
         setLeftCollapsed(true);
+        setChatOpen(false);
       }
       return next;
     });
+  }, []);
+
+  const handleToggleChat = useCallback(() => {
+    setChatMounted(true);
+    setChatOpen((o) => {
+      const next = !o;
+      if (next && typeof window !== "undefined") {
+        if (window.innerWidth < 768) {
+          setLeftCollapsed(true);
+          setRightCollapsed(true);
+          setParticipationOpen(false);
+        } else if (window.innerWidth < 1180) {
+          setLeftCollapsed(true);
+        }
+      }
+      return next;
+    });
+  }, []);
+
+  const handleBeforeOpenPopover = useCallback(() => {
+    if (typeof window !== "undefined" && window.innerWidth < 768) {
+      setLeftCollapsed(true);
+      setRightCollapsed(true);
+      setChatOpen(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -538,11 +576,14 @@ export const App: React.FC = () => {
       } else if (e.key === "]") {
         e.preventDefault();
         handleToggleRight();
+      } else if (e.key === "/") {
+        e.preventDefault();
+        handleToggleChat();
       }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [handleToggleLeft, handleToggleRight]);
+  }, [handleToggleLeft, handleToggleRight, handleToggleChat]);
 
   const selectedAgebId =
     inspection?.ageb && typeof inspection.ageb.cvegeo_ageb === "string"
@@ -602,9 +643,13 @@ export const App: React.FC = () => {
                 setViewportZoom(z);
               }}
               onOpenExportModal={() => {
+                setArchInitialSection("cad");
                 setArchMounted(true);
                 setArchOpen(true);
               }}
+              selectedPoint={inspection?.coordinates || null}
+              leftSidebarOpen={!leftCollapsed}
+              rightSidebarOpen={!rightCollapsed}
               onInspectLocation={handleInspectLocation}
               onQuickJumpCity={handleCityJump}
             />
@@ -630,8 +675,10 @@ export const App: React.FC = () => {
                 liveTelemetry={liveTelemetry}
                 colorblindSafe={colorblindSafe}
                 language={language}
+                theme={theme}
                 googleMapsApiKey={clientConfig.google_maps_api_key}
                 cesiumIonToken={clientConfig.cesium_ion_token}
+                onQuickJumpCity={handleCityJump}
                 onInspectLocation={handleInspectLocation}
               />
             </Suspense>
@@ -695,28 +742,41 @@ export const App: React.FC = () => {
         largeText={largeText}
         onToggleLargeText={() => setLargeText((v) => !v)}
         participationOpen={participationOpen}
-        onToggleParticipation={() => setParticipationOpen((v) => !v)}
+        onToggleParticipation={() => {
+          setParticipationOpen((v) => {
+            const next = !v;
+            if (next && typeof window !== "undefined" && window.innerWidth < 768) {
+              setLeftCollapsed(true);
+              setRightCollapsed(true);
+              setChatOpen(false);
+            }
+            return next;
+          });
+        }}
         citizenPinsCount={citizenPins.length}
         onOpenArchitecture={() => {
+          setArchInitialSection("governance");
           setArchMounted(true);
           setArchOpen(true);
         }}
         chatOpen={chatOpen}
-        onToggleChat={() => {
-          setChatMounted(true);
-          setChatOpen((o) => !o);
-        }}
+        onToggleChat={handleToggleChat}
         language={language}
         onLanguageChange={setLanguage}
         onFlyTo={(cam) => setCameraTarget({ ...cam })}
+        onBeforeOpenPopover={handleBeforeOpenPopover}
+        onTrackTarget={(lon, lat, elevM, label) => {
+          showToast(`${language === "en" ? "Tracking" : "Siguiendo"} · ${label}`);
+          handleInspectLocation(lon, lat, null, null, elevM);
+        }}
       />
 
-      {/* Passive HIG Status Feedback Pill */}
+      {/* Passive HIG Status Feedback Pill (Anchored Below Header & Above Bottom Island — Zero Legend Collision) */}
       {statusToast && (
         <div
           role="status"
           aria-live="polite"
-          className="hig-glass-toolbar pointer-events-none fixed left-1/2 top-[72px] z-30 -translate-x-1/2 rounded-full px-3.5 py-1.5 text-[11.5px] font-medium text-[var(--hig-ink)] whitespace-nowrap"
+          className="hig-glass-popover pointer-events-none fixed left-1/2 bottom-[74px] z-30 -translate-x-1/2 rounded-full px-3.5 py-1.5 text-[11.5px] font-medium text-[var(--hig-ink)] whitespace-nowrap"
         >
           {statusToast}
         </div>
@@ -726,6 +786,7 @@ export const App: React.FC = () => {
       <ChallengeLayerDock
           collapsed={leftCollapsed}
           onToggleCollapse={handleToggleLeft}
+          viewMode={viewMode}
           activeChallenge={activeChallenge}
           onSelectChallenge={setActiveChallenge}
           activeMetric={activeMetric}
@@ -735,6 +796,10 @@ export const App: React.FC = () => {
           language={language}
           layers={layers}
           onToggleLayer={handleToggleLayer}
+          onApplyLayerPreset={(patch, label) => {
+            setLayers((prev) => ({ ...prev, ...patch }));
+            showToast(label);
+          }}
           extrusionScale={extrusionScale}
           onExtrusionScaleChange={setExtrusionScale}
           terrain3dEnabled={terrain3dEnabled}
@@ -779,7 +844,9 @@ export const App: React.FC = () => {
             onTargetYearChange={setTargetYear}
             customLevers={customLevers}
             onLeverChange={(k, v) => setCustomLevers((prev) => ({ ...prev, [k]: v }))}
+            onResetLevers={() => setCustomLevers({})}
             simulation={simulation}
+            simLoading={simLoading}
             recommendations={recommendations}
             physicsOverlay={physicsOverlay}
             physicsJobStatus={physicsJobStatus}
@@ -820,8 +887,10 @@ export const App: React.FC = () => {
             scopeId={scopeId}
             scenarioName={scenarioName}
             language={language}
+            leftSidebarOpen={!leftCollapsed}
             onFlyTo={(cam) => setCameraTarget({ ...cam })}
             onApplyMapAction={handleApplyMapAction}
+            onClearMapHighlight={() => setAiMapHighlight(null)}
           />
         </Suspense>
       )}
@@ -836,6 +905,7 @@ export const App: React.FC = () => {
             currentBbox={viewportBbox}
             currentZoom={viewportZoom}
             corridors={corridors}
+            initialSection={archInitialSection}
             onStartTour={handleStartTour}
           />
         </Suspense>

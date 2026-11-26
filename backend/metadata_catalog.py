@@ -30,6 +30,12 @@ CANONICAL_KPI_RECONCILIATION: dict[str, Any] = {
             "de BCS (claves 0301–0339): 22 carecen de disponibilidad (21 con DMA < 0 + clave 0309 El Conejo-Los Viejos "
             "con DMA = 0.000 hm³/año). El polígono #40 corresponde al acuífero interestatal 0228 Llanos del Berrendo (+9.707 hm³)."
         ),
+        "reconciliation_notes_en": (
+            "798,447 residents is the official INEGI 2020 Census baseline; 729,726 covers the 1,155 urban AGEBs; "
+            "955,463 represents the 2025 calibrated demographic projection. Across aquifers, 39 lie within BCS "
+            "(codes 0301–0339): 22 have no surplus availability (21 with negative DMA + aquifer 0309 El Conejo–Los Viejos "
+            "at 0.000 hm³/yr). Polygon #40 corresponds to interstate aquifer 0228 Llanos del Berrendo (+9.707 hm³/yr)."
+        ),
     },
     "municipalities": {
         "03001": {
@@ -76,35 +82,45 @@ CANONICAL_KPI_RECONCILIATION: dict[str, Any] = {
             "municipality_code": "03003",
             "municipality_name": "La Paz",
             "water_rationing_status": "COVERED_280_SECTORS",
+            "water_rationing_status_en": "280 sectors covered",
             "transit_inventory_status": "TRUNK_ROUTES_NO_GTFS",
+            "transit_inventory_status_en": "Trunk routes active (no GTFS)",
             "notes": "Único municipio con polígonos históricos de tandeo OOMSAPAS; pendiente telemetría SCADA en vivo.",
         },
         {
             "municipality_code": "03008",
             "municipality_name": "Los Cabos",
             "water_rationing_status": "IMPLAN_V3_WATER_NETWORK_LIVE",
+            "water_rationing_status_en": "Water & purple net live",
             "transit_inventory_status": "IMPLAN_V3_1012_STOPS_LIVE",
+            "transit_inventory_status_en": "36 routes · 1,012 stops",
             "notes": "Red hidráulica IMPLAN v3 (water_network_lc) y transporte (36 rutas, 1,012 paradas) integrados al visor; alcantarillado cimp116 excluido por auditoría geométrica.",
         },
         {
             "municipality_code": "03009",
             "municipality_name": "Loreto",
             "water_rationing_status": "MISSING",
+            "water_rationing_status_en": "Pending utility layer",
             "transit_inventory_status": "MISSING",
+            "transit_inventory_status_en": "Pending GTFS layer",
             "notes": "Cuenta con inventario PMDU y edificios 3D; faltan capas de red hidráulica municipal y transporte.",
         },
         {
             "municipality_code": "03001",
             "municipality_name": "Comondú",
             "water_rationing_status": "MISSING",
+            "water_rationing_status_en": "Pending utility layer",
             "transit_inventory_status": "MISSING",
+            "transit_inventory_status_en": "Pending GTFS layer",
             "notes": "Acuífero Santo Domingo (0306) modelado CONAGUA; falta cartografía de tandeo y rutas municipales.",
         },
         {
             "municipality_code": "03002",
             "municipality_name": "Mulegé",
             "water_rationing_status": "MISSING",
+            "water_rationing_status_en": "Pending utility layer",
             "transit_inventory_status": "MISSING",
+            "transit_inventory_status_en": "Pending GTFS layer",
             "notes": "Edificios 3D y acuíferos cargados; falta inventario de redes municipales y transporte.",
         },
     ],

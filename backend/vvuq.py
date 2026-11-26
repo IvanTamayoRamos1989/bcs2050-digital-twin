@@ -41,8 +41,14 @@ LEGAL_DISCLAIMER_TEXT = (
     "Media Anual (CONAGUA DOF), ni dictámenes de interconexión (CFE / CENACE) o manifestaciones de impacto ambiental (SEMARNAT)."
 )
 
+LEGAL_DISCLAIMER_TEXT_EN = (
+    "VVUQ LEGAL NOTICE (ISO 23247-8): Exploratory territorial planning simulation with P10–P90 uncertainty bands. "
+    "Does not replace official determinations from the National Risk Atlas (CENAPRED / Civil Protection), CONAGUA DOF "
+    "Mean Annual Water Availability decrees, CFE / CENACE grid interconnection rulings, or SEMARNAT environmental permits."
+)
+
 _BAND_LOCK = threading.Lock()
-_BAND_CACHE: dict[tuple[str, str, str], tuple[float, dict[str, Any]]] = {}
+_BAND_CACHE: dict[tuple[str, str, str, str], tuple[float, dict[str, Any]]] = {}
 _BAND_TTL_SEC = 300.0
 
 
@@ -53,9 +59,11 @@ def build_vvuq_block(
     validation_error_rmse_or_mape: dict[str, Any],
     p10_p50_p90_uncertainty_band: dict[str, Any],
     assumptions: list[str],
-    legal_disclaimer: str = LEGAL_DISCLAIMER_TEXT,
+    legal_disclaimer: str | None = None,
+    language: str = "es",
 ) -> dict[str, Any]:
     """Build canonical ISO 23247-8 / Destination Earth VVUQ metadata block."""
+    default_disclaimer = LEGAL_DISCLAIMER_TEXT_EN if language == "en" else LEGAL_DISCLAIMER_TEXT
     return {
         "standard": "ISO 23247-8 / Destination Earth VVUQ",
         "engine_family": engine_family,
@@ -63,7 +71,7 @@ def build_vvuq_block(
         "validation_error_rmse_or_mape": validation_error_rmse_or_mape,
         "p10_p50_p90_uncertainty_band": p10_p50_p90_uncertainty_band,
         "assumptions": assumptions,
-        "legal_disclaimer": legal_disclaimer,
+        "legal_disclaimer": legal_disclaimer or default_disclaimer,
         "backtest_report": "docs/VVUQ_BACKTEST_REPORT_2010_2023.md",
     }
 
@@ -80,9 +88,11 @@ def compute_trajectory_vvuq(
     trajectory: list[dict[str, Any]],
     use_bigquery: bool,
     custom_levers_used: bool,
+    language: str = "es",
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     """Run parametric ensemble perturbation to enrich trajectory points with P10–P90 bands & build VVUQ metadata."""
-    cache_key = (scope_id, scenario_name, str(sorted(levers.items())))
+    lang = "en" if str(language).strip().lower().startswith("en") else "es"
+    cache_key = (scope_id, scenario_name, str(sorted(levers.items())), lang)
     if not custom_levers_used:
         now = time.monotonic()
         with _BAND_LOCK:
@@ -210,7 +220,9 @@ def compute_trajectory_vvuq(
     vvuq_meta = build_vvuq_block(
         engine_family="BCS2050 Coupled Ontology v3 System-Dynamics Ensemble (3-member P10/P50/P90 perturbation)",
         calibration_dataset=(
-            "INEGI Censo 2000–2020 & Intercensal 2025 + CONAGUA DOF 2020–2023 (40 acuíferos) + CENACE PRODESEN/SIBCS"
+            "INEGI Census 2000–2020 & Intercensal 2025 + CONAGUA DOF 2020–2023 (40 aquifers) + CENACE PRODESEN/SIBCS"
+            if lang == "en"
+            else "INEGI Censo 2000–2020 & Intercensal 2025 + CONAGUA DOF 2020–2023 (40 acuíferos) + CENACE PRODESEN/SIBCS"
         ),
         validation_error_rmse_or_mape={
             "demographic_2010_2020_mape_pct": HISTORICAL_VALIDATION_METRICS["demographic_2010_2020_municipal"]["mape_pct"],
@@ -220,11 +232,20 @@ def compute_trajectory_vvuq(
             "aquifer_primary_5_rmse_hm3": HISTORICAL_VALIDATION_METRICS["aquifer_2020_2023_conagua"]["primary_5_modeled_rmse_hm3"],
         },
         p10_p50_p90_uncertainty_band=p10_50_90,
-        assumptions=[
-            "Demografía 2025–2050 incluye perturbación paramétrica ±12%–15% sobre migración turística y tasa de crecimiento municipal.",
-            "Balance hídrico propaga incertidumbre ±25% en recarga natural y velocidad de abatimiento observada entre CONAGUA 2020 y 2023.",
-            "Capacidad de carga eléctrica asume refuerzo SIBCS (+120 MW en 2031 y +120 MW adicionales en 2040) y varianza ±15% en despliegue fotovoltaico distribuido.",
-        ],
+        assumptions=(
+            [
+                "2025–2050 demographics incorporate ±12%–15% parametric perturbation on tourism migration and municipal growth.",
+                "Water balance propagates ±25% uncertainty on natural recharge and observed 2020–2023 CONAGUA aquifer depletion rates.",
+                "Grid carrying capacity assumes phased SIBCS upgrades (+120 MW by 2031 and +120 MW by 2040) with ±15% distributed PV variance.",
+            ]
+            if lang == "en"
+            else [
+                "Demografía 2025–2050 incluye perturbación paramétrica ±12%–15% sobre migración turística y tasa de crecimiento municipal.",
+                "Balance hídrico propaga incertidumbre ±25% en recarga natural y velocidad de abatimiento observada entre CONAGUA 2020 y 2023.",
+                "Capacidad de carga eléctrica asume refuerzo SIBCS (+120 MW en 2031 y +120 MW adicionales en 2040) y varianza ±15% en despliegue fotovoltaico distribuido.",
+            ]
+        ),
+        language=lang,
     )
 
     if not custom_levers_used:

@@ -85,8 +85,11 @@ SEEDED_PARTICIPATION_PINS: list[dict[str, Any]] = [
         "pmdu_period": "PMDU-LPZ-2026",
         "category": "flood_heat",
         "title": "Drenaje pluvial y sombra urbana en Malecón / Zona Centro",
+        "title_en": "Stormwater drainage & urban shade on Malecón / Downtown",
         "comment": "Se proponen jardines de lluvia (SUDS) y pérgolas con paneles solares en cruces peatonales rumbo al Malecón para reducir islas de calor y encharcamientos ciclónicos.",
+        "comment_en": "Proposing rain gardens (SUDS) and solar-shaded pergolas along pedestrian crossings toward the Malecón to reduce urban heat islands and cyclone runoff flooding.",
         "author_alias": "Ejemplo Ilustrativo · Mesa Vecinal LPZ",
+        "author_alias_en": "Reference Example · La Paz Neighborhood Desk",
         "status": "approved",
         "created_at": "2026-10-01T16:00:00Z",
         "moderated_at": "2026-10-02T10:00:00Z",
@@ -102,8 +105,11 @@ SEEDED_PARTICIPATION_PINS: list[dict[str, Any]] = [
         "pmdu_period": "PMDU-LCB-2026",
         "category": "mobility",
         "title": "Paraderos sombreados y cruce seguro en El Tezal",
+        "title_en": "Shaded transit stops & safe crossings in El Tezal",
         "comment": "La vivienda densa al norte de la Transpeninsular requiere pasos peatonales elevados, alumbrado solar y bahías para transporte público conectadas a la red 15-min.",
+        "comment_en": "High-density housing north of the Transpeninsular Highway needs raised pedestrian crosswalks, solar lighting, and bus bays linked to the 15-minute network.",
         "author_alias": "Ejemplo Ilustrativo · Observatorio Cabos",
+        "author_alias_en": "Reference Example · Los Cabos Observatory",
         "status": "approved",
         "created_at": "2026-10-03T18:30:00Z",
         "moderated_at": "2026-10-04T09:15:00Z",
@@ -119,8 +125,11 @@ SEEDED_PARTICIPATION_PINS: list[dict[str, Any]] = [
         "pmdu_period": "POER-BCS-2026",
         "category": "water",
         "title": "Reúso PTAR línea morada y amortiguamiento del Estero SJC",
+        "title_en": "Purple-line reclaimed water reuse & SJC Estuary buffer",
         "comment": "Priorizar riego exclusivo con agua tratada de línea morada en áreas verdes hoteleras para proteger el nivel freático del Estero de San José del Cabo.",
+        "comment_en": "Prioritize exclusive purple-line reclaimed water irrigation across resort landscaping to protect the groundwater table of the San José del Cabo Estuary.",
         "author_alias": "Ejemplo Ilustrativo · Red Hídrica Sur",
+        "author_alias_en": "Reference Example · South Water Network",
         "status": "approved",
         "created_at": "2026-10-05T14:20:00Z",
         "moderated_at": "2026-10-06T11:00:00Z",
@@ -136,8 +145,11 @@ SEEDED_PARTICIPATION_PINS: list[dict[str, Any]] = [
         "pmdu_period": "PMDU-LOR-2026",
         "category": "public_space",
         "title": "Corredor verde peatonal en borde del arroyo Las Parras",
+        "title_en": "Pedestrian greenway along Las Parras arroyo edge",
         "comment": "Consolidar parque lineal con flora nativa de baja demanda hídrica que funcione como cauce seguro durante lluvias de septiembre sin pavimentar el lecho.",
+        "comment_en": "Establish a linear park with low-water native desert flora serving as an unpaved cyclone drainage buffer during September storm runoff.",
         "author_alias": "Ejemplo Ilustrativo · Taller Loreto",
+        "author_alias_en": "Reference Example · Loreto Workshop",
         "status": "approved",
         "created_at": "2026-10-07T17:10:00Z",
         "moderated_at": "2026-10-08T12:00:00Z",
@@ -226,17 +238,32 @@ def sanitize_and_redact_text(raw: str) -> tuple[str, bool]:
     return cleaned, redacted
 
 
+_SEEDED_PIN_EN_FALLBACKS: dict[str, dict[str, str]] = {
+    p["pin_id"]: {
+        "title_en": str(p.get("title_en") or ""),
+        "comment_en": str(p.get("comment_en") or ""),
+        "author_alias_en": str(p.get("author_alias_en") or ""),
+    }
+    for p in SEEDED_PARTICIPATION_PINS
+}
+
+
 def _normalize_pin_record(doc: dict[str, Any]) -> dict[str, Any]:
+    pid = str(doc["pin_id"])
+    fb = _SEEDED_PIN_EN_FALLBACKS.get(pid, {})
     return {
-        "pin_id": str(doc["pin_id"]),
+        "pin_id": pid,
         "lon": round(float(doc["lon"]), 6),
         "lat": round(float(doc["lat"]), 6),
         "municipality_code": str(doc.get("municipality_code") or "03"),
         "pmdu_period": str(doc.get("pmdu_period") or "PMDU-LPZ-2026"),
         "category": str(doc.get("category") or "public_space"),
         "title": str(doc.get("title") or ""),
+        "title_en": str(doc.get("title_en") or fb.get("title_en") or ""),
         "comment": str(doc.get("comment") or ""),
+        "comment_en": str(doc.get("comment_en") or fb.get("comment_en") or ""),
         "author_alias": str(doc.get("author_alias") or "Participación Ciudadana"),
+        "author_alias_en": str(doc.get("author_alias_en") or fb.get("author_alias_en") or ""),
         "status": str(doc.get("status") or "pending_moderation"),
         "created_at": str(doc.get("created_at") or ""),
         "moderated_at": str(doc.get("moderated_at") or ""),
@@ -475,8 +502,9 @@ GOVERNANCE_DOCUMENT_SPECS: list[dict[str, str]] = [
 ]
 
 
-def get_governance_summary() -> dict[str, Any]:
+def get_governance_summary(language: str = "es") -> dict[str, Any]:
     """Return live institutional governance, data classification tiers, and RFP document inventory."""
+    is_en = str(language).strip().lower().startswith("en")
     docs_out: list[dict[str, Any]] = []
     for spec in GOVERNANCE_DOCUMENT_SPECS:
         file_path = Path(DIGITAL_TWIN_ROOT) / spec["path"]
@@ -490,18 +518,46 @@ def get_governance_summary() -> dict[str, Any]:
             }
         )
 
-    return {
-        "framework": "Gemini Principles (CDBB) · ISO 19115 · ISO 23247-8 VVUQ",
-        "legal_frameworks": ["LGPDPPSO", "LFPDPPP", "LFTAIP / LGTAIP", "LGAHOTDU"],
-        "steering_committee": [
+    steering_committee = (
+        [
+            {"entity": "SEPUIMM", "role": "Chair & Technical Secretariat / Cloud Stewardship"},
+            {"entity": "IMPLAN La Paz", "role": "Central Metropolitan Seat"},
+            {"entity": "IMPLAN Los Cabos", "role": "South Corridor Seat"},
+            {"entity": "Comondú · Loreto · Mulegé", "role": "Rotating Regional Seat"},
+            {"entity": "UABCS / CIBNOR", "role": "Scientific Validation & VVUQ Chair"},
+            {"entity": "BCS Civic & Professional Council", "role": "Citizen Observatory & Professional Guilds"},
+        ]
+        if is_en
+        else [
             {"entity": "SEPUIMM", "role": "Presidencia y Secretaría Técnica / Custodia Cloud"},
             {"entity": "IMPLAN La Paz", "role": "Vocalía Metropolitana Centro"},
             {"entity": "IMPLAN Los Cabos", "role": "Vocalía Corredor Sur"},
             {"entity": "Comondú · Loreto · Mulegé", "role": "Vocalía Regional Rotativa"},
             {"entity": "UABCS / CIBNOR", "role": "Presidencia de Validación Científica y VVUQ"},
             {"entity": "Consejo Cívico y Gremial BCS", "role": "Observatorio Ciudadano y Colegios"},
-        ],
-        "data_classification_tiers": [
+        ]
+    )
+
+    tiers = (
+        [
+            {
+                "tier": "Tier 1 — Public Open Data",
+                "license": "CC-BY-4.0 / MX Open Data",
+                "scope": "Aggregated AGEB (1,155) & H3 KPIs, 3D OpenBuildings, PMDU zoning, ambient telemetry, and moderated citizen pins.",
+            },
+            {
+                "tier": "Tier 2 — Technical Restricted",
+                "license": "RBAC Municipal / SEPUIMM / IMPLAN",
+                "scope": "CAD/DXF/BIM exports, WNTR hydraulic pipe topology, UtilityNetwork ADE layers, and PMDU moderation queue.",
+            },
+            {
+                "tier": "Tier 3 — Confidential / PII",
+                "license": "Prohibited on Public Web (LGPDPPSO)",
+                "scope": "Property owner names, tax IDs (RFC/CURP), utility customer billing records, and SCADA operational control credentials.",
+            },
+        ]
+        if is_en
+        else [
             {
                 "tier": "Nivel 1 — Abierto Público",
                 "license": "CC-BY-4.0 / Datos Abiertos MX",
@@ -517,7 +573,14 @@ def get_governance_summary() -> dict[str, Any]:
                 "license": "Prohibido en Web Pública (LGPDPPSO)",
                 "scope": "Nombres de propietarios, RFC, CURP, recibos domiciliarios y credenciales SCADA de control operativo.",
             },
-        ],
+        ]
+    )
+
+    return {
+        "framework": "Gemini Principles (CDBB) · ISO 19115 · ISO 23247-8 VVUQ",
+        "legal_frameworks": ["LGPDPPSO", "LFPDPPP", "LFTAIP / LGTAIP", "LGAHOTDU"],
+        "steering_committee": steering_committee,
+        "data_classification_tiers": tiers,
         "technical_controls": {
             "planner_rbac_tokens_configured": bool(get_planner_api_tokens()),
             "ageb_h3_public_aggregation": True,
