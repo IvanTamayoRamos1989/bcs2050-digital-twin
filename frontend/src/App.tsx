@@ -82,6 +82,11 @@ export const App: React.FC = () => {
   const [chatOpen, setChatOpen] = useState(false);
   const [chatMounted, setChatMounted] = useState(false);
   const [language, setLanguage] = useState<"es" | "en">("es");
+  const [theme, setTheme] = useState<"dark" | "light">("dark");
+  const [reduceTransparency, setReduceTransparency] = useState<boolean>(false);
+  const [largeText, setLargeText] = useState<boolean>(false);
+  const [statusToast, setStatusToast] = useState<string | null>(null);
+  const toastTimerRef = useRef<number | null>(null);
   const [clientConfig, setClientConfig] = useState<ClientConfigResponse>({
     google_maps_api_key: (import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "").trim(),
     cesium_ion_token: (import.meta.env.VITE_CESIUM_ION_TOKEN || "").trim(),
@@ -140,6 +145,33 @@ export const App: React.FC = () => {
   useEffect(() => {
     document.documentElement.lang = language;
   }, [language]);
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    document.documentElement.classList.toggle("dark", theme === "dark");
+  }, [theme]);
+
+  useEffect(() => {
+    document.documentElement.classList.toggle("hig-reduce-transparency", reduceTransparency);
+  }, [reduceTransparency]);
+
+  useEffect(() => {
+    document.documentElement.classList.toggle("hig-text-large", largeText);
+  }, [largeText]);
+
+  const showToast = useCallback((msg: string) => {
+    setStatusToast(msg);
+    if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = window.setTimeout(() => {
+      setStatusToast(null);
+    }, 2400);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current);
+    };
+  }, []);
 
   const refreshParticipationPins = useCallback(() => {
     TwinAPI.getParticipationPins()
@@ -315,8 +347,9 @@ export const App: React.FC = () => {
       const city = overview.cities[citySlug];
       setScopeId(city.municipality_code);
       setCameraTarget({ ...city.camera });
+      showToast(`${city.name} · ${city.buildings_count.toLocaleString()} ${language === "en" ? "3D buildings" : "edificios 3D"}`);
     },
-    [overview],
+    [language, overview, showToast],
   );
 
   const handleToggleLayer = useCallback((k: keyof LayerVisibility) => {
@@ -344,11 +377,15 @@ export const App: React.FC = () => {
     setCustomLevers({});
   }, []);
 
-  const handleApplyOptimalLevers = useCallback((levers: Record<string, number>) => {
-    setScenarioName("COMPACT_SUSTAINABLE_2050");
-    setCustomLevers(levers);
-    setPhase("scenarios");
-  }, []);
+  const handleApplyOptimalLevers = useCallback(
+    (levers: Record<string, number>) => {
+      setScenarioName("COMPACT_SUSTAINABLE_2050");
+      setCustomLevers(levers);
+      setPhase("scenarios");
+      showToast(language === "en" ? "Optimal 2050 levers loaded" : "Palancas óptimas 2050 cargadas");
+    },
+    [language, showToast],
+  );
 
   const handleStartTour = useCallback(
     (tourId: string) => {
@@ -403,136 +440,187 @@ export const App: React.FC = () => {
     });
   }, []);
 
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      const tag = target?.tagName?.toLowerCase();
+      if (tag === "input" || tag === "textarea" || tag === "select" || target?.isContentEditable) {
+        return;
+      }
+      if (e.key === "[") {
+        e.preventDefault();
+        handleToggleLeft();
+      } else if (e.key === "]") {
+        e.preventDefault();
+        handleToggleRight();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [handleToggleLeft, handleToggleRight]);
+
   const selectedAgebId =
     inspection?.ageb && typeof inspection.ageb.cvegeo_ageb === "string"
       ? inspection.ageb.cvegeo_ageb
       : null;
 
   return (
-    <div className="relative flex h-screen w-screen flex-col overflow-hidden bg-[#0A0A0D] text-[#F5F5F7] select-none">
+    <div className="relative h-screen w-screen overflow-hidden bg-[var(--hig-bg)] text-[var(--hig-ink)] select-none">
       {/* WCAG 2.1 AA Skip Navigation Link */}
       <a href="#main-content" className="skip-link">
         {language === "en" ? "Skip to 3D map content" : "Saltar al mapa 3D principal"}
       </a>
 
-      {/* Top Executive Navigation */}
-      <div className="relative z-30 shrink-0">
-        <TopCommandBar
-          overview={overview}
-          liveTelemetry={liveTelemetry}
-          sensorThings={sensorThings}
-          liveActive={layers.liveTelemetry}
-          onToggleLive={() => handleToggleLayer("liveTelemetry")}
-          phase={phase}
-          onPhaseChange={setPhase}
-          scopeId={scopeId}
-          onScopeChange={handleScopeChange}
-          activeCitySlug={activeCitySlug}
-          onCityJump={handleCityJump}
-          engineMode={engineMode}
-          onEngineModeChange={setEngineMode}
-          basemapMode={basemapMode}
-          onBasemapModeChange={setBasemapMode}
-          viewMode={viewMode}
-          onViewModeChange={(m) => {
-            setViewMode(m);
-            setRightCollapsed(false);
-            if (typeof window !== "undefined" && window.innerWidth < 768) {
-              setLeftCollapsed(true);
-            }
-          }}
-          colorblindSafe={colorblindSafe}
-          onToggleColorblindSafe={() => setColorblindSafe((v) => !v)}
-          participationOpen={participationOpen}
-          onToggleParticipation={() => setParticipationOpen((v) => !v)}
-          citizenPinsCount={citizenPins.length}
-          onOpenArchitecture={() => {
-            setArchMounted(true);
-            setArchOpen(true);
-          }}
-          chatOpen={chatOpen}
-          onToggleChat={() => {
-            setChatMounted(true);
-            setChatOpen((o) => !o);
-          }}
-          language={language}
-          onLanguageChange={setLanguage}
-        />
-      </div>
-
-      {/* Main Viewport Container Below Dynamic Header */}
-      <div className="relative flex-1 min-h-0 w-full overflow-hidden">
-        {/* Full-Bleed Dual-Engine 3D Viewport */}
-        <main id="main-content" tabIndex={-1} className="h-full w-full">
-          {engineMode === "deck3d" ? (
-            <WebGLErrorBoundary fallbackTitle="Visor 3D Analítico (MapLibre + deck.gl)">
-              <AnalyticsMap3D
+      {/* Edge-to-Edge Full-Bleed Dual-Engine 3D Spatial Canvas */}
+      <main id="main-content" tabIndex={-1} className="absolute inset-0 h-full w-full">
+        {engineMode === "deck3d" ? (
+          <WebGLErrorBoundary fallbackTitle="Visor 3D Analítico (MapLibre + deck.gl)">
+            <AnalyticsMap3D
+              cameraTarget={cameraTarget}
+              basemapMode={basemapMode}
+              maptilerKey={clientConfig.maptiler_key}
+              activeMetric={activeMetric}
+              colorblindSafe={colorblindSafe}
+              language={language}
+              layers={layers}
+              extrusionScale={extrusionScale}
+              agebs3dMode={agebs3dMode}
+              phase={phase}
+              simulation={simulation}
+              corridorArcs={overview?.corridor_arcs || []}
+              liveTelemetry={liveTelemetry}
+              sensorThings={sensorThings}
+              physicsOverlay={physicsOverlay}
+              citizenPins={citizenPins}
+              pendingPinCoords={pendingPinCoords}
+              pinPlacementMode={pinPlacementMode}
+              onMapClickForPin={handleMapClickForPin}
+              onCancelPinPlacement={() => setPinPlacementMode(false)}
+              selectedAgebId={selectedAgebId}
+              tours={tours}
+              activeTourId={activeTourId}
+              onStartTour={handleStartTour}
+              onStopTour={() => setActiveTourId(null)}
+              onViewportChange={(bbox, z) => {
+                setViewportBbox(bbox);
+                setViewportZoom(z);
+              }}
+              onOpenExportModal={() => {
+                setArchMounted(true);
+                setArchOpen(true);
+              }}
+              onInspectLocation={handleInspectLocation}
+              onQuickJumpCity={handleCityJump}
+            />
+          </WebGLErrorBoundary>
+        ) : (
+          <WebGLErrorBoundary fallbackTitle="Globo 3D CesiumJS">
+            <Suspense
+              fallback={
+                <div className="flex h-full w-full items-center justify-center bg-[var(--hig-bg)] text-xs font-semibold text-[var(--hig-accent)]">
+                  {language === "en" ? "Loading 3D CesiumJS Globe..." : "Cargando Globo 3D CesiumJS..."}
+                </div>
+              }
+            >
+              <CesiumGlobe3D
                 cameraTarget={cameraTarget}
-                basemapMode={basemapMode}
-                maptilerKey={clientConfig.maptiler_key}
+                activeCitySlug={activeCitySlug || "la_paz"}
                 activeMetric={activeMetric}
-                colorblindSafe={colorblindSafe}
-                language={language}
-                layers={layers}
                 extrusionScale={extrusionScale}
                 agebs3dMode={agebs3dMode}
-                phase={phase}
-                simulation={simulation}
-                corridorArcs={overview?.corridor_arcs || []}
-                liveTelemetry={liveTelemetry}
-                sensorThings={sensorThings}
-                physicsOverlay={physicsOverlay}
-                citizenPins={citizenPins}
-                pendingPinCoords={pendingPinCoords}
-                pinPlacementMode={pinPlacementMode}
-                onMapClickForPin={handleMapClickForPin}
-                onCancelPinPlacement={() => setPinPlacementMode(false)}
-                selectedAgebId={selectedAgebId}
-                tours={tours}
-                activeTourId={activeTourId}
-                onStartTour={handleStartTour}
-                onStopTour={() => setActiveTourId(null)}
-                onViewportChange={(bbox, z) => {
-                  setViewportBbox(bbox);
-                  setViewportZoom(z);
-                }}
-                onOpenExportModal={() => {
-                  setArchMounted(true);
-                  setArchOpen(true);
-                }}
+                layers={layers}
+                colorblindSafe={colorblindSafe}
+                language={language}
+                googleMapsApiKey={clientConfig.google_maps_api_key}
+                cesiumIonToken={clientConfig.cesium_ion_token}
                 onInspectLocation={handleInspectLocation}
-                onQuickJumpCity={handleCityJump}
               />
-            </WebGLErrorBoundary>
-          ) : (
-            <WebGLErrorBoundary fallbackTitle="Globo 3D CesiumJS">
-              <Suspense
-                fallback={
-                  <div className="flex h-full w-full items-center justify-center bg-[#050811] text-xs font-semibold text-sky-300">
-                    {language === "en" ? "Loading 3D CesiumJS Globe..." : "Cargando Globo 3D CesiumJS..."}
-                  </div>
-                }
-              >
-                <CesiumGlobe3D
-                  cameraTarget={cameraTarget}
-                  activeCitySlug={activeCitySlug || "la_paz"}
-                  activeMetric={activeMetric}
-                  extrusionScale={extrusionScale}
-                  agebs3dMode={agebs3dMode}
-                  layers={layers}
-                  colorblindSafe={colorblindSafe}
-                  language={language}
-                  googleMapsApiKey={clientConfig.google_maps_api_key}
-                  cesiumIonToken={clientConfig.cesium_ion_token}
-                  onInspectLocation={handleInspectLocation}
-                />
-              </Suspense>
-            </WebGLErrorBoundary>
-          )}
-        </main>
+            </Suspense>
+          </WebGLErrorBoundary>
+        )}
+      </main>
 
-        {/* Floating Left Challenge & Layer Dock */}
-        <ChallengeLayerDock
+      {/* Floating 3-Island Apple HIG Liquid Glass Toolbar */}
+      <TopCommandBar
+        overview={overview}
+        tours={tours}
+        liveTelemetry={liveTelemetry}
+        sensorThings={sensorThings}
+        liveActive={layers.liveTelemetry}
+        onToggleLive={() => handleToggleLayer("liveTelemetry")}
+        phase={phase}
+        onPhaseChange={setPhase}
+        scopeId={scopeId}
+        onScopeChange={handleScopeChange}
+        activeCitySlug={activeCitySlug}
+        onCityJump={handleCityJump}
+        onStartTour={handleStartTour}
+        engineMode={engineMode}
+        onEngineModeChange={setEngineMode}
+        basemapMode={basemapMode}
+        onBasemapModeChange={(b) => {
+          setBasemapMode(b);
+          const labels: Record<BasemapMode, string> = {
+            obsidian: language === "en" ? "Obsidian Map" : "Mapa base: Obsidian",
+            satellite: language === "en" ? "HD Satellite" : "Mapa base: Satélite HD",
+            terrain: language === "en" ? "3D Relief" : "Mapa base: Relieve 3D",
+          };
+          showToast(labels[b]);
+        }}
+        viewMode={viewMode}
+        onViewModeChange={(m) => {
+          setViewMode(m);
+          setRightCollapsed(false);
+          if (typeof window !== "undefined" && window.innerWidth < 768) {
+            setLeftCollapsed(true);
+          }
+          showToast(
+            m === "citizen"
+              ? language === "en" ? "Citizen Mode" : "Modo Ciudadano"
+              : language === "en" ? "Technical Mode" : "Modo Técnico",
+          );
+        }}
+        leftCollapsed={leftCollapsed}
+        onToggleLeft={handleToggleLeft}
+        rightCollapsed={rightCollapsed}
+        onToggleRight={handleToggleRight}
+        colorblindSafe={colorblindSafe}
+        onToggleColorblindSafe={() => setColorblindSafe((v) => !v)}
+        theme={theme}
+        onThemeChange={setTheme}
+        reduceTransparency={reduceTransparency}
+        onToggleReduceTransparency={() => setReduceTransparency((v) => !v)}
+        largeText={largeText}
+        onToggleLargeText={() => setLargeText((v) => !v)}
+        participationOpen={participationOpen}
+        onToggleParticipation={() => setParticipationOpen((v) => !v)}
+        citizenPinsCount={citizenPins.length}
+        onOpenArchitecture={() => {
+          setArchMounted(true);
+          setArchOpen(true);
+        }}
+        chatOpen={chatOpen}
+        onToggleChat={() => {
+          setChatMounted(true);
+          setChatOpen((o) => !o);
+        }}
+        language={language}
+        onLanguageChange={setLanguage}
+      />
+
+      {/* Passive HIG Status Feedback Pill */}
+      {statusToast && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="hig-glass-toolbar pointer-events-none fixed left-1/2 top-[72px] z-30 -translate-x-1/2 rounded-full px-3.5 py-1.5 text-[11.5px] font-medium text-[var(--hig-ink)] whitespace-nowrap"
+        >
+          {statusToast}
+        </div>
+      )}
+
+      {/* Floating Left Apple Maps Sidebar */}
+      <ChallengeLayerDock
           collapsed={leftCollapsed}
           onToggleCollapse={handleToggleLeft}
           activeChallenge={activeChallenge}
@@ -597,7 +685,6 @@ export const App: React.FC = () => {
             onFlyTo={(cam) => setCameraTarget({ ...cam })}
           />
         )}
-      </div>
 
       {/* Moderated Citizen Participation PMDU Dialog */}
       <ParticipationPanel

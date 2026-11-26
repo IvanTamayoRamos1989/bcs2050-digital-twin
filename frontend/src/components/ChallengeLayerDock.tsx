@@ -2,7 +2,6 @@ import React from "react";
 import {
   Building2,
   ChevronLeft,
-  ChevronRight,
   Droplets,
   Eye,
   Factory,
@@ -45,7 +44,7 @@ const CHALLENGES: {
     labelEs: "Vivienda y Suelo",
     labelEn: "Housing & Land Use",
     icon: <Building2 className="h-3.5 w-3.5" />,
-    tintCls: "bg-[#0A84FF]/20 text-[#64D2FF]",
+    tintCls: "bg-[#0A84FF]/18 text-[var(--hig-accent)]",
     defaultMetric: "infill_homes_potential",
     metrics: ["infill_homes_potential", "density_hab_ha_2025", "city_science_index"],
   },
@@ -54,7 +53,7 @@ const CHALLENGES: {
     labelEs: "Forma Urbana 15-Min",
     labelEn: "15-Min Urban Form",
     icon: <Footprints className="h-3.5 w-3.5" />,
-    tintCls: "bg-[#30D158]/20 text-[#30D158]",
+    tintCls: "bg-[#30D158]/18 text-[var(--hig-green)]",
     defaultMetric: "city15_score",
     metrics: ["city15_score", "fractality_score", "harmony_score", "landuse_entropy_score"],
   },
@@ -63,7 +62,7 @@ const CHALLENGES: {
     labelEs: "Economía y Clústeres",
     labelEn: "Economy & Clusters",
     icon: <Factory className="h-3.5 w-3.5" />,
-    tintCls: "bg-[#FF9F0A]/20 text-[#FF9F0A]",
+    tintCls: "bg-[#FF9F0A]/18 text-[var(--hig-amber)]",
     defaultMetric: "city_science_index",
     metrics: ["city_science_index", "landuse_entropy_score", "density_hab_ha_2025"],
   },
@@ -72,7 +71,7 @@ const CHALLENGES: {
     labelEs: "Agua, Energía y Clima",
     labelEn: "Water, Energy & Climate",
     icon: <Droplets className="h-3.5 w-3.5" />,
-    tintCls: "bg-[#64D2FF]/20 text-[#64D2FF]",
+    tintCls: "bg-[#64D2FF]/18 text-[var(--hig-cyan)]",
     defaultMetric: "carrying_resilience_score",
     metrics: ["carrying_resilience_score", "solar_mw", "surge_exposed_pct"],
   },
@@ -81,7 +80,7 @@ const CHALLENGES: {
     labelEs: "Movilidad y Corredores",
     labelEn: "Mobility & Corridors",
     icon: <Route className="h-3.5 w-3.5" />,
-    tintCls: "bg-[#BF5AF2]/20 text-[#DA8FFF]",
+    tintCls: "bg-[#BF5AF2]/18 text-[#BF5AF2]",
     defaultMetric: "city15_score",
     metrics: ["city15_score", "fractality_score", "carrying_resilience_score"],
   },
@@ -130,16 +129,7 @@ export const ChallengeLayerDock: React.FC<Props> = ({
   const isEn = language === "en";
 
   if (collapsed) {
-    return (
-      <button
-        type="button"
-        onClick={onToggleCollapse}
-        className="ios-glass pointer-events-auto absolute left-4 top-4 z-20 flex items-center gap-1.5 rounded-full px-3.5 py-2 text-[12px] font-semibold text-[#F5F5F7] hover:bg-white/[0.12] transition-colors cursor-pointer"
-      >
-        <ChevronRight className="h-4 w-4 text-[#0A84FF]" aria-hidden="true" />
-        <span>{isEn ? "Challenges & Layers" : "Retos y Capas"}</span>
-      </button>
-    );
+    return null;
   }
 
   const currentChallenge = CHALLENGES.find((c) => c.id === activeChallenge) || CHALLENGES[0];
@@ -148,31 +138,45 @@ export const ChallengeLayerDock: React.FC<Props> = ({
   return (
     <aside
       aria-label={isEn ? "Urban challenges and map layers" : "Retos urbanos y capas del mapa"}
-      className="ios-glass pointer-events-auto absolute left-4 top-4 z-20 flex max-h-[calc(100%-82px)] w-[calc(100vw-32px)] sm:w-[300px] flex-col rounded-[24px] overflow-hidden"
+      className="hig-glass-sidebar pointer-events-auto absolute z-30 sm:z-20 flex flex-col overflow-hidden max-sm:inset-x-0 max-sm:bottom-0 max-sm:top-auto max-sm:w-full max-sm:max-h-[76vh] max-sm:rounded-b-none max-sm:rounded-t-[28px] sm:left-4 sm:top-[72px] sm:w-[300px] sm:max-h-[calc(100%-152px)] sm:rounded-[24px]"
     >
-      {/* Apple Sheet Header */}
-      <div className="flex items-center justify-between border-b border-white/[0.08] px-4 py-3">
+      {/* Mobile iOS Sheet Grabber */}
+      <div
+        aria-hidden="true"
+        className="sm:hidden mx-auto mt-2.5 mb-1 h-1 w-9 shrink-0 rounded-full bg-[var(--hig-ink-3)]"
+      />
+
+      {/* Sidebar Header */}
+      <div className="flex items-center justify-between border-b border-[var(--hig-divider)] px-4 py-3">
         <div>
-          <p className="text-[10.5px] font-medium tracking-wide text-[#EBEBF5]/60">
+          <p className="text-[10.5px] font-medium tracking-wide text-[var(--hig-ink-2)]">
             {isEn ? "5 Urban Challenges" : "5 Retos Urbanos"}
           </p>
-          <h2 className="text-[15px] font-semibold tracking-tight text-[#F5F5F7]">
+          <h2 className="text-[15px] font-semibold tracking-tight text-[var(--hig-ink)]">
             City Science
           </h2>
         </div>
         <button
           type="button"
           onClick={onToggleCollapse}
-          aria-label={isEn ? "Collapse left panel" : "Colapsar panel izquierdo"}
-          className="flex h-7 w-7 items-center justify-center rounded-full bg-white/[0.08] text-[#EBEBF5]/75 hover:bg-white/[0.15] hover:text-white transition-colors cursor-pointer"
+          aria-label={isEn ? "Collapse left sidebar" : "Colapsar explorador"}
+          className="hidden sm:flex h-7 w-7 items-center justify-center rounded-full bg-[var(--hig-pill-bg)] text-[var(--hig-ink-2)] hover:text-[var(--hig-ink)] transition-colors cursor-pointer"
         >
           <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+        </button>
+        <button
+          type="button"
+          onClick={onToggleCollapse}
+          aria-label={isEn ? "Done" : "Listo"}
+          className="sm:hidden min-h-[36px] rounded-full bg-[var(--hig-pill-bg)] px-3.5 py-1 text-[12px] font-semibold text-[var(--hig-accent)] cursor-pointer"
+        >
+          {isEn ? "Done" : "Listo"}
         </button>
       </div>
 
       <div className="twin-scroll overflow-y-auto p-3.5 space-y-3.5">
-        {/* 5 Core Challenges — iOS Grouped List */}
-        <div className="ios-surface rounded-2xl divide-y divide-white/[0.06] overflow-hidden">
+        {/* 5 Core Challenges — HIG Standard Grouped List */}
+        <div className="hig-content-group rounded-2xl divide-y divide-[var(--hig-divider)] overflow-hidden">
           {CHALLENGES.map((ch) => {
             const active = ch.id === activeChallenge;
             return (
@@ -186,8 +190,8 @@ export const ChallengeLayerDock: React.FC<Props> = ({
                 }}
                 className={`flex w-full items-center justify-between px-3 py-2 text-left text-[12px] transition-colors cursor-pointer ${
                   active
-                    ? "bg-[#0A84FF]/18 text-[#F5F5F7] font-semibold"
-                    : "text-[#EBEBF5]/85 hover:bg-white/[0.05] font-medium"
+                    ? "bg-[var(--hig-accent)]/16 text-[var(--hig-ink)] font-semibold"
+                    : "text-[var(--hig-ink-2)] hover:bg-[var(--hig-pill-bg)] hover:text-[var(--hig-ink)] font-medium"
                 }`}
               >
                 <span className="flex items-center gap-2.5 min-w-0">
@@ -200,7 +204,7 @@ export const ChallengeLayerDock: React.FC<Props> = ({
                   <span className="truncate">{isEn ? ch.labelEn : ch.labelEs}</span>
                 </span>
                 {active && (
-                  <span className="h-2 w-2 shrink-0 rounded-full bg-[#0A84FF]" aria-hidden="true" />
+                  <span className="h-2 w-2 shrink-0 rounded-full bg-[var(--hig-accent)]" aria-hidden="true" />
                 )}
               </button>
             );
@@ -208,9 +212,9 @@ export const ChallengeLayerDock: React.FC<Props> = ({
         </div>
 
         {/* Active 3D Metric Card */}
-        <div className="ios-surface rounded-2xl p-3.5 space-y-2.5">
+        <div className="hig-content-group rounded-2xl p-3.5 space-y-2.5">
           <div className="flex items-center justify-between gap-2">
-            <p className="text-[11px] font-semibold text-[#EBEBF5]/75">
+            <p className="text-[11px] font-semibold text-[var(--hig-ink-2)]">
               {isEn ? "Active 3D Metric" : "Variable 3D Activa"}
             </p>
             <button
@@ -219,8 +223,8 @@ export const ChallengeLayerDock: React.FC<Props> = ({
               aria-pressed={colorblindSafe}
               className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold transition-colors cursor-pointer ${
                 colorblindSafe
-                  ? "bg-[#FF9F0A]/20 text-[#FF9F0A] ring-1 ring-[#FF9F0A]/40"
-                  : "bg-white/[0.08] text-[#EBEBF5]/75 hover:bg-white/[0.14]"
+                  ? "bg-[#FF9F0A]/20 text-[var(--hig-amber)] ring-1 ring-[#FF9F0A]/40"
+                  : "bg-[var(--hig-pill-bg)] text-[var(--hig-ink-2)]"
               }`}
             >
               <Eye className="h-2.5 w-2.5" aria-hidden="true" />
@@ -240,8 +244,8 @@ export const ChallengeLayerDock: React.FC<Props> = ({
                   onClick={() => onSelectMetric(mKey)}
                   className={`rounded-full px-2.5 py-1 text-[10.5px] font-semibold transition-all cursor-pointer ${
                     isSel
-                      ? "bg-[#0A84FF] text-white shadow-sm"
-                      : "bg-white/[0.08] text-[#EBEBF5]/80 hover:bg-white/[0.14]"
+                      ? "bg-[var(--hig-accent)] text-white shadow-sm"
+                      : "bg-[var(--hig-pill-bg)] text-[var(--hig-ink-2)] hover:text-[var(--hig-ink)]"
                   }`}
                 >
                   {isEn ? mm.shortLabelEn : mm.shortLabel}
@@ -250,19 +254,19 @@ export const ChallengeLayerDock: React.FC<Props> = ({
             })}
           </div>
 
-          <p className="text-[11px] leading-snug text-[#EBEBF5]/72">
+          <p className="text-[11px] leading-snug text-[var(--hig-ink-2)]">
             {isEn ? metricMeta.descriptionEn : metricMeta.description}
           </p>
 
           {/* Gradient Scale Legend */}
           <div className="pt-0.5">
             <div
-              className="h-1.5 w-full rounded-full ring-1 ring-white/10"
+              className="h-1.5 w-full rounded-full ring-1 ring-[var(--hig-divider)]"
               style={{
                 background: getMetricGradientCss(metricMeta, colorblindSafe),
               }}
             />
-            <div className="mt-1.5 flex justify-between font-mono-num text-[10px] text-[#EBEBF5]/60">
+            <div className="mt-1.5 flex justify-between font-mono-num text-[10px] text-[var(--hig-ink-3)]">
               <span>0 {metricMeta.unit}</span>
               <span>{Math.round(metricMeta.maxValue / 2)} {metricMeta.unit}</span>
               <span>{metricMeta.maxValue}+ {metricMeta.unit}</span>
@@ -271,12 +275,12 @@ export const ChallengeLayerDock: React.FC<Props> = ({
         </div>
 
         {/* 3D Extrusion Controls */}
-        <div className="ios-surface rounded-2xl p-3.5 space-y-3">
+        <div className="hig-content-group rounded-2xl p-3.5 space-y-3">
           <div className="flex items-center justify-between">
-            <label htmlFor="extrusion-slider" className="text-[12px] font-medium text-[#F5F5F7]">
+            <label htmlFor="extrusion-slider" className="text-[12px] font-medium text-[var(--hig-ink)]">
               {isEn ? "3D Extrusion" : "Extrusión 3D"}
             </label>
-            <span className="font-mono-num text-[12px] font-semibold text-[#0A84FF]">
+            <span className="font-mono-num text-[12px] font-semibold text-[var(--hig-accent)]">
               {extrusionScale.toFixed(1)}×
             </span>
           </div>
@@ -291,7 +295,7 @@ export const ChallengeLayerDock: React.FC<Props> = ({
             onChange={(e) => onExtrusionScaleChange(Number(e.target.value))}
             className="ios-slider"
           />
-          <label className="flex items-center justify-between pt-1 border-t border-white/[0.06] text-[12px] text-[#EBEBF5]/85 cursor-pointer">
+          <label className="flex items-center justify-between pt-1.5 border-t border-[var(--hig-divider)] text-[12px] text-[var(--hig-ink-2)] cursor-pointer">
             <span>{isEn ? "Extrude 3D AGEB Prisms" : "Extruir Prismas AGEB 3D"}</span>
             <IosSwitch
               checked={agebs3dMode}
@@ -302,31 +306,31 @@ export const ChallengeLayerDock: React.FC<Props> = ({
           </label>
         </div>
 
-        {/* Geospatial Layer Toggles — iOS Settings Grouped List */}
+        {/* Geospatial Layer Toggles — HIG Grouped List */}
         <div className="space-y-2">
-          <p className="px-1 text-[11px] font-semibold tracking-wide text-[#EBEBF5]/60">
+          <p className="px-1 text-[11px] font-semibold tracking-wide text-[var(--hig-ink-3)]">
             {isEn ? "Geospatial Layers" : "Capas Geoespaciales"}
           </p>
-          <div className="ios-surface rounded-2xl divide-y divide-white/[0.06] overflow-hidden">
+          <div className="hig-content-group rounded-2xl divide-y divide-[var(--hig-divider)] overflow-hidden">
             {LAYER_CONTROLS.map((lc) => {
               const on = layers[lc.key];
               const labelText = isEn ? lc.labelEn : lc.labelEs;
               return (
                 <label
                   key={lc.key}
-                  className="flex items-center justify-between gap-2 px-3 py-2 text-[11.5px] hover:bg-white/[0.04] transition-colors cursor-pointer"
+                  className="flex items-center justify-between gap-2 px-3 py-2 text-[11.5px] hover:bg-[var(--hig-pill-bg)] transition-colors cursor-pointer"
                 >
                   <span className="flex items-center gap-2.5 min-w-0">
                     <span
                       className={`h-2 w-2 shrink-0 rounded-full ${lc.dot} ${on ? "opacity-100" : "opacity-35"}`}
                       aria-hidden="true"
                     />
-                    <span className={`truncate ${on ? "text-[#F5F5F7] font-medium" : "text-[#EBEBF5]/65"}`}>
+                    <span className={`truncate ${on ? "text-[var(--hig-ink)] font-medium" : "text-[var(--hig-ink-2)]"}`}>
                       {labelText}
                     </span>
                   </span>
                   <span className="flex items-center gap-2 shrink-0">
-                    <span className="font-mono-num text-[10px] text-[#EBEBF5]/50">{lc.count}</span>
+                    <span className="font-mono-num text-[10px] text-[var(--hig-ink-3)]">{lc.count}</span>
                     <IosSwitch
                       checked={on}
                       onChange={() => onToggleLayer(lc.key)}

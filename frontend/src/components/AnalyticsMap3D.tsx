@@ -1212,7 +1212,7 @@ export const AnalyticsMap3D: React.FC<Props> = ({
         <div
           role="status"
           aria-live="polite"
-          className="ios-glass pointer-events-auto absolute left-1/2 top-4 z-40 flex max-w-[calc(100vw-32px)] -translate-x-1/2 items-center gap-3 rounded-full border border-[#FF9F0A]/50 px-4 py-2 text-[12px] text-[#FF9F0A]"
+          className="hig-glass-toolbar pointer-events-auto absolute left-1/2 top-[72px] z-40 flex max-w-[calc(100vw-32px)] -translate-x-1/2 items-center gap-3 rounded-full border border-[#FF9F0A]/50 px-4 py-2 text-[12px] text-[var(--hig-amber)]"
         >
           <span className="font-semibold">
             {isEn
@@ -1222,7 +1222,7 @@ export const AnalyticsMap3D: React.FC<Props> = ({
           <button
             type="button"
             onClick={onCancelPinPlacement}
-            className="rounded-full bg-white/[0.12] px-3 py-0.5 text-[11px] font-semibold text-[#F5F5F7] hover:bg-white/[0.2] cursor-pointer"
+            className="rounded-full bg-[var(--hig-pill-bg)] px-3 py-0.5 text-[11px] font-semibold text-[var(--hig-ink)] hover:bg-[var(--hig-pill-hover)] cursor-pointer"
           >
             {isEn ? "Cancel" : "Cancelar"}
           </button>
@@ -1232,49 +1232,49 @@ export const AnalyticsMap3D: React.FC<Props> = ({
       {/* Hover Tooltip */}
       {hoverInfo && (
         <div
-          className="ios-glass pointer-events-none fixed z-40 max-w-xs rounded-2xl px-3.5 py-2.5 text-[11.5px]"
-          style={{ left: Math.min(window.innerWidth - 280, hoverInfo.x + 14), top: Math.max(70, hoverInfo.y + 14) }}
+          className="hig-glass-sidebar pointer-events-none fixed z-40 max-w-xs rounded-2xl px-3.5 py-2.5 text-[11.5px]"
+          style={{ left: Math.min(window.innerWidth - 280, hoverInfo.x + 14), top: Math.max(76, hoverInfo.y + 14) }}
         >
-          <p className="font-semibold text-[#64D2FF]">{hoverInfo.title}</p>
+          <p className="font-semibold text-[var(--hig-cyan)]">{hoverInfo.title}</p>
           {hoverInfo.lines.map((ln, idx) => (
-            <p key={idx} className="text-[#EBEBF5]/85 leading-snug mt-0.5">
+            <p key={idx} className="text-[var(--hig-ink-2)] leading-snug mt-0.5">
               {ln}
             </p>
           ))}
         </div>
       )}
 
-      {/* Bottom Floating Dynamic Island Telemetry & Quick Actions */}
-      <div className="ios-glass pointer-events-auto absolute bottom-4 left-4 sm:left-1/2 z-20 flex max-w-[calc(100vw-82px)] sm:max-w-[calc(100vw-130px)] sm:-translate-x-1/2 items-center gap-2.5 overflow-x-auto rounded-full px-4 py-2 text-[11.5px] whitespace-nowrap">
-        <span className="flex items-center gap-1.5 font-mono-num text-[#EBEBF5]/80">
-          <Compass className="h-3.5 w-3.5 text-[#0A84FF]" />
+      {/* Bottom Floating HIG Dynamic Island Telemetry & Quick Actions */}
+      <div className="hig-glass-toolbar pointer-events-auto absolute max-sm:bottom-3 max-sm:left-2.5 max-sm:max-w-[calc(100vw-110px)] max-sm:px-3 max-sm:gap-2 sm:bottom-4 sm:left-1/2 sm:max-w-[calc(100vw-130px)] sm:-translate-x-1/2 sm:px-4 sm:gap-2.5 z-20 flex items-center overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden rounded-full py-2 text-[11.5px] whitespace-nowrap">
+        <span className="flex items-center gap-1.5 font-mono-num text-[var(--hig-ink-2)]">
+          <Compass className="h-3.5 w-3.5 text-[var(--hig-accent)]" />
           Z {zoom.toFixed(1)}
         </span>
-        <span className="h-3 w-px bg-white/[0.14]" />
+        <span className="h-3 w-px bg-[var(--hig-divider)]" />
         {activeTourId ? (
           <div className="flex items-center gap-2">
-            <span className="flex items-center gap-1.5 font-medium text-[#DA8FFF]">
+            <span className="flex items-center gap-1.5 font-medium text-[#BF5AF2]">
               <Film className="h-3.5 w-3.5 text-[#BF5AF2] animate-pulse" />
               <span>{tourStepTitle || "Recorrido aéreo 3D..."}</span>
             </span>
             <button
               type="button"
               onClick={() => onStopTour?.()}
-              className="flex items-center gap-1 rounded-full bg-[#FF453A]/20 px-2.5 py-0.5 text-[10.5px] font-semibold text-[#FF453A] hover:bg-[#FF453A]/30 cursor-pointer"
+              className="flex items-center gap-1 rounded-full bg-[#FF453A]/20 px-2.5 py-0.5 text-[10.5px] font-semibold text-[var(--hig-red)] hover:bg-[#FF453A]/30 cursor-pointer"
             >
               <Square className="h-2.5 w-2.5 fill-current" />
               <span>Detener</span>
             </button>
           </div>
         ) : zoom >= 11.5 && layers.buildings3d && phase !== "scenarios" && Boolean(tileset3dUrl) && !tilesetError ? (
-          <span className="flex items-center gap-1.5 font-mono-num text-[#64D2FF]">
+          <span className="flex items-center gap-1.5 font-mono-num text-[var(--hig-cyan)]">
             <Building2 className="h-3.5 w-3.5" />
             {tilesLoadedCount > 0
               ? `OGC 3D Tiles 1.1 · ${tilesLoadedCount} tiles .glb`
               : "OGC 3D Tiles 1.1 · Streaming"}
           </span>
         ) : zoom >= 11.8 ? (
-          <span className="flex items-center gap-1.5 font-mono-num text-[#30D158]">
+          <span className="flex items-center gap-1.5 font-mono-num text-[var(--hig-green)]">
             <Building2 className="h-3.5 w-3.5" />
             {loadingBuildings
               ? "Cargando R-Tree 3D..."
@@ -1282,25 +1282,25 @@ export const AnalyticsMap3D: React.FC<Props> = ({
           </span>
         ) : (
           <div className="flex items-center gap-1.5">
-            <ZoomIn className="h-3.5 w-3.5 text-[#FF9F0A]" />
+            <ZoomIn className="h-3.5 w-3.5 text-[var(--hig-amber)]" />
             <button
               type="button"
               onClick={() => onQuickJumpCity("la_paz")}
-              className="rounded-full bg-[#0A84FF]/20 px-2.5 py-0.5 text-[10.5px] font-semibold text-[#64D2FF] hover:bg-[#0A84FF]/30 transition-colors cursor-pointer"
+              className="rounded-full bg-[#0A84FF]/18 px-2.5 py-0.5 text-[10.5px] font-semibold text-[var(--hig-accent)] hover:bg-[#0A84FF]/28 transition-colors cursor-pointer"
             >
               La Paz 3D
             </button>
             <button
               type="button"
               onClick={() => onQuickJumpCity("cabo_san_lucas")}
-              className="rounded-full bg-[#30D158]/20 px-2.5 py-0.5 text-[10.5px] font-semibold text-[#30D158] hover:bg-[#30D158]/30 transition-colors cursor-pointer"
+              className="rounded-full bg-[#30D158]/18 px-2.5 py-0.5 text-[10.5px] font-semibold text-[var(--hig-green)] hover:bg-[#30D158]/28 transition-colors cursor-pointer"
             >
               Los Cabos 3D
             </button>
             <button
               type="button"
               onClick={() => onQuickJumpCity("loreto")}
-              className="rounded-full bg-[#BF5AF2]/20 px-2.5 py-0.5 text-[10.5px] font-semibold text-[#DA8FFF] hover:bg-[#BF5AF2]/30 transition-colors cursor-pointer"
+              className="rounded-full bg-[#BF5AF2]/18 px-2.5 py-0.5 text-[10.5px] font-semibold text-[#BF5AF2] hover:bg-[#BF5AF2]/28 transition-colors cursor-pointer"
             >
               Loreto 3D
             </button>
@@ -1308,12 +1308,12 @@ export const AnalyticsMap3D: React.FC<Props> = ({
         )}
         {!activeTourId && (
           <>
-            <span className="h-3 w-px bg-white/[0.14]" />
+            <span className="h-3 w-px bg-[var(--hig-divider)]" />
             <button
               type="button"
               onClick={() => onStartTour?.("el_tezal")}
               title="Iniciar recorrido aéreo tipo InfraWorks / Lumion sobre El Tezal"
-              className="flex items-center gap-1.5 rounded-full bg-[#0A84FF]/20 px-2.5 py-0.5 text-[10.5px] font-semibold text-[#64D2FF] hover:bg-[#0A84FF]/30 transition-colors cursor-pointer"
+              className="flex items-center gap-1.5 rounded-full bg-[#0A84FF]/18 px-2.5 py-0.5 text-[10.5px] font-semibold text-[var(--hig-accent)] hover:bg-[#0A84FF]/28 transition-colors cursor-pointer"
             >
               <Film className="h-3 w-3" />
               <span>Vuelo El Tezal</span>
@@ -1324,9 +1324,9 @@ export const AnalyticsMap3D: React.FC<Props> = ({
               onChange={(e) => {
                 if (e.target.value) onStartTour?.(e.target.value);
               }}
-              className="rounded-full bg-white/[0.08] px-2.5 py-0.5 text-[10.5px] font-medium text-[#F5F5F7] border border-white/[0.1] focus:outline-none cursor-pointer"
+              className="rounded-full bg-[var(--hig-pill-bg)] px-2.5 py-0.5 text-[10.5px] font-medium text-[var(--hig-ink)] border border-[var(--hig-divider)] focus:outline-none cursor-pointer"
             >
-              <option value="" className="bg-[#16161A] text-[#F5F5F7]">Tours ▾</option>
+              <option value="" className="bg-[var(--hig-select-bg)] text-[var(--hig-ink)]">Tours ▾</option>
               {(tours && tours.length > 0
                 ? tours
                 : [
@@ -1335,19 +1335,19 @@ export const AnalyticsMap3D: React.FC<Props> = ({
                     { id: "loreto_bahia", short_label: "Vuelo Loreto" },
                   ]
               ).map((t) => (
-                <option key={t.id} value={t.id} className="bg-[#16161A] text-[#F5F5F7]">
+                <option key={t.id} value={t.id} className="bg-[var(--hig-select-bg)] text-[var(--hig-ink)]">
                   {t.short_label}
                 </option>
               ))}
             </select>
           </>
         )}
-        <span className="h-3 w-px bg-white/[0.14]" />
+        <span className="h-3 w-px bg-[var(--hig-divider)]" />
         <button
           type="button"
           onClick={() => onOpenExportModal?.()}
           title="Exportar a Civil 3D (.DXF), Lumion/Unreal (.OBJ) y BIM ISO 19650"
-          className="flex items-center gap-1.5 rounded-full bg-[#FF9F0A]/20 px-2.5 py-0.5 text-[10.5px] font-semibold text-[#FF9F0A] hover:bg-[#FF9F0A]/30 transition-colors cursor-pointer"
+          className="flex items-center gap-1.5 rounded-full bg-[#FF9F0A]/18 px-2.5 py-0.5 text-[10.5px] font-semibold text-[var(--hig-amber)] hover:bg-[#FF9F0A]/28 transition-colors cursor-pointer"
         >
           <Box className="h-3 w-3" />
           <span>CAD / BIM / 3D</span>

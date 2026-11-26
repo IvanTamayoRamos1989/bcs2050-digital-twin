@@ -451,22 +451,22 @@ export const CesiumGlobe3D: React.FC<Props> = ({
         aria-label={isEn ? "CesiumJS 3D Globe of Baja California Sur" : "Globo 3D CesiumJS de Baja California Sur"}
         className="h-full w-full"
       />
-      <div className="ios-glass pointer-events-auto absolute bottom-4 left-1/2 z-20 flex max-w-[calc(100vw-32px)] -translate-x-1/2 items-center gap-2.5 overflow-x-auto rounded-full px-4 py-2 text-[11.5px] whitespace-nowrap">
-        <span className="flex items-center gap-1.5 text-[#64D2FF] font-semibold">
+      <div className="hig-glass-toolbar pointer-events-auto absolute bottom-4 left-1/2 z-20 flex max-w-[calc(100vw-32px)] -translate-x-1/2 items-center gap-2.5 overflow-x-auto rounded-full px-4 py-2 text-[11.5px] whitespace-nowrap">
+        <span className="flex items-center gap-1.5 text-[var(--hig-cyan)] font-semibold">
           <Globe2 className="h-3.5 w-3.5" aria-hidden="true" />
           CesiumJS 3D · {activeModeLabel}
         </span>
 
         {googleTilesLoaded && (
           <>
-            <span className="h-3 w-px bg-white/[0.14]" />
+            <span className="h-3 w-px bg-[var(--hig-divider)]" />
             <div role="group" aria-label={isEn ? "Cesium 3D mode switcher" : "Selector modo 3D Cesium"} className="ios-segmented flex items-center">
               <button
                 type="button"
                 onClick={() => setCesiumViewMode("photorealistic")}
                 aria-pressed={cesiumViewMode === "photorealistic"}
                 className={`rounded-full px-2.5 py-0.5 text-[10.5px] font-semibold transition-all cursor-pointer ${
-                  cesiumViewMode === "photorealistic" ? "bg-[#30D158] text-[#050507]" : "text-[#EBEBF5]/75 hover:text-white"
+                  cesiumViewMode === "photorealistic" ? "bg-[#30D158] text-[#050507]" : "text-[var(--hig-ink-2)] hover:text-[var(--hig-ink)]"
                 }`}
               >
                 {isEn ? "Photorealistic 3D" : "Fotorrealista 3D"}
@@ -476,7 +476,7 @@ export const CesiumGlobe3D: React.FC<Props> = ({
                 onClick={() => setCesiumViewMode("analytical")}
                 aria-pressed={cesiumViewMode === "analytical"}
                 className={`flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10.5px] font-semibold transition-all cursor-pointer ${
-                  cesiumViewMode === "analytical" ? "ios-segment-active" : "text-[#EBEBF5]/75 hover:text-white"
+                  cesiumViewMode === "analytical" ? "ios-segment-active" : "text-[var(--hig-ink-2)] hover:text-[var(--hig-ink)]"
                 }`}
               >
                 <Layers className="h-2.5 w-2.5" aria-hidden="true" />
@@ -486,8 +486,8 @@ export const CesiumGlobe3D: React.FC<Props> = ({
           </>
         )}
 
-        <span className="h-3 w-px bg-white/[0.14]" />
-        <span className="font-mono-num text-[#30D158]">
+        <span className="h-3 w-px bg-[var(--hig-divider)]" />
+        <span className="font-mono-num text-[var(--hig-green)]">
           {streaming3DTiles
             ? `${buildingCount.toLocaleString()} ${isEn ? "3D bldgs" : "edif. 3D"}`
             : `${buildingCount.toLocaleString()} ${isEn ? "bldgs" : "edif."} (${activeCitySlug || "la_paz"})`}
@@ -495,10 +495,10 @@ export const CesiumGlobe3D: React.FC<Props> = ({
 
         {cesiumViewMode === "analytical" && (
           <>
-            <span className="hidden sm:inline-flex h-3 w-px bg-white/[0.14]" />
-            <span className="hidden sm:flex items-center gap-2 text-[10.5px] text-[#EBEBF5]/80">
+            <span className="hidden sm:inline-flex h-3 w-px bg-[var(--hig-divider)]" />
+            <span className="hidden sm:flex items-center gap-2 text-[10.5px] text-[var(--hig-ink-2)]">
               <span className="inline-flex items-center gap-1">
-                <span className="h-2 w-2 rounded-full bg-[#F5F5F7] ring-1 ring-white/30" /> &lt;6m
+                <span className="h-2 w-2 rounded-full bg-[var(--hig-ink)] ring-1 ring-[var(--hig-divider)]" /> &lt;6m
               </span>
               <span className="inline-flex items-center gap-1">
                 <span className="h-2 w-2 rounded-full bg-[#0A84FF]" /> 9–15m
@@ -511,7 +511,7 @@ export const CesiumGlobe3D: React.FC<Props> = ({
         )}
 
         {!googleKey && (
-          <span className="hidden lg:flex items-center gap-1 text-[10px] text-[#FF9F0A]">
+          <span className="hidden lg:flex items-center gap-1 text-[10px] text-[var(--hig-amber)]">
             <KeyRound className="h-3 w-3" aria-hidden="true" />
             VITE_GOOGLE_MAPS_API_KEY
           </span>

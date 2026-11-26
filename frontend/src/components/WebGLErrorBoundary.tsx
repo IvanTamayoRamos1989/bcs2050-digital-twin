@@ -23,19 +23,19 @@ export class WebGLErrorBoundary extends React.Component<Props, State> {
   render() {
     if (this.state.hasError) {
       return (
-        <div className="flex h-full w-full items-center justify-center bg-[#0A0A0D] p-8 text-center">
-          <div className="ios-glass max-w-md rounded-[24px] p-6">
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-[#FF9F0A]">
+        <div className="flex h-full w-full items-center justify-center bg-[var(--hig-bg)] p-8 text-center">
+          <div className="hig-glass-sidebar max-w-md rounded-[24px] p-6">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--hig-amber)]">
               Fallback de Motor Gráfico
             </p>
-            <h3 className="mt-2 text-lg font-semibold text-[#F5F5F7]">
+            <h3 className="mt-2 text-lg font-semibold text-[var(--hig-ink)]">
               {this.props.fallbackTitle || "Visor 3D reiniciando"}
             </h3>
-            <p className="mt-2 text-xs text-[#EBEBF5]/65">{this.state.message}</p>
+            <p className="mt-2 text-xs text-[var(--hig-ink-2)]">{this.state.message}</p>
             <button
               type="button"
               onClick={() => this.setState({ hasError: false, message: "" })}
-              className="mt-4 rounded-full bg-[#0A84FF] hover:bg-[#409CFF] px-5 py-2 text-xs font-semibold text-white transition-colors cursor-pointer"
+              className="hig-lift mt-4 rounded-full bg-[var(--hig-accent)] hover:bg-[var(--hig-accent-hover)] px-5 py-2 text-xs font-semibold text-white transition-colors cursor-pointer"
             >
               Reintentar Visor 3D
             </button>
