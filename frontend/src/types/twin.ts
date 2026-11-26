@@ -23,7 +23,8 @@ export type AgebMetricKey =
   | "solar_mw"
   | "surge_exposed_pct"
   | "carrying_resilience_score"
-  | "density_hab_ha_2025";
+  | "density_hab_ha_2025"
+  | "irs_score_2025_eic_calibrated";
 
 export interface CameraPreset {
   lon: number;
@@ -245,6 +246,8 @@ export interface InspectResponse {
   tandeo_lapaz: Record<string, unknown> | null;
   poer_uga: Record<string, unknown> | null;
   protected_area: Record<string, unknown> | null;
+  ejido_or_reserve?: Record<string, unknown> | null;
+  hazard_zone?: Record<string, unknown> | null;
   nearest_services: Record<string, { name: string; sector: string; walk_m: number; walk_min: number }[]>;
   nearest_transit: { name: string; mode: string; walk_m: number }[];
   nearest_substation: { name: string; voltage: string; distance_km: number } | null;
@@ -576,6 +579,16 @@ export interface LayerVisibility {
   plannedProjects: boolean;
   liveTelemetry: boolean;
   citizenPins: boolean;
+  waterNetworkLc: boolean;
+  arroyosRivers: boolean;
+  hazardAtlas: boolean;
+  parksPublicSpace: boolean;
+  landTenure: boolean;
+  mobilityArterials: boolean;
+  airportsPortsMarinas: boolean;
+  coastalEcosystems: boolean;
+  culturalHeritage: boolean;
+  wasteManagement: boolean;
 }
 
 export interface CitizenPin {

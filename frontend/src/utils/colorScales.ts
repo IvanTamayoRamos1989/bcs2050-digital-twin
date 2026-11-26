@@ -172,6 +172,21 @@ export const METRIC_CATALOG: Record<AgebMetricKey, MetricMeta> = {
     description: "Densidad habitacional calibrada EIC 2025 por hectárea en manzanas y AGEBs.",
     descriptionEn: "Calibrated 2025 residential density (inhabitants/ha) across urban AGEBs.",
   },
+  irs_score_2025_eic_calibrated: {
+    key: "irs_score_2025_eic_calibrated",
+    label: "Rezago Social CONEVAL (IRS)",
+    labelEn: "CONEVAL Social Lag (IRS)",
+    shortLabel: "Rezago IRS",
+    shortLabelEn: "Social Lag",
+    unit: "IRS",
+    maxValue: 2.5,
+    lowColor: [16, 185, 129],
+    midColor: [245, 158, 11],
+    highColor: [239, 68, 68],
+    inverted: true,
+    description: "Índice de Rezago Social calibrado 2025 por AGEB (CONEVAL / EIC; mayor valor = mayor vulnerabilidad social).",
+    descriptionEn: "2025 calibrated Social Lag Index by AGEB (CONEVAL / EIC; higher values indicate greater vulnerability).",
+  },
 };
 
 export function getMetricStops(
@@ -196,7 +211,10 @@ export function interpolateMetricColor(
   colorblindSafe = true,
 ): [number, number, number, number] {
   const [low, mid, high] = getMetricStops(meta, colorblindSafe);
-  const t = Math.max(0, Math.min(1, value / Math.max(1, meta.maxValue)));
+  const t =
+    meta.key === "irs_score_2025_eic_calibrated"
+      ? Math.max(0, Math.min(1, (value + 1.2) / 3.2))
+      : Math.max(0, Math.min(1, value / Math.max(1, meta.maxValue)));
   const c0 = t < 0.5 ? low : mid;
   const c1 = t < 0.5 ? mid : high;
   const lt = t < 0.5 ? t * 2 : (t - 0.5) * 2;

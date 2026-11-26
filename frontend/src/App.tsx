@@ -59,6 +59,16 @@ const INITIAL_LAYERS: LayerVisibility = {
   plannedProjects: true,
   liveTelemetry: true,
   citizenPins: true,
+  waterNetworkLc: false,
+  arroyosRivers: false,
+  hazardAtlas: false,
+  parksPublicSpace: false,
+  landTenure: false,
+  mobilityArterials: false,
+  airportsPortsMarinas: false,
+  coastalEcosystems: false,
+  culturalHeritage: false,
+  wasteManagement: false,
 };
 
 const isSmallViewport = () => typeof window !== "undefined" && window.innerWidth < 1024;

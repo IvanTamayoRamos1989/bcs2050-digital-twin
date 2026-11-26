@@ -45,6 +45,16 @@ LAYER_FILES: dict[str, str] = {
     "poer_ugas": "poer_ugas.geojson",
     "anps": "anps.geojson",
     "waste_sites": "waste_sites.geojson",
+    "water_network_lc": "water_network_lc.geojson",
+    "arroyos_rivers": "arroyos_rivers.geojson",
+    "hazard_atlas": "hazard_atlas.geojson",
+    "parks_public_space": "parks_public_space.geojson",
+    "land_tenure": "land_tenure.geojson",
+    "mobility_arterials": "mobility_arterials.geojson",
+    "airports_ports_marinas": "airports_ports_marinas.geojson",
+    "coastal_ecosystems": "coastal_ecosystems.geojson",
+    "cultural_heritage": "cultural_heritage.geojson",
+    "waste_routes_lpz": "waste_routes_lpz.geojson",
 }
 
 _HYDRATE_LOCK = threading.Lock()
@@ -148,7 +158,7 @@ def load_summary() -> dict[str, Any]:
     return json.loads(_ACTIVE_SUMMARY_PATH.read_text(encoding="utf-8"))
 
 
-@lru_cache(maxsize=24)
+@lru_cache(maxsize=48)
 def load_layer_geojson(layer_id: str) -> dict[str, Any]:
     ensure_spatial_data_ready()
     fname = LAYER_FILES.get(layer_id)
@@ -568,6 +578,14 @@ class SpatialIndexManager:
         tandeo_info = self._find_containing_feature("tandeo", lon, lat)
         poer_info = self._find_containing_feature("poer_ugas", lon, lat)
         anp_info = self._find_containing_feature("anps", lon, lat)
+        try:
+            tenure_info = self._find_containing_feature("land_tenure", lon, lat)
+        except FileNotFoundError:
+            tenure_info = None
+        try:
+            hazard_info = self._find_containing_feature("hazard_atlas", lon, lat)
+        except FileNotFoundError:
+            hazard_info = None
 
         zoning_hits = self.query_zoning(minx=lon - 0.0005, miny=lat - 0.0005, maxx=lon + 0.0005, maxy=lat + 0.0005, limit=5)
         zoning_info = None
@@ -634,6 +652,8 @@ class SpatialIndexManager:
             "tandeo_lapaz": tandeo_info,
             "poer_uga": poer_info,
             "protected_area": anp_info,
+            "ejido_or_reserve": tenure_info,
+            "hazard_zone": hazard_info,
             "nearest_services": nearest_by_cat,
             "nearest_transit": nearest_stops,
             "nearest_substation": nearest_sub,

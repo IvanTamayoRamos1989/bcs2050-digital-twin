@@ -460,6 +460,20 @@ export const PhaseTelemetryPanel: React.FC<Props> = ({
                       {isEn ? "CONANP Protected Area" : "ANP CONANP"}: {String(inspection.protected_area.area_name)}
                     </p>
                   )}
+                  {inspection.ejido_or_reserve && (
+                    <p className="text-[var(--hig-amber)] font-medium">
+                      {isEn ? "Land Tenure:" : "Tenencia Suelo:"}{" "}
+                      {String(inspection.ejido_or_reserve.name || "Ejido / Reserve")} (
+                      {String(inspection.ejido_or_reserve.legal_regime || inspection.ejido_or_reserve.tenure_type || "RAN")})
+                    </p>
+                  )}
+                  {inspection.hazard_zone && (
+                    <p className="text-[var(--hig-red)] font-medium">
+                      {isEn ? "Hazard Atlas:" : "Atlas Riesgo:"}{" "}
+                      {String(inspection.hazard_zone.name || inspection.hazard_zone.hazard_type)}
+                      {inspection.hazard_zone.severity ? ` · ${String(inspection.hazard_zone.severity)}` : ""}
+                    </p>
+                  )}
                   {inspection.nearest_services?.health?.[0] && (
                     <p className="text-[var(--hig-ink-2)]">
                       <strong>{isEn ? "Nearest Health:" : "Salud cercana:"}</strong> {inspection.nearest_services.health[0].name} (

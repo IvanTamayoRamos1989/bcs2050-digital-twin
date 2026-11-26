@@ -303,6 +303,16 @@ export const AnalyticsMap3D: React.FC<Props> = ({
     if (layers.transit && !geoCache.transit_stops) needed.push("transit_stops", "transit_lines");
     if (layers.poer && !geoCache.poer_ugas) needed.push("poer_ugas");
     if (layers.anps && !geoCache.anps) needed.push("anps");
+    if (layers.waterNetworkLc && !geoCache.water_network_lc) needed.push("water_network_lc");
+    if (layers.arroyosRivers && !geoCache.arroyos_rivers) needed.push("arroyos_rivers");
+    if (layers.hazardAtlas && !geoCache.hazard_atlas) needed.push("hazard_atlas");
+    if (layers.parksPublicSpace && !geoCache.parks_public_space) needed.push("parks_public_space");
+    if (layers.landTenure && !geoCache.land_tenure) needed.push("land_tenure");
+    if (layers.mobilityArterials && !geoCache.mobility_arterials) needed.push("mobility_arterials");
+    if (layers.airportsPortsMarinas && !geoCache.airports_ports_marinas) needed.push("airports_ports_marinas");
+    if (layers.coastalEcosystems && !geoCache.coastal_ecosystems) needed.push("coastal_ecosystems");
+    if (layers.culturalHeritage && !geoCache.cultural_heritage) needed.push("cultural_heritage");
+    if (layers.wasteManagement && !geoCache.waste_routes_lpz) needed.push("waste_routes_lpz", "waste_sites");
     if (!geoCache.municipalities) needed.push("municipalities");
 
     if (needed.length === 0) return;
@@ -974,6 +984,356 @@ export const AnalyticsMap3D: React.FC<Props> = ({
               y,
               title: object.name,
               lines: [isEn ? `Regional Flow Index: ${object.flow_index}/100` : `Flujo Regional Índice: ${object.flow_index}/100`],
+            });
+          },
+        }),
+      );
+    }
+
+    // 13b. Google Cloud BigQuery Enriched Thematic Layers (Lazy-Fetched on Toggle)
+    if (layers.landTenure && geoCache.land_tenure) {
+      list.push(
+        new GeoJsonLayer({
+          id: "land-tenure-layer",
+          data: geoCache.land_tenure,
+          stroked: true,
+          filled: true,
+          getFillColor: (f: GeoJSON.Feature) =>
+            f.properties?.tenure_type === "territorial_reserve" ? [52, 199, 89, 80] : [217, 119, 6, 48],
+          getLineColor: (f: GeoJSON.Feature) =>
+            f.properties?.tenure_type === "territorial_reserve" ? [22, 163, 74, 210] : [180, 83, 9, 175],
+          getLineWidth: 1.5,
+          lineWidthUnits: "pixels",
+          pickable: true,
+          onHover: ({ x, y, object }) => {
+            if (!object) return setHoverInfo(null);
+            const p = object.properties || {};
+            setHoverInfo({
+              x,
+              y,
+              title: `${p.tenure_type === "territorial_reserve" ? (isEn ? "Territorial Reserve" : "Reserva Territorial") : "Ejido / RAN"} · ${p.name || ""}`,
+              lines: [`${p.municipality || "BCS"} · ${p.legal_regime || p.source || ""}`],
+            });
+          },
+        }),
+      );
+    }
+
+    if (layers.coastalEcosystems && geoCache.coastal_ecosystems) {
+      list.push(
+        new GeoJsonLayer({
+          id: "coastal-ecosystems-layer",
+          data: geoCache.coastal_ecosystems,
+          stroked: true,
+          filled: true,
+          pointType: "circle",
+          getPointRadius: 180,
+          pointRadiusMinPixels: 5,
+          pointRadiusMaxPixels: 10,
+          getFillColor: (f: GeoJSON.Feature) => {
+            const t = f.properties?.eco_type;
+            if (t === "mangrove") return [0, 199, 190, 110];
+            if (t === "ramsar") return [16, 185, 129, 65];
+            if (t === "coral_reef") return [244, 63, 94, 215];
+            return [14, 165, 233, 215];
+          },
+          getLineColor: [13, 148, 136, 200],
+          getLineWidth: 1.4,
+          lineWidthUnits: "pixels",
+          pickable: true,
+          onHover: ({ x, y, object }) => {
+            if (!object) return setHoverInfo(null);
+            const p = object.properties || {};
+            setHoverInfo({
+              x,
+              y,
+              title: `${p.name || "Coastal Ecosystem"}`,
+              lines: [`${String(p.eco_type || "").toUpperCase()} · ${p.area_ha ? `${p.area_ha} ha · ` : ""}${p.source || ""}`],
+            });
+          },
+        }),
+      );
+    }
+
+    if (layers.hazardAtlas && geoCache.hazard_atlas) {
+      list.push(
+        new GeoJsonLayer({
+          id: "hazard-atlas-layer",
+          data: geoCache.hazard_atlas,
+          stroked: true,
+          filled: true,
+          pointType: "circle",
+          getPointRadius: 240,
+          pointRadiusMinPixels: 6,
+          pointRadiusMaxPixels: 12,
+          getFillColor: (f: GeoJSON.Feature) => {
+            const ht = f.properties?.hazard_type;
+            if (ht === "flood_tr100") return [220, 38, 38, 115];
+            if (ht === "storm_surge") return [234, 88, 12, 105];
+            if (ht === "heatwave") return [245, 158, 11, 80];
+            if (ht === "cyclone_basin") return [99, 102, 241, 32];
+            return [190, 18, 60, 235];
+          },
+          getLineColor: (f: GeoJSON.Feature) => {
+            const ht = f.properties?.hazard_type;
+            if (ht === "flood_tr100") return [185, 28, 28, 210];
+            if (ht === "storm_surge") return [194, 65, 12, 200];
+            return [99, 102, 241, 140];
+          },
+          getLineWidth: 1.2,
+          lineWidthUnits: "pixels",
+          pickable: true,
+          onHover: ({ x, y, object }) => {
+            if (!object) return setHoverInfo(null);
+            const p = object.properties || {};
+            setHoverInfo({
+              x,
+              y,
+              title: p.name || (isEn ? "Hazard Zone" : "Zona de Riesgo"),
+              lines: [`${p.hazard_type || ""} ${p.severity ? `· ${p.severity}` : ""} · ${p.source || ""}`],
+            });
+          },
+        }),
+      );
+    }
+
+    if (layers.arroyosRivers && geoCache.arroyos_rivers) {
+      list.push(
+        new GeoJsonLayer({
+          id: "arroyos-rivers-layer",
+          data: geoCache.arroyos_rivers,
+          stroked: true,
+          filled: false,
+          getLineColor: [0, 145, 178, 205],
+          getLineWidth: 2,
+          lineWidthUnits: "pixels",
+          pickable: true,
+          onHover: ({ x, y, object }) => {
+            if (!object) return setHoverInfo(null);
+            const p = object.properties || {};
+            setHoverInfo({
+              x,
+              y,
+              title: p.name || (isEn ? "Arroyo Channel" : "Cauce / Arroyo"),
+              lines: [`${p.municipality || "Los Cabos"} · ${p.source || ""}`],
+            });
+          },
+        }),
+      );
+    }
+
+    if (layers.waterNetworkLc && geoCache.water_network_lc) {
+      list.push(
+        new GeoJsonLayer({
+          id: "water-network-lc-layer",
+          data: geoCache.water_network_lc,
+          stroked: true,
+          filled: true,
+          pointType: "circle",
+          getPointRadius: 90,
+          pointRadiusMinPixels: 5,
+          pointRadiusMaxPixels: 10,
+          getLineColor: (f: GeoJSON.Feature) => {
+            const st = f.properties?.subtype;
+            if (st === "purple_line") return [168, 85, 247, 235];
+            if (st === "aqueduct") return [2, 132, 199, 235];
+            return [56, 189, 248, 195];
+          },
+          getFillColor: (f: GeoJSON.Feature) => {
+            const st = f.properties?.subtype;
+            if (st === "tank") return [37, 99, 235, 235];
+            if (st === "well") return [13, 148, 136, 235];
+            return [168, 85, 247, 235];
+          },
+          getLineWidth: (f: GeoJSON.Feature) => (f.properties?.subtype === "purple_line" || f.properties?.subtype === "aqueduct" ? 2.8 : 1.5),
+          lineWidthUnits: "pixels",
+          pickable: true,
+          onHover: ({ x, y, object }) => {
+            if (!object) return setHoverInfo(null);
+            const p = object.properties || {};
+            setHoverInfo({
+              x,
+              y,
+              title: `${p.name || "Water Infrastructure"}`,
+              lines: [`${p.subtype || ""} · ${p.municipality || "Los Cabos"} (${p.source || ""})`],
+            });
+          },
+        }),
+      );
+    }
+
+    if (layers.parksPublicSpace && geoCache.parks_public_space) {
+      list.push(
+        new GeoJsonLayer({
+          id: "parks-public-space-layer",
+          data: geoCache.parks_public_space,
+          stroked: true,
+          filled: true,
+          pointType: "circle",
+          getPointRadius: 80,
+          pointRadiusMinPixels: 5,
+          pointRadiusMaxPixels: 10,
+          getFillColor: (f: GeoJSON.Feature) =>
+            f.properties?.space_type === "beach_access" ? [6, 182, 212, 230] : [34, 197, 94, 130],
+          getLineColor: (f: GeoJSON.Feature) =>
+            f.properties?.space_type === "beach_access" ? [255, 255, 255, 230] : [21, 128, 61, 210],
+          getLineWidth: 1.5,
+          lineWidthUnits: "pixels",
+          pickable: true,
+          onHover: ({ x, y, object }) => {
+            if (!object) return setHoverInfo(null);
+            const p = object.properties || {};
+            setHoverInfo({
+              x,
+              y,
+              title: p.name || (isEn ? "Park / Public Space" : "Parque / Espacio Público"),
+              lines: [`${p.space_type || ""} · ${p.municipality || "BCS"} (${p.source || ""})`],
+            });
+          },
+        }),
+      );
+    }
+
+    if (layers.mobilityArterials && geoCache.mobility_arterials) {
+      list.push(
+        new GeoJsonLayer({
+          id: "mobility-arterials-layer",
+          data: geoCache.mobility_arterials,
+          stroked: true,
+          filled: false,
+          getLineColor: (f: GeoJSON.Feature) =>
+            f.properties?.road_type === "bikeway" ? [16, 185, 129, 235] : [245, 158, 11, 210],
+          getLineWidth: (f: GeoJSON.Feature) => (f.properties?.road_type === "bikeway" ? 2.5 : 2.0),
+          lineWidthUnits: "pixels",
+          pickable: true,
+          onHover: ({ x, y, object }) => {
+            if (!object) return setHoverInfo(null);
+            const p = object.properties || {};
+            setHoverInfo({
+              x,
+              y,
+              title: p.name || (isEn ? "Arterial Corridor" : "Vialidad Primaria"),
+              lines: [`${p.road_type || ""} · ${p.municipality || "Los Cabos"}`],
+            });
+          },
+        }),
+      );
+    }
+
+    if (layers.airportsPortsMarinas && geoCache.airports_ports_marinas) {
+      list.push(
+        new GeoJsonLayer({
+          id: "airports-ports-marinas-layer",
+          data: geoCache.airports_ports_marinas,
+          pointType: "circle",
+          getPointRadius: 320,
+          pointRadiusMinPixels: 6,
+          pointRadiusMaxPixels: 13,
+          getFillColor: (f: GeoJSON.Feature) => {
+            const ht = f.properties?.hub_type;
+            if (ht === "airport") return [0, 122, 255, 240];
+            if (ht === "marina") return [168, 85, 247, 235];
+            return [14, 165, 233, 235];
+          },
+          getLineColor: [255, 255, 255, 240],
+          getLineWidth: 2,
+          lineWidthUnits: "pixels",
+          pickable: true,
+          onHover: ({ x, y, object }) => {
+            if (!object) return setHoverInfo(null);
+            const p = object.properties || {};
+            setHoverInfo({
+              x,
+              y,
+              title: p.name || "Logistics Hub",
+              lines: [`${String(p.hub_type || "").toUpperCase()} · ${p.iata_code ? `IATA ${p.iata_code} · ` : ""}${p.source || ""}`],
+            });
+          },
+        }),
+      );
+    }
+
+    if (layers.culturalHeritage && geoCache.cultural_heritage) {
+      list.push(
+        new GeoJsonLayer({
+          id: "cultural-heritage-layer",
+          data: geoCache.cultural_heritage,
+          pointType: "circle",
+          getPointRadius: 280,
+          pointRadiusMinPixels: 6,
+          pointRadiusMaxPixels: 12,
+          getFillColor: (f: GeoJSON.Feature) => {
+            const ht = f.properties?.heritage_type;
+            if (ht === "unesco") return [234, 179, 8, 245];
+            if (ht === "mission") return [217, 119, 6, 240];
+            return [168, 85, 247, 230];
+          },
+          getLineColor: [255, 255, 255, 240],
+          getLineWidth: 2,
+          lineWidthUnits: "pixels",
+          pickable: true,
+          onHover: ({ x, y, object }) => {
+            if (!object) return setHoverInfo(null);
+            const p = object.properties || {};
+            setHoverInfo({
+              x,
+              y,
+              title: p.name || "Cultural Heritage",
+              lines: [`${String(p.heritage_type || "").toUpperCase()} · ${p.source || ""}`],
+            });
+          },
+        }),
+      );
+    }
+
+    if (layers.wasteManagement && geoCache.waste_routes_lpz) {
+      list.push(
+        new GeoJsonLayer({
+          id: "waste-routes-lpz-layer",
+          data: geoCache.waste_routes_lpz,
+          stroked: true,
+          filled: true,
+          getFillColor: [162, 132, 94, 60],
+          getLineColor: [146, 64, 14, 175],
+          getLineWidth: 1.5,
+          lineWidthUnits: "pixels",
+          pickable: true,
+          onHover: ({ x, y, object }) => {
+            if (!object) return setHoverInfo(null);
+            const p = object.properties || {};
+            setHoverInfo({
+              x,
+              y,
+              title: p.name || "Waste Collection Sector",
+              lines: [`La Paz · ${p.source || ""}`],
+            });
+          },
+        }),
+      );
+    }
+
+    if (layers.wasteManagement && geoCache.waste_sites) {
+      list.push(
+        new GeoJsonLayer({
+          id: "waste-sites-layer",
+          data: geoCache.waste_sites,
+          pointType: "circle",
+          getPointRadius: 340,
+          pointRadiusMinPixels: 6,
+          pointRadiusMaxPixels: 13,
+          getFillColor: [180, 83, 9, 240],
+          getLineColor: [255, 255, 255, 235],
+          getLineWidth: 2,
+          lineWidthUnits: "pixels",
+          pickable: true,
+          onHover: ({ x, y, object }) => {
+            if (!object) return setHoverInfo(null);
+            const p = object.properties || {};
+            setHoverInfo({
+              x,
+              y,
+              title: p.facility_or_project_name || "Waste Disposal Site",
+              lines: [`${p.municipality_name || "BCS"} · ${p.facility_type || ""} (${p.project_status || ""})`],
             });
           },
         }),

@@ -76,6 +76,46 @@ COLLECTION_META: dict[str, dict[str, Any]] = {
     "poer_ugas": {"title": "UGAs POER BCS (1,990 polígonos)", "description": "Programa de Ordenamiento Ecológico Regional de BCS."},
     "anps": {"title": "Áreas Naturales Protegidas CONANP (76)", "description": "Polígonos de conservación ecológica federales y estatales."},
     "waste_sites": {"title": "Sitios de Disposición Final de Residuos (11)", "description": "Rellenos sanitarios y sitios registrados."},
+    "water_network_lc": {
+        "title": "Los Cabos Water Distribution & Purple-Line Network (IMPLAN v3)",
+        "description": "Water aqueducts, distribution mains, storage tanks, extraction wells, pump stations, and purple treated-water lines.",
+    },
+    "arroyos_rivers": {
+        "title": "Los Cabos Arroyos & Hydrologic Channels",
+        "description": "Primary ephemeral rivers and arroyo drainage corridors across Los Cabos.",
+    },
+    "hazard_atlas": {
+        "title": "BCS Multi-Hazard Risk Atlas (Flood Tr=100, Storm Surge, Heat, Cyclones & Erosion)",
+        "description": "Composite flood zones (Tr=100), coastal storm surge vulnerability, heatwave zones, cyclone basins, and INEGI erosion sites.",
+    },
+    "parks_public_space": {
+        "title": "Urban Parks, Public Plazas & Beach Access Points (La Paz + Los Cabos)",
+        "description": "Municipal parks, civic plazas, green spaces, and official public coastal beach access points.",
+    },
+    "land_tenure": {
+        "title": "Agrarian Ejidos (RAN) & Urban Territorial Reserves",
+        "description": "Official agrarian nucleus boundaries (RAN) and IMPLAN Los Cabos urban growth reserves.",
+    },
+    "mobility_arterials": {
+        "title": "Los Cabos Primary Arterial Roads & Bikeways",
+        "description": "Road hierarchy corridors and dedicated urban cycling infrastructure.",
+    },
+    "airports_ports_marinas": {
+        "title": "BCS Airports, Airfields, Ports & Marinas",
+        "description": "Regional aviation hubs, commercial/fishing ports, landing sites, and coastal marinas.",
+    },
+    "coastal_ecosystems": {
+        "title": "SEMARNAT Mangroves, Ramsar Wetlands, Coral Reefs & Desert Oases",
+        "description": "Blue-carbon coastal wetlands, Ramsar conservation polygons, coral reef habitats, and desert oases.",
+    },
+    "cultural_heritage": {
+        "title": "Jesuit Missions, UNESCO World Heritage & Archaeological Sites",
+        "description": "Historic Baja California Sur mission trail, UNESCO heritage sites, and archaeological patrimony.",
+    },
+    "waste_routes_lpz": {
+        "title": "La Paz Municipal Waste Collection Zones",
+        "description": "Urban solid-waste collection routing sectors from Visor Urbano La Paz.",
+    },
     "records": {
         "title": "Catálogo OGC API - Records (167 registros ISO 19115 + SPDX)",
         "description": "Metadatos buscables de las capas del Gemelo Digital y panel.bcs2050.com.",
