@@ -159,7 +159,7 @@ export const TopCommandBar: React.FC<Props> = ({
   }, [livePopoverOpen, settingsOpen]);
 
   const basemapOptions: { id: BasemapMode; labelEs: string; labelEn: string }[] = [
-    { id: "obsidian", labelEs: "Obsidian", labelEn: "Obsidian" },
+    { id: "obsidian", labelEs: theme === "light" ? "Claro" : "Oscuro", labelEn: theme === "light" ? "Light" : "Dark" },
     { id: "satellite", labelEs: "Satélite", labelEn: "Satellite" },
     { id: "terrain", labelEs: "Relieve", labelEn: "Relief" },
   ];
@@ -186,7 +186,7 @@ export const TopCommandBar: React.FC<Props> = ({
         <div className="hidden sm:flex items-center gap-1.5 px-1 shrink-0">
           <div
             aria-hidden="true"
-            className="flex h-7 w-7 items-center justify-center rounded-[9px] bg-gradient-to-b from-[#2E2E35] to-[#17171B] text-[9.5px] font-semibold tracking-tight text-[#F5F5F7] ring-1 ring-white/15 shadow-[inset_0_1px_0_rgba(255,255,255,0.22)]"
+            className="flex h-7 w-7 items-center justify-center rounded-[9px] bg-[var(--hig-seg-active)] text-[9.5px] font-semibold tracking-tight text-[var(--hig-ink)] ring-1 ring-[var(--hig-border)] shadow-[inset_0_1px_0_var(--hig-specular),0_1px_3px_rgba(0,0,0,0.08)]"
           >
             BCS
           </div>
@@ -542,7 +542,7 @@ export const TopCommandBar: React.FC<Props> = ({
                         engineMode === "deck3d" ? "ios-segment-active font-semibold" : "text-[var(--hig-ink-2)]"
                       }`}
                     >
-                      3D Analítico
+                      {isEn ? "Analytical 3D" : "3D Analítico"}
                     </button>
                     <button
                       type="button"
@@ -551,7 +551,7 @@ export const TopCommandBar: React.FC<Props> = ({
                         engineMode === "cesium3d" ? "ios-segment-active font-semibold" : "text-[var(--hig-ink-2)]"
                       }`}
                     >
-                      Globo
+                      {isEn ? "Globe" : "Globo"}
                     </button>
                   </div>
                 </div>
@@ -590,17 +590,6 @@ export const TopCommandBar: React.FC<Props> = ({
                   >
                     <button
                       type="button"
-                      onClick={() => onThemeChange("dark")}
-                      aria-pressed={theme === "dark"}
-                      className={`flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10.5px] font-semibold cursor-pointer ${
-                        theme === "dark" ? "ios-segment-active" : "text-[var(--hig-ink-2)]"
-                      }`}
-                    >
-                      <Moon className="h-3 w-3" aria-hidden="true" />
-                      <span>{isEn ? "Dark" : "Oscuro"}</span>
-                    </button>
-                    <button
-                      type="button"
                       onClick={() => onThemeChange("light")}
                       aria-pressed={theme === "light"}
                       className={`flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10.5px] font-semibold cursor-pointer ${
@@ -609,6 +598,17 @@ export const TopCommandBar: React.FC<Props> = ({
                     >
                       <Sun className="h-3 w-3" aria-hidden="true" />
                       <span>{isEn ? "Light" : "Claro"}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onThemeChange("dark")}
+                      aria-pressed={theme === "dark"}
+                      className={`flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10.5px] font-semibold cursor-pointer ${
+                        theme === "dark" ? "ios-segment-active" : "text-[var(--hig-ink-2)]"
+                      }`}
+                    >
+                      <Moon className="h-3 w-3" aria-hidden="true" />
+                      <span>{isEn ? "Dark" : "Oscuro"}</span>
                     </button>
                   </div>
                 </div>
@@ -688,18 +688,6 @@ export const TopCommandBar: React.FC<Props> = ({
                   >
                     <button
                       type="button"
-                      onClick={() => onLanguageChange("es")}
-                      aria-pressed={language === "es"}
-                      className={`rounded-full px-2.5 py-0.5 text-[10.5px] font-semibold transition-all cursor-pointer ${
-                        language === "es"
-                          ? "ios-segment-active"
-                          : "text-[var(--hig-ink-2)] hover:text-[var(--hig-ink)]"
-                      }`}
-                    >
-                      ES
-                    </button>
-                    <button
-                      type="button"
                       onClick={() => onLanguageChange("en")}
                       aria-pressed={language === "en"}
                       className={`rounded-full px-2.5 py-0.5 text-[10.5px] font-semibold transition-all cursor-pointer ${
@@ -709,6 +697,18 @@ export const TopCommandBar: React.FC<Props> = ({
                       }`}
                     >
                       EN
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onLanguageChange("es")}
+                      aria-pressed={language === "es"}
+                      className={`rounded-full px-2.5 py-0.5 text-[10.5px] font-semibold transition-all cursor-pointer ${
+                        language === "es"
+                          ? "ios-segment-active"
+                          : "text-[var(--hig-ink-2)] hover:text-[var(--hig-ink)]"
+                      }`}
+                    >
+                      ES
                     </button>
                   </div>
                 </div>

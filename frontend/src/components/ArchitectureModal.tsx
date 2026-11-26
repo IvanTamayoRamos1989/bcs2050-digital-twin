@@ -6,6 +6,7 @@ import type { ArchitectureResponse, CorridorPreset, GovernanceSummaryResponse, M
 interface Props {
   open: boolean;
   onClose: () => void;
+  language?: "es" | "en";
   currentBbox?: [number, number, number, number] | null;
   currentZoom?: number;
   corridors?: Record<string, CorridorPreset>;
@@ -15,11 +16,13 @@ interface Props {
 export const ArchitectureModal: React.FC<Props> = ({
   open,
   onClose,
+  language = "en",
   currentBbox,
   currentZoom = 6.4,
   corridors,
   onStartTour,
 }) => {
+  const isEn = language === "en";
   const [data, setData] = useState<ArchitectureResponse | null>(null);
   const [metaCatalog, setMetaCatalog] = useState<MetadataCatalogResponse | null>(null);
   const [governance, setGovernance] = useState<GovernanceSummaryResponse | null>(null);
@@ -70,7 +73,7 @@ export const ArchitectureModal: React.FC<Props> = ({
       role="dialog"
       aria-modal="true"
       aria-labelledby="arch-modal-title"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-md p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/25 backdrop-blur-md p-4"
     >
       <div className="hig-glass-sidebar flex max-h-[88vh] w-full max-w-4xl flex-col rounded-[28px] overflow-hidden">
         <div className="flex items-center justify-between border-b border-[var(--hig-divider)] px-5 py-4">
@@ -80,17 +83,21 @@ export const ArchitectureModal: React.FC<Props> = ({
             </div>
             <div>
               <h2 id="arch-modal-title" className="text-[15px] font-semibold tracking-tight text-[var(--hig-ink)]">
-                Gobernanza BCS2050 · Arquitectura, Privacidad y Stack OGC
+                {isEn
+                  ? "BCS2050 Governance · Architecture, Privacy & OGC Stack"
+                  : "Gobernanza BCS2050 · Arquitectura, Privacidad y Stack OGC"}
               </h2>
               <p className="text-[11px] text-[var(--hig-ink-2)]">
-                Principios Gemini · LGPDPPSO/LFPDPPP · CityGML 3.0 LoD2.2 · Catálogo 126 Herramientas
+                {isEn
+                  ? "Gemini Principles · LGPDPPSO/LFPDPPP · CityGML 3.0 LoD2.2 · 126-Tool Catalog"
+                  : "Principios Gemini · LGPDPPSO/LFPDPPP · CityGML 3.0 LoD2.2 · Catálogo 126 Herramientas"}
               </p>
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            aria-label="Cerrar diálogo de gobernanza y arquitectura"
+            aria-label={isEn ? "Close governance and architecture dialog" : "Cerrar diálogo de gobernanza y arquitectura"}
             className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--hig-pill-bg)] text-[var(--hig-ink-2)] hover:text-[var(--hig-ink)] transition-colors cursor-pointer"
           >
             <X className="h-4 w-4" aria-hidden="true" />
@@ -105,10 +112,12 @@ export const ArchitectureModal: React.FC<Props> = ({
                 <div className="hig-content-group rounded-2xl p-4 ring-1 ring-[#30D158]/25 space-y-3">
                   <div>
                     <h3 className="text-[13px] font-semibold text-[var(--hig-ink)]">
-                      Gobernanza Institucional (Principios Gemini) · Privacidad DPIA · RFP CityGML 3.0 LoD2.2
+                      {isEn
+                        ? "Institutional Governance (Gemini Principles) · DPIA Privacy · CityGML 3.0 LoD2.2 RFP"
+                        : "Gobernanza Institucional (Principios Gemini) · Privacidad DPIA · RFP CityGML 3.0 LoD2.2"}
                     </h3>
                     <p className="text-[11px] text-[var(--hig-ink-2)] mt-0.5">
-                      {governance.framework} · Marco legal: {governance.legal_frameworks.join(" · ")}
+                      {governance.framework} · {isEn ? "Legal framework:" : "Marco legal:"} {governance.legal_frameworks.join(" · ")}
                     </p>
                   </div>
 
@@ -146,7 +155,7 @@ export const ArchitectureModal: React.FC<Props> = ({
               {/* Live Commercial Keys Status */}
               <div className="hig-content-group rounded-2xl p-4">
                 <p className="text-[11px] font-semibold text-[var(--hig-cyan)] mb-2.5">
-                  Estado de Integración de APIs / Licencias Comerciales
+                  {isEn ? "API Integrations & Commercial Licensing Status" : "Estado de Integración de APIs / Licencias Comerciales"}
                 </p>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                   {Object.entries(data.capabilities).map(([k, active]) => (
@@ -174,16 +183,20 @@ export const ArchitectureModal: React.FC<Props> = ({
                     </div>
                     <div>
                       <h3 className="text-[13px] font-semibold text-[var(--hig-ink)]">
-                        Puente Interoperable AEC · Autodesk · BIM (ISO 19650) · Lumion / Unreal
+                        {isEn
+                          ? "Interoperable AEC Bridge · Autodesk · BIM (ISO 19650) · Lumion / Unreal"
+                          : "Puente Interoperable AEC · Autodesk · BIM (ISO 19650) · Lumion / Unreal"}
                       </h3>
                       <p className="text-[10.5px] text-[var(--hig-ink-2)]">
-                        Exportación métrica UTM Zona 12N (EPSG:32612) para Civil 3D, InfraWorks, Revit, ACC y UE5
+                        {isEn
+                          ? "Metric UTM Zone 12N (EPSG:32612) export for Civil 3D, InfraWorks, Revit, ACC & UE5"
+                          : "Exportación métrica UTM Zona 12N (EPSG:32612) para Civil 3D, InfraWorks, Revit, ACC y UE5"}
                       </p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
                     <select
-                      aria-label="Corredor o vista a exportar"
+                      aria-label={isEn ? "Corridor or view to export" : "Corredor o vista a exportar"}
                       value={selectedCorridor}
                       onChange={(e) => setSelectedCorridor(e.target.value)}
                       className="ios-input rounded-full px-3 py-1.5 text-[11px] font-medium cursor-pointer"
@@ -196,16 +209,16 @@ export const ArchitectureModal: React.FC<Props> = ({
                         ))
                       ) : (
                         <>
-                          <option value="el_tezal" className="bg-[var(--hig-select-bg)] text-[var(--hig-ink)]">Corredor El Tezal · Los Cabos</option>
-                          <option value="la_paz_malecon" className="bg-[var(--hig-select-bg)] text-[var(--hig-ink)]">Malecón & Centro · La Paz</option>
-                          <option value="cabo_san_lucas_centro" className="bg-[var(--hig-select-bg)] text-[var(--hig-ink)]">Cabo San Lucas & Marina</option>
-                          <option value="san_jose_del_cabo" className="bg-[var(--hig-select-bg)] text-[var(--hig-ink)]">San José del Cabo & Estero</option>
-                          <option value="loreto_centro" className="bg-[var(--hig-select-bg)] text-[var(--hig-ink)]">Centro Histórico · Loreto</option>
+                          <option value="el_tezal" className="bg-[var(--hig-select-bg)] text-[var(--hig-ink)]">El Tezal Corridor · Los Cabos</option>
+                          <option value="la_paz_malecon" className="bg-[var(--hig-select-bg)] text-[var(--hig-ink)]">Malecón &amp; Centro · La Paz</option>
+                          <option value="cabo_san_lucas_centro" className="bg-[var(--hig-select-bg)] text-[var(--hig-ink)]">Cabo San Lucas &amp; Marina</option>
+                          <option value="san_jose_del_cabo" className="bg-[var(--hig-select-bg)] text-[var(--hig-ink)]">San José del Cabo &amp; Estero</option>
+                          <option value="loreto_centro" className="bg-[var(--hig-select-bg)] text-[var(--hig-ink)]">Historic Center · Loreto</option>
                         </>
                       )}
                       {currentBbox && currentZoom >= 11.8 && (
                         <option value="__viewport__" className="bg-[var(--hig-select-bg)] text-[var(--hig-ink)]">
-                          Vista actual del mapa (Z {currentZoom.toFixed(1)})
+                          {isEn ? `Current map view (Z ${currentZoom.toFixed(1)})` : `Vista actual del mapa (Z ${currentZoom.toFixed(1)})`}
                         </option>
                       )}
                     </select>
@@ -219,7 +232,7 @@ export const ArchitectureModal: React.FC<Props> = ({
                         className="hig-lift flex items-center gap-1.5 rounded-full bg-[var(--hig-accent)] hover:bg-[var(--hig-accent-hover)] px-3 py-1.5 text-[11px] font-semibold text-white transition-colors cursor-pointer"
                       >
                         <Film className="h-3.5 w-3.5" />
-                        <span>Vuelo El Tezal</span>
+                        <span>{isEn ? "El Tezal Flight" : "Vuelo El Tezal"}</span>
                       </button>
                     )}
                   </div>
@@ -243,7 +256,7 @@ export const ArchitectureModal: React.FC<Props> = ({
                     className="flex items-center justify-between gap-2 rounded-xl bg-[#30D158]/15 px-3 py-2.5 text-[var(--hig-green)] hover:bg-[#30D158]/25 transition-colors"
                   >
                     <div>
-                      <p className="font-semibold text-[11.5px] text-[var(--hig-ink)]">.OBJ Malla 3D</p>
+                      <p className="font-semibold text-[11.5px] text-[var(--hig-ink)]">{isEn ? ".OBJ 3D Mesh" : ".OBJ Malla 3D"}</p>
                       <p className="text-[10px] text-[var(--hig-green)]">Lumion / Unreal Engine</p>
                     </div>
                     <Download className="h-3.5 w-3.5 shrink-0" />
@@ -251,11 +264,11 @@ export const ArchitectureModal: React.FC<Props> = ({
                   <a
                     href={TwinAPI.buildExportUrl("bim-package", exportOpts)}
                     download
-                    className="flex items-center justify-between gap-2 rounded-xl bg-[#BF5AF2]/15 px-3 py-2.5 text-[#BF5AF2] hover:bg-[#BF5AF2]/25 transition-colors"
+                    className="flex items-center justify-between gap-2 rounded-xl bg-[#BF5AF2]/15 px-3 py-2.5 text-[#8944AB] hover:bg-[#BF5AF2]/25 transition-colors"
                   >
                     <div>
                       <p className="font-semibold text-[11.5px] text-[var(--hig-ink)]">BIM ISO 19650</p>
-                      <p className="text-[10px] text-[#BF5AF2]">Revit / ACC / Tandem</p>
+                      <p className="text-[10px] text-[#8944AB]">Revit / ACC / Tandem</p>
                     </div>
                     <Download className="h-3.5 w-3.5 shrink-0" />
                   </a>
@@ -266,7 +279,7 @@ export const ArchitectureModal: React.FC<Props> = ({
                   >
                     <div>
                       <p className="font-semibold text-[11.5px] text-[var(--hig-ink)]">Cesium for Unreal</p>
-                      <p className="text-[10px] text-[var(--hig-amber)]">Escena UE5 + Cámara</p>
+                      <p className="text-[10px] text-[var(--hig-amber)]">{isEn ? "UE5 Scene + Camera" : "Escena UE5 + Cámara"}</p>
                     </div>
                     <Download className="h-3.5 w-3.5 shrink-0" />
                   </a>
@@ -295,10 +308,14 @@ export const ArchitectureModal: React.FC<Props> = ({
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
                     <h3 className="text-[13px] font-semibold text-[var(--hig-ink)]">
-                      Estándares Abiertos OGC API Family &amp; 3D Tiles 1.1 (glTF 2.0)
+                      {isEn
+                        ? "Open OGC API Family & 3D Tiles 1.1 Standards (glTF 2.0)"
+                        : "Estándares Abiertos OGC API Family & 3D Tiles 1.1 (glTF 2.0)"}
                     </h3>
                     <p className="text-[10.5px] text-[var(--hig-ink-2)]">
-                      Streaming espacial cloud-native: 396,823 edificios en 283 tiles .glb + MVT + Features + Processes
+                      {isEn
+                        ? "Cloud-native spatial streaming: 396,823 buildings in 283 .glb tiles + MVT + Features + Processes"
+                        : "Streaming espacial cloud-native: 396,823 edificios en 283 tiles .glb + MVT + Features + Processes"}
                     </p>
                   </div>
                   {data.tileset_3d_url && (
@@ -309,7 +326,7 @@ export const ArchitectureModal: React.FC<Props> = ({
                       className="flex items-center gap-1.5 rounded-full bg-[#64D2FF]/15 px-3 py-1.5 text-[11px] font-semibold text-[var(--hig-cyan)] hover:bg-[#64D2FF]/25"
                     >
                       <FileJson className="h-3.5 w-3.5" />
-                      <span>Ver tileset.json (GCS)</span>
+                      <span>{isEn ? "View tileset.json (GCS)" : "Ver tileset.json (GCS)"}</span>
                     </a>
                   )}
                 </div>
@@ -318,27 +335,27 @@ export const ArchitectureModal: React.FC<Props> = ({
                     {
                       label: "OGC API - Features",
                       path: data.ogc_endpoints?.features || "/ogc/collections",
-                      desc: "18 colecciones vectoriales GeoJSON paginadas",
+                      desc: isEn ? "18 paginated GeoJSON vector collections" : "18 colecciones vectoriales GeoJSON paginadas",
                     },
                     {
                       label: "OGC API - Tiles (MVT)",
                       path: data.ogc_endpoints?.tiles_mvt || "/ogc/collections/{collection_id}/tiles/WebMercatorQuad/{z}/{y}/{x}.mvt",
-                      desc: "Teselas vectoriales binarias Mapbox Vector Tile",
+                      desc: isEn ? "Mapbox Vector Tile binary tiles" : "Teselas vectoriales binarias Mapbox Vector Tile",
                     },
                     {
                       label: "OGC API - Processes",
                       path: data.ogc_endpoints?.processes || "/ogc/processes",
-                      desc: "Simulación 2050 y Goal-Gap síncrono/asíncrono",
+                      desc: isEn ? "Sync/async 2050 simulation & Goal-Gap" : "Simulación 2050 y Goal-Gap síncrono/asíncrono",
                     },
                     {
                       label: "OGC API - Records",
                       path: data.ogc_endpoints?.records || "/ogc/collections/records/items",
-                      desc: "Catálogo ISO 19115 + SPDX interoperable",
+                      desc: isEn ? "Interoperable ISO 19115 + SPDX catalog" : "Catálogo ISO 19115 + SPDX interoperable",
                     },
                     {
                       label: "OGC SensorThings v1.1",
                       path: data.ogc_endpoints?.sensorthings || "/FROST-Server/v1.1/Things",
-                      desc: "Entidades IoT ambientales, hidrológicas y red eléctrica",
+                      desc: isEn ? "Environmental, hydrologic & power IoT stations" : "Entidades IoT ambientales, hidrológicas y red eléctrica",
                     },
                     {
                       label: "OGC 3D Tiles 1.1 Info",
@@ -363,7 +380,7 @@ export const ArchitectureModal: React.FC<Props> = ({
                     <p className="font-mono-num text-[10px] text-[var(--hig-ink-3)]">{b.reference}</p>
                     <p className="text-[var(--hig-ink-2)]">{b.metrics}</p>
                     <p className="text-[var(--hig-green)] text-[11px] pt-1.5 border-t border-[var(--hig-divider)]">
-                      <strong>En BCS2050:</strong> {b.adoption_in_bcs2050}
+                      <strong>{isEn ? "In BCS2050:" : "En BCS2050:"}</strong> {b.adoption_in_bcs2050}
                     </p>
                   </div>
                 ))}
@@ -372,14 +389,16 @@ export const ArchitectureModal: React.FC<Props> = ({
               {/* Commercial Tiers */}
               <div>
                 <p className="text-[11px] font-semibold text-[var(--hig-amber)] mb-2">
-                  Matriz de Licencias, Software y APIs Comerciales
+                  {isEn ? "Commercial Licensing, Software & API Matrix" : "Matriz de Licencias, Software y APIs Comerciales"}
                 </p>
                 <div className="grid md:grid-cols-3 gap-3">
                   {data.commercial_tiers.map((t) => (
                     <div key={t.tier} className="hig-content-group rounded-2xl p-3.5 space-y-2">
                       <div>
                         <h4 className="font-semibold text-[var(--hig-ink)]">{t.tier}</h4>
-                        <p className="font-mono-num text-sm font-semibold text-[var(--hig-green)] mt-0.5">{t.budget_usd_yr} / año</p>
+                        <p className="font-mono-num text-sm font-semibold text-[var(--hig-green)] mt-0.5">
+                          {t.budget_usd_yr} / {isEn ? "yr" : "año"}
+                        </p>
                       </div>
                       <ul className="space-y-1 text-[11px] text-[var(--hig-ink-2)] list-disc pl-4">
                         {t.items.map((it) => (
@@ -394,7 +413,7 @@ export const ArchitectureModal: React.FC<Props> = ({
               {/* Open Source Stack */}
               <div>
                 <p className="text-[11px] font-semibold text-[var(--hig-green)] mb-2">
-                  Motores Open Source (Orquestados vía OGC API Processes)
+                  {isEn ? "Open Source Engines (Orchestrated via OGC API Processes)" : "Motores Open Source (Orquestados vía OGC API Processes)"}
                 </p>
                 <div className="grid md:grid-cols-2 gap-2">
                   {data.top_opensource_engines.map((e) => (
@@ -422,11 +441,14 @@ export const ArchitectureModal: React.FC<Props> = ({
                       <ShieldCheck className="h-4 w-4 text-[var(--hig-green)]" />
                       <div>
                         <h3 className="text-[12.5px] font-semibold text-[var(--hig-ink)]">
-                          Catálogo ISO 19115 · Licencias SPDX &amp; Reconciliación de KPIs
+                          {isEn
+                            ? "ISO 19115 Catalog · SPDX Licenses & KPI Reconciliation"
+                            : "Catálogo ISO 19115 · Licencias SPDX & Reconciliación de KPIs"}
                         </h3>
                         <p className="text-[10.5px] text-[var(--hig-ink-2)]">
-                          {metaCatalog.summary.total_records} capas documentadas ({metaCatalog.summary.twin_records} Gemelo 3D +{" "}
-                          {metaCatalog.summary.panel_v2_records} Panel v2) · Oficial vs. Modelado explícito
+                          {isEn
+                            ? `${metaCatalog.summary.total_records} documented layers (${metaCatalog.summary.twin_records} 3D Twin + ${metaCatalog.summary.panel_v2_records} Panel v2) · Official vs. Modeled explicit`
+                            : `${metaCatalog.summary.total_records} capas documentadas (${metaCatalog.summary.twin_records} Gemelo 3D + ${metaCatalog.summary.panel_v2_records} Panel v2) · Oficial vs. Modelado explícito`}
                         </p>
                       </div>
                     </div>
@@ -437,12 +459,14 @@ export const ArchitectureModal: React.FC<Props> = ({
                       className="flex items-center gap-1.5 rounded-full bg-[#30D158]/15 px-3 py-1.5 text-[11px] font-semibold text-[var(--hig-green)] hover:bg-[#30D158]/25"
                     >
                       <FileJson className="h-3.5 w-3.5" />
-                      <span>Ver JSON ISO 19115</span>
+                      <span>{isEn ? "View ISO 19115 JSON" : "Ver JSON ISO 19115"}</span>
                     </a>
                   </div>
 
                   <p className="text-[10.5px] text-[var(--hig-ink-2)] leading-snug rounded-xl bg-[var(--hig-pill-bg)] p-3">
-                    <strong className="text-[var(--hig-green)]">Verdad Única BigQuery (`gold_kpi_state_summary`):</strong>{" "}
+                    <strong className="text-[var(--hig-green)]">
+                      {isEn ? "BigQuery Single Source of Truth" : "Verdad Única BigQuery"} (`gold_kpi_state_summary`):
+                    </strong>{" "}
                     {metaCatalog.canonical_kpis.state.reconciliation_notes}
                   </p>
 
@@ -451,7 +475,7 @@ export const ArchitectureModal: React.FC<Props> = ({
                       <div key={aud.municipality_code} className="rounded-xl bg-[var(--hig-pill-bg)] p-2.5 text-[10px]">
                         <p className="font-semibold text-[var(--hig-ink)]">{aud.municipality_name}</p>
                         <p className="font-mono-num text-[9px] text-[var(--hig-cyan)] mt-0.5 truncate" title={aud.water_rationing_status}>
-                          Agua: {aud.water_rationing_status}
+                          {isEn ? "Water:" : "Agua:"} {aud.water_rationing_status}
                         </p>
                         <p className="font-mono-num text-[9px] text-[var(--hig-amber)] truncate" title={aud.transit_inventory_status}>
                           Bus: {aud.transit_inventory_status}
@@ -463,7 +487,9 @@ export const ArchitectureModal: React.FC<Props> = ({
               )}
             </>
           ) : (
-            <p className="text-[var(--hig-ink-3)]">Cargando catálogo arquitectónico...</p>
+            <p className="text-[var(--hig-ink-3)]">
+              {isEn ? "Loading architecture catalog..." : "Cargando catálogo arquitectónico..."}
+            </p>
           )}
         </div>
       </div>

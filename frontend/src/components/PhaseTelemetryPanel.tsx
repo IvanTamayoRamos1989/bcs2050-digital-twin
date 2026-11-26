@@ -88,10 +88,10 @@ const PHASE_TABS: { id: AretianPhase; labelEs: string; labelEn: string }[] = [
 ];
 
 const SCENARIO_PRESETS = [
-  { id: "COMPACT_SUSTAINABLE_2050", label: "Compacta 15-Min", badge: "Óptima", badgeCls: "text-[var(--hig-green)]" },
-  { id: "BAU_TENDENCIAL", label: "BAU Tendencial", badge: "Riesgo", badgeCls: "text-[var(--hig-amber)]" },
-  { id: "HIGH_GROWTH_TOURISM_STRESS", label: "Auge Turístico +65%", badge: "Estrés", badgeCls: "text-[var(--hig-red)]" },
-  { id: "CLIMATE_SHOCK_IPCC_SSP585", label: "Choque IPCC SSP5-8.5", badge: "Clima", badgeCls: "text-[var(--hig-cyan)]" },
+  { id: "COMPACT_SUSTAINABLE_2050", labelEs: "Compacta 15-Min", labelEn: "Compact 15-Min", badgeEs: "Óptima", badgeEn: "Optimal", badgeCls: "text-[var(--hig-green)]" },
+  { id: "BAU_TENDENCIAL", labelEs: "BAU Tendencial", labelEn: "BAU Baseline", badgeEs: "Riesgo", badgeEn: "Risk", badgeCls: "text-[var(--hig-amber)]" },
+  { id: "HIGH_GROWTH_TOURISM_STRESS", labelEs: "Auge Turístico +65%", labelEn: "Tourism Boom +65%", badgeEs: "Estrés", badgeEn: "Stress", badgeCls: "text-[var(--hig-red)]" },
+  { id: "CLIMATE_SHOCK_IPCC_SSP585", labelEs: "Choque IPCC SSP5-8.5", labelEn: "IPCC SSP5-8.5 Shock", badgeEs: "Clima", badgeEn: "Climate", badgeCls: "text-[var(--hig-cyan)]" },
 ];
 
 const YEARS = [2025, 2027, 2031, 2035, 2040, 2050];
@@ -102,7 +102,7 @@ const CHART_TOOLTIP_STYLE = {
   borderRadius: 12,
   fontSize: 11,
   color: "var(--hig-ink)",
-  boxShadow: "0 12px 30px rgba(0,0,0,0.32)",
+  boxShadow: "0 10px 28px rgba(0,0,0,0.12)",
 };
 
 export const PhaseTelemetryPanel: React.FC<Props> = ({
@@ -110,7 +110,7 @@ export const PhaseTelemetryPanel: React.FC<Props> = ({
   onToggleCollapse,
   phase,
   onPhaseChange,
-  language = "es",
+  language = "en",
   scopeId,
   overview,
   inspection,
@@ -181,14 +181,23 @@ export const PhaseTelemetryPanel: React.FC<Props> = ({
         socio: st?.socioecon_score ?? 72.0,
       };
 
-  const radarData = [
-    { pillar: "15-Min", score: activeStats.c15 },
-    { pillar: "Fractalidad", score: activeStats.frac },
-    { pillar: "Armonía", score: activeStats.harm },
-    { pillar: "Mix Usos", score: activeStats.ent },
-    { pillar: "Cap. Carga", score: activeStats.carry },
-    { pillar: "Vitalidad", score: activeStats.socio },
-  ];
+  const radarData = isEn
+    ? [
+        { pillar: "15-Min", score: activeStats.c15 },
+        { pillar: "Fractality", score: activeStats.frac },
+        { pillar: "Harmony", score: activeStats.harm },
+        { pillar: "Land-Use Mix", score: activeStats.ent },
+        { pillar: "Carrying Cap.", score: activeStats.carry },
+        { pillar: "Vitality", score: activeStats.socio },
+      ]
+    : [
+        { pillar: "15-Min", score: activeStats.c15 },
+        { pillar: "Fractalidad", score: activeStats.frac },
+        { pillar: "Armonía", score: activeStats.harm },
+        { pillar: "Mix Usos", score: activeStats.ent },
+        { pillar: "Cap. Carga", score: activeStats.carry },
+        { pillar: "Vitalidad", score: activeStats.socio },
+      ];
 
   const handleExportReport = () => {
     const payload = {
@@ -209,7 +218,11 @@ export const PhaseTelemetryPanel: React.FC<Props> = ({
 
   return (
     <aside
-      aria-label="Panel técnico de telemetría, simulador 2050 y modelos físicos"
+      aria-label={
+        isEn
+          ? "Technical telemetry, 2050 simulator and physics models inspector"
+          : "Panel técnico de telemetría, simulador 2050 y modelos físicos"
+      }
       className="hig-glass-sidebar pointer-events-auto absolute z-30 sm:z-20 flex flex-col overflow-hidden max-sm:inset-x-0 max-sm:bottom-0 max-sm:top-auto max-sm:w-full max-sm:max-h-[76vh] max-sm:rounded-b-none max-sm:rounded-t-[28px] sm:right-4 sm:top-[72px] sm:w-[388px] sm:max-h-[calc(100%-240px)] sm:rounded-[24px]"
     >
       {/* Mobile iOS Sheet Grabber */}
@@ -283,21 +296,27 @@ export const PhaseTelemetryPanel: React.FC<Props> = ({
           <>
             <div className="grid grid-cols-2 gap-2.5">
               <div className="hig-content-group rounded-2xl p-3">
-                <p className="text-[10.5px] font-medium text-[var(--hig-ink-2)]">Índice City Science</p>
+                <p className="text-[10.5px] font-medium text-[var(--hig-ink-2)]">
+                  {isEn ? "City Science Index" : "Índice City Science"}
+                </p>
                 <p className="font-mono-num mt-1 text-[22px] font-semibold tracking-tight text-[var(--hig-green)]">
                   {activeStats.csi}
                   <span className="text-[11px] font-normal text-[var(--hig-ink-3)]"> / 100</span>
                 </p>
               </div>
               <div className="hig-content-group rounded-2xl p-3">
-                <p className="text-[10.5px] font-medium text-[var(--hig-ink-2)]">Ciudad 15-Minutos</p>
+                <p className="text-[10.5px] font-medium text-[var(--hig-ink-2)]">
+                  {isEn ? "15-Minute City" : "Ciudad 15-Minutos"}
+                </p>
                 <p className="font-mono-num mt-1 text-[22px] font-semibold tracking-tight text-[var(--hig-accent)]">
                   {activeStats.c15}
                   <span className="text-[11px] font-normal text-[var(--hig-ink-3)]"> pts</span>
                 </p>
               </div>
               <div className="hig-content-group rounded-2xl p-3">
-                <p className="text-[10.5px] font-medium text-[var(--hig-ink-2)]">Edificios 3D · Pob.</p>
+                <p className="text-[10.5px] font-medium text-[var(--hig-ink-2)]">
+                  {isEn ? "3D Buildings · Pop." : "Edificios 3D · Pob."}
+                </p>
                 <p className="font-mono-num mt-1 text-[15px] font-semibold tracking-tight text-[var(--hig-ink)]">
                   {activeStats.buildings.toLocaleString()}
                 </p>
@@ -305,13 +324,15 @@ export const PhaseTelemetryPanel: React.FC<Props> = ({
                   {activeStats.popOfficial2020.toLocaleString()} INEGI 2020
                 </p>
                 <p className="font-mono-num text-[10px] text-[var(--hig-cyan)]">
-                  {activeStats.pop.toLocaleString()} Proy. 2025
+                  {activeStats.pop.toLocaleString()} {isEn ? "2025 Proj." : "Proy. 2025"}
                 </p>
               </div>
               <div className="hig-content-group rounded-2xl p-3">
-                <p className="text-[10.5px] font-medium text-[var(--hig-ink-2)]">Capacidad Infill 2050</p>
+                <p className="text-[10.5px] font-medium text-[var(--hig-ink-2)]">
+                  {isEn ? "2050 Infill Capacity" : "Capacidad Infill 2050"}
+                </p>
                 <p className="font-mono-num mt-1 text-[15px] font-semibold tracking-tight text-[var(--hig-green)]">
-                  +{activeStats.infill.toLocaleString()} viv
+                  +{activeStats.infill.toLocaleString()} {isEn ? "homes" : "viv"}
                 </p>
                 <p className="font-mono-num mt-0.5 text-[10px] text-[var(--hig-ink-2)]">
                   Solar: {activeStats.solarMw.toLocaleString()} MW
@@ -323,21 +344,23 @@ export const PhaseTelemetryPanel: React.FC<Props> = ({
             <div className="hig-content-group rounded-2xl px-3.5 py-2.5 flex items-center justify-between gap-2 text-[11px]">
               <div>
                 <span className="text-[10.5px] font-semibold text-[var(--hig-cyan)]">
-                  Acuíferos BCS (CONAGUA DOF 2023)
+                  {isEn ? "BCS Aquifers (CONAGUA DOF 2023)" : "Acuíferos BCS (CONAGUA DOF 2023)"}
                 </span>
                 <p className="font-mono-num mt-0.5 text-[10.5px] text-[var(--hig-ink-2)]">
-                  {aquifersNoAvailCount} / {aquifersOfficialCount} sin disponibilidad · {aquifersStrictDeficit} déficit &lt; 0 (+1 comp. 0228)
+                  {isEn
+                    ? `${aquifersNoAvailCount} / ${aquifersOfficialCount} no surplus · ${aquifersStrictDeficit} deficit < 0 (+1 offset 0228)`
+                    : `${aquifersNoAvailCount} / ${aquifersOfficialCount} sin disponibilidad · ${aquifersStrictDeficit} déficit < 0 (+1 comp. 0228)`}
                 </p>
               </div>
               <span className="rounded-full bg-[#64D2FF]/15 px-2 py-0.5 font-mono-num text-[9.5px] font-semibold text-[var(--hig-cyan)] shrink-0">
-                OFICIAL
+                {isEn ? "OFFICIAL" : "OFICIAL"}
               </span>
             </div>
 
             {/* Radar Chart */}
             <div className="hig-content-group rounded-2xl p-3.5">
               <p className="text-[11px] font-semibold text-[var(--hig-ink-2)] mb-1">
-                Huella City Science (6 Dimensiones)
+                {isEn ? "City Science Footprint (6 Dimensions)" : "Huella City Science (6 Dimensiones)"}
               </p>
               <div className="h-44 w-full">
                 <ResponsiveContainer width="100%" height="100%">
@@ -365,22 +388,22 @@ export const PhaseTelemetryPanel: React.FC<Props> = ({
                     onClick={onClearInspection}
                     className="rounded-full bg-[var(--hig-pill-bg)] px-2.5 py-0.5 text-[10.5px] font-medium text-[var(--hig-ink-2)] hover:text-[var(--hig-ink)] cursor-pointer"
                   >
-                    Cerrar
+                    {isEn ? "Close" : "Cerrar"}
                   </button>
                 </div>
 
                 {inspection.building && (
                   <div className="rounded-xl bg-[var(--hig-pill-bg)] p-2.5 text-[11px] space-y-0.5">
                     <p className="font-semibold text-[var(--hig-amber)]">
-                      Edificio 3D · {String(inspection.building.city_name || "")}
+                      {isEn ? "3D Building" : "Edificio 3D"} · {String(inspection.building.city_name || "")}
                     </p>
                     <p className="font-mono-num text-[var(--hig-ink)]">
-                      Altura: {String(inspection.building.height_m)} m ({String(inspection.building.floors)} niveles) · GFA:{" "}
-                      {Number(inspection.building.gfa_m2 || 0).toLocaleString()} m²
+                      {isEn ? "Height" : "Altura"}: {String(inspection.building.height_m)} m ({String(inspection.building.floors)}{" "}
+                      {isEn ? "floors" : "niveles"}) · GFA: {Number(inspection.building.gfa_m2 || 0).toLocaleString()} m²
                     </p>
                     <p className="font-mono-num text-[var(--hig-ink-2)]">
-                      Solar PV Techo: {String(inspection.building.solar_kwp)} kWp · Cota:{" "}
-                      {String(inspection.building.ground_elev_m)} msnm
+                      {isEn ? "Rooftop Solar PV" : "Solar PV Techo"}: {String(inspection.building.solar_kwp)} kWp ·{" "}
+                      {isEn ? "Elev" : "Cota"}: {String(inspection.building.ground_elev_m)} {isEn ? "masl" : "msnm"}
                     </p>
                   </div>
                 )}
@@ -396,33 +419,34 @@ export const PhaseTelemetryPanel: React.FC<Props> = ({
                       <span className="text-[var(--hig-cyan)]">Frac: {String(inspection.ageb.fractality_score)}</span>
                     </div>
                     <p className="text-[10.5px] text-[var(--hig-ink-2)]">
-                      Pob 2025: {Number(inspection.ageb.pobtot_2025_eic_calibrated || 0).toLocaleString()} hab · Infill: +
-                      {Number(inspection.ageb.infill_homes_potential || 0).toLocaleString()} viv · Solar:{" "}
-                      {String(inspection.ageb.solar_mw)} MW
+                      {isEn ? "2025 Pop" : "Pob 2025"}: {Number(inspection.ageb.pobtot_2025_eic_calibrated || 0).toLocaleString()}{" "}
+                      {isEn ? "res" : "hab"} · Infill: +{Number(inspection.ageb.infill_homes_potential || 0).toLocaleString()}{" "}
+                      {isEn ? "homes" : "viv"} · Solar: {String(inspection.ageb.solar_mw)} MW
                     </p>
                   </div>
                 )}
 
                 {inspection.zoning && (
                   <div className="rounded-xl bg-[var(--hig-pill-bg)] p-2.5 text-[11px] text-[var(--hig-ink-2)]">
-                    <span className="font-semibold text-[var(--hig-amber)]">Zonificación:</span>{" "}
-                    {String(inspection.zoning.category)} ({String(inspection.zoning.land_use_code || "N/D")}) · COS{" "}
-                    {String(inspection.zoning.cos_max ?? "N/D")} / CUS {String(inspection.zoning.cus_max ?? "N/D")}
+                    <span className="font-semibold text-[var(--hig-amber)]">{isEn ? "Zoning:" : "Zonificación:"}</span>{" "}
+                    {String(inspection.zoning.category)} ({String(inspection.zoning.land_use_code || (isEn ? "N/A" : "N/D"))}) · COS{" "}
+                    {String(inspection.zoning.cos_max ?? (isEn ? "N/A" : "N/D"))} / CUS{" "}
+                    {String(inspection.zoning.cus_max ?? (isEn ? "N/A" : "N/D"))}
                   </div>
                 )}
 
                 <div className="rounded-xl bg-[var(--hig-pill-bg)] p-2.5 text-[11px] space-y-1">
                   {inspection.aquifer && (
                     <p className="text-[var(--hig-cyan)]">
-                      <strong>Acuífero {String(inspection.aquifer.aquifer_code)}:</strong>{" "}
+                      <strong>{isEn ? "Aquifer" : "Acuífero"} {String(inspection.aquifer.aquifer_code)}:</strong>{" "}
                       {String(inspection.aquifer.aquifer_name)} · DMA{" "}
                       <span className="font-mono-num font-semibold">{String(inspection.aquifer.dma_2023_hm3)} hm³/yr</span>
                     </p>
                   )}
                   {inspection.tandeo_lapaz && (
                     <p className="text-[var(--hig-red)] font-medium">
-                      Alerta Tandeo OOMSAPAS: Sector {String(inspection.tandeo_lapaz.nombre)} (
-                      {String(inspection.tandeo_lapaz.dias)})
+                      {isEn ? "OOMSAPAS Rationing Alert: Sector" : "Alerta Tandeo OOMSAPAS: Sector"}{" "}
+                      {String(inspection.tandeo_lapaz.nombre)} ({String(inspection.tandeo_lapaz.dias)})
                     </p>
                   )}
                   {inspection.poer_uga && (
@@ -433,19 +457,19 @@ export const PhaseTelemetryPanel: React.FC<Props> = ({
                   )}
                   {inspection.protected_area && (
                     <p className="text-[var(--hig-green)] font-medium">
-                      ANP CONANP: {String(inspection.protected_area.area_name)}
+                      {isEn ? "CONANP Protected Area" : "ANP CONANP"}: {String(inspection.protected_area.area_name)}
                     </p>
                   )}
                   {inspection.nearest_services?.health?.[0] && (
                     <p className="text-[var(--hig-ink-2)]">
-                      <strong>Salud cercana:</strong> {inspection.nearest_services.health[0].name} (
+                      <strong>{isEn ? "Nearest Health:" : "Salud cercana:"}</strong> {inspection.nearest_services.health[0].name} (
                       {inspection.nearest_services.health[0].walk_m} m ·{" "}
                       {inspection.nearest_services.health[0].walk_min} min)
                     </p>
                   )}
                   {inspection.nearest_services?.education?.[0] && (
                     <p className="text-[var(--hig-ink-2)]">
-                      <strong>Escuela cercana:</strong> {inspection.nearest_services.education[0].name} (
+                      <strong>{isEn ? "Nearest School:" : "Escuela cercana:"}</strong> {inspection.nearest_services.education[0].name} (
                       {inspection.nearest_services.education[0].walk_m} m)
                     </p>
                   )}
@@ -453,7 +477,9 @@ export const PhaseTelemetryPanel: React.FC<Props> = ({
               </div>
             ) : (
               <div className="rounded-2xl border border-dashed border-[var(--hig-border)] p-3.5 text-center text-[11px] text-[var(--hig-ink-3)] leading-relaxed">
-                Haz clic en cualquier edificio 3D, AGEB o punto del mapa para inspeccionar su expediente completo.
+                {isEn
+                  ? "Click any 3D building, AGEB polygon, or point on the map to inspect its full territorial dossier."
+                  : "Haz clic en cualquier edificio 3D, AGEB o punto del mapa para inspeccionar su expediente completo."}
               </div>
             )}
           </>
@@ -464,14 +490,14 @@ export const PhaseTelemetryPanel: React.FC<Props> = ({
           <>
             <div className="hig-content-group rounded-2xl p-3.5 space-y-3">
               <p className="text-[11px] font-semibold text-[var(--hig-ink-2)]">
-                Metas Normativas Horizontes 2050
+                {isEn ? "2050 Normative Horizon Targets" : "Metas Normativas Horizontes 2050"}
               </p>
               {[
-                { key: "target_city15_score" as const, label: "Meta Ciudad 15-Min", min: 65, max: 98, unit: "pts" },
-                { key: "target_infill_share_pct" as const, label: "Crecimiento vía Infill", min: 20, max: 90, unit: "%" },
-                { key: "target_ptar_reuse_pct" as const, label: "Reúso PTAR Línea Morada", min: 20, max: 90, unit: "%" },
-                { key: "target_rooftop_solar_pct" as const, label: "Adopción Solar en Techos", min: 10, max: 80, unit: "%" },
-                { key: "target_suds_coverage_pct" as const, label: "Arroyos & Drenaje SUDS", min: 20, max: 100, unit: "%" },
+                { key: "target_city15_score" as const, label: isEn ? "15-Min City Target" : "Meta Ciudad 15-Min", min: 65, max: 98, unit: "pts" },
+                { key: "target_infill_share_pct" as const, label: isEn ? "Infill Growth Share" : "Crecimiento vía Infill", min: 20, max: 90, unit: "%" },
+                { key: "target_ptar_reuse_pct" as const, label: isEn ? "WWTP Purple-Line Reuse" : "Reúso PTAR Línea Morada", min: 20, max: 90, unit: "%" },
+                { key: "target_rooftop_solar_pct" as const, label: isEn ? "Rooftop Solar Adoption" : "Adopción Solar en Techos", min: 10, max: 80, unit: "%" },
+                { key: "target_suds_coverage_pct" as const, label: isEn ? "Arroyos & SUDS Drainage" : "Arroyos & Drenaje SUDS", min: 20, max: 100, unit: "%" },
               ].map((s) => (
                 <div key={s.key} className="space-y-1.5">
                   <div className="flex justify-between text-[11.5px]">
@@ -498,16 +524,20 @@ export const PhaseTelemetryPanel: React.FC<Props> = ({
               <>
                 <div className="grid grid-cols-2 gap-2.5">
                   <div className="hig-content-group rounded-2xl p-3">
-                    <p className="text-[10.5px] font-medium text-[var(--hig-ink-2)]">Nuevas Viv. 2050</p>
+                    <p className="text-[10.5px] font-medium text-[var(--hig-ink-2)]">
+                      {isEn ? "New Homes 2050" : "Nuevas Viv. 2050"}
+                    </p>
                     <p className="font-mono-num mt-1 text-[16px] font-semibold text-[var(--hig-ink)]">
                       {goalGap.projected_new_homes_2050.toLocaleString()}
                     </p>
                     <p className="text-[10.5px] text-[var(--hig-green)]">
-                      Cobertura infill: {goalGap.infill_absorption_coverage_pct}%
+                      {isEn ? "Infill coverage:" : "Cobertura infill:"} {goalGap.infill_absorption_coverage_pct}%
                     </p>
                   </div>
                   <div className="hig-content-group rounded-2xl p-3">
-                    <p className="text-[10.5px] font-medium text-[var(--hig-ink-2)]">CAPEX Requerido</p>
+                    <p className="text-[10.5px] font-medium text-[var(--hig-ink-2)]">
+                      {isEn ? "Required CAPEX" : "CAPEX Requerido"}
+                    </p>
                     <p className="font-mono-num mt-1 text-[16px] font-semibold text-[var(--hig-amber)]">
                       ${goalGap.estimated_capex_mdp_mxn.toLocaleString()} MDP
                     </p>
@@ -519,7 +549,7 @@ export const PhaseTelemetryPanel: React.FC<Props> = ({
 
                 <div className="hig-content-group rounded-2xl p-3.5">
                   <p className="text-[11px] font-semibold text-[var(--hig-ink-2)] mb-1.5">
-                    Brecha Línea Base vs Meta 2050
+                    {isEn ? "Baseline vs 2050 Target Gap" : "Brecha Línea Base vs Meta 2050"}
                   </p>
                   <div className="h-44 w-full">
                     <ResponsiveContainer width="100%" height="100%">
@@ -528,8 +558,8 @@ export const PhaseTelemetryPanel: React.FC<Props> = ({
                         <XAxis type="number" domain={[0, 100]} tick={{ fill: "var(--hig-ink-3)", fontSize: 9 }} />
                         <YAxis dataKey="label" type="category" width={115} tick={{ fill: "var(--hig-ink-2)", fontSize: 9 }} />
                         <Tooltip contentStyle={CHART_TOOLTIP_STYLE} />
-                        <Bar dataKey="current" name="Actual" fill="var(--hig-ink-3)" radius={[0, 4, 4, 0]} />
-                        <Bar dataKey="target" name="Meta 2050" fill="var(--hig-green)" radius={[0, 4, 4, 0]} />
+                        <Bar dataKey="current" name={isEn ? "Current" : "Actual"} fill="var(--hig-ink-3)" radius={[0, 4, 4, 0]} />
+                        <Bar dataKey="target" name={isEn ? "2050 Target" : "Meta 2050"} fill="var(--hig-green)" radius={[0, 4, 4, 0]} />
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
@@ -540,7 +570,7 @@ export const PhaseTelemetryPanel: React.FC<Props> = ({
                   onClick={() => onApplyOptimalLevers(goalGap.optimal_levers)}
                   className="hig-lift flex w-full items-center justify-center gap-2 rounded-full bg-[var(--hig-accent)] hover:bg-[var(--hig-accent-hover)] px-4 py-2.5 text-[12px] font-semibold text-white shadow-md shadow-[var(--hig-accent)]/25 transition-colors cursor-pointer"
                 >
-                  <span>Cargar Palancas Óptimas en Simulador</span>
+                  <span>{isEn ? "Load Optimal Levers in Simulator" : "Cargar Palancas Óptimas en Simulador"}</span>
                   <ArrowRight className="h-3.5 w-3.5" />
                 </button>
               </>
@@ -565,8 +595,12 @@ export const PhaseTelemetryPanel: React.FC<Props> = ({
                         : "hig-content-group text-[var(--hig-ink-2)] hover:bg-[var(--hig-pill-bg)]"
                     }`}
                   >
-                    <span className={`text-[10px] font-semibold uppercase tracking-wide ${sc.badgeCls}`}>{sc.badge}</span>
-                    <p className="text-[11.5px] font-semibold leading-tight mt-0.5 text-[var(--hig-ink)]">{sc.label}</p>
+                    <span className={`text-[10px] font-semibold uppercase tracking-wide ${sc.badgeCls}`}>
+                      {isEn ? sc.badgeEn : sc.badgeEs}
+                    </span>
+                    <p className="text-[11.5px] font-semibold leading-tight mt-0.5 text-[var(--hig-ink)]">
+                      {isEn ? sc.labelEn : sc.labelEs}
+                    </p>
                   </button>
                 );
               })}
@@ -575,7 +609,9 @@ export const PhaseTelemetryPanel: React.FC<Props> = ({
             {/* Horizon Time Segmented Pill */}
             <div className="hig-content-group rounded-2xl p-3 space-y-2">
               <div className="flex items-center justify-between text-[11.5px]">
-                <span className="font-medium text-[var(--hig-ink-2)]">Horizonte Temporal 3D</span>
+                <span className="font-medium text-[var(--hig-ink-2)]">
+                  {isEn ? "3D Time Horizon" : "Horizonte Temporal 3D"}
+                </span>
                 <span className="font-mono-num text-[14px] font-semibold text-[var(--hig-accent)]">{targetYear}</span>
               </div>
               <div className="ios-segmented grid grid-cols-6 gap-0.5">
@@ -601,7 +637,7 @@ export const PhaseTelemetryPanel: React.FC<Props> = ({
                     {simulation.scenario_meta.title}
                   </span>
                   <span className="rounded-full bg-[#FF9F0A]/15 px-2 py-0.5 font-mono-num text-[9px] font-semibold text-[var(--hig-amber)] shrink-0">
-                    MODELADO
+                    {isEn ? "MODELED" : "MODELADO"}
                   </span>
                 </div>
 
@@ -610,7 +646,7 @@ export const PhaseTelemetryPanel: React.FC<Props> = ({
                     <AlertTriangle className="h-4 w-4 text-[var(--hig-red)] shrink-0 mt-0.5" />
                     <div>
                       <p className="font-semibold text-[var(--hig-red)]">
-                        Ruptura Capacidad de Carga: {simulation.carrying_capacity_breach_year}
+                        {isEn ? "Carrying Capacity Breach:" : "Ruptura Capacidad de Carga:"} {simulation.carrying_capacity_breach_year}
                       </p>
                       <p className="text-[10.5px] text-[var(--hig-ink-2)] mt-0.5">{simulation.breach_warnings[0]}</p>
                     </div>
@@ -625,7 +661,9 @@ export const PhaseTelemetryPanel: React.FC<Props> = ({
                     </p>
                   </div>
                   <div className="hig-content-group rounded-2xl p-3">
-                    <p className="text-[10.5px] text-[var(--hig-ink-2)]">Balance Acuífero</p>
+                    <p className="text-[10.5px] text-[var(--hig-ink-2)]">
+                      {isEn ? "Aquifer Balance" : "Balance Acuífero"}
+                    </p>
                     <p
                       className={`font-mono-num mt-0.5 text-[20px] font-semibold ${
                         simulation.active_year_snapshot.aquifer_effective_balance_hm3_yr >= 0
@@ -637,13 +675,17 @@ export const PhaseTelemetryPanel: React.FC<Props> = ({
                     </p>
                   </div>
                   <div className="hig-content-group rounded-2xl p-3">
-                    <p className="text-[10.5px] text-[var(--hig-ink-2)]">Margen SIBCS</p>
+                    <p className="text-[10.5px] text-[var(--hig-ink-2)]">
+                      {isEn ? "SIBCS Margin" : "Margen SIBCS"}
+                    </p>
                     <p className="font-mono-num mt-0.5 text-[14px] font-semibold text-[var(--hig-cyan)]">
                       {simulation.active_year_snapshot.sibcs_headroom_mw} MW ({simulation.active_year_snapshot.sibcs_reserve_margin_pct}%)
                     </p>
                   </div>
                   <div className="hig-content-group rounded-2xl p-3">
-                    <p className="text-[10.5px] text-[var(--hig-ink-2)]">Solar Desplegada</p>
+                    <p className="text-[10.5px] text-[var(--hig-ink-2)]">
+                      {isEn ? "Deployed Solar" : "Solar Desplegada"}
+                    </p>
                     <p className="font-mono-num mt-0.5 text-[14px] font-semibold text-[var(--hig-amber)]">
                       {simulation.active_year_snapshot.deployed_rooftop_solar_mw.toLocaleString()} MW
                     </p>
@@ -653,14 +695,14 @@ export const PhaseTelemetryPanel: React.FC<Props> = ({
                 {/* Policy Levers */}
                 <div className="hig-content-group rounded-2xl p-3.5 space-y-2.5">
                   <p className="text-[11px] font-semibold text-[var(--hig-ink-2)]">
-                    Palancas Contrafactuales
+                    {isEn ? "Counterfactual Levers" : "Palancas Contrafactuales"}
                   </p>
                   {[
-                    { k: "infill_share_pct", l: "Infill Intraurbano (%)", min: 10, max: 90, step: 2 },
-                    { k: "ptar_reuse_target_pct", l: "Reúso Línea Morada (%)", min: 10, max: 90, step: 2 },
-                    { k: "desalination_added_lps", l: "Desalación SWRO (lps)", min: 0, max: 600, step: 25 },
-                    { k: "distributed_solar_share_pct", l: "Solar Distribuida (%)", min: 5, max: 75, step: 2 },
-                    { k: "suds_coverage_pct", l: "Cobertura SUDS (%)", min: 10, max: 95, step: 5 },
+                    { k: "infill_share_pct", l: isEn ? "Urban Infill Share (%)" : "Infill Intraurbano (%)", min: 10, max: 90, step: 2 },
+                    { k: "ptar_reuse_target_pct", l: isEn ? "Purple-Line Reuse (%)" : "Reúso Línea Morada (%)", min: 10, max: 90, step: 2 },
+                    { k: "desalination_added_lps", l: isEn ? "SWRO Desalination (lps)" : "Desalación SWRO (lps)", min: 0, max: 600, step: 25 },
+                    { k: "distributed_solar_share_pct", l: isEn ? "Distributed Solar (%)" : "Solar Distribuida (%)", min: 5, max: 75, step: 2 },
+                    { k: "suds_coverage_pct", l: isEn ? "SUDS Coverage (%)" : "Cobertura SUDS (%)", min: 10, max: 95, step: 5 },
                   ].map((lv) => (
                     <div key={lv.k} className="space-y-1.5">
                       <div className="flex justify-between text-[11px]">
@@ -687,7 +729,7 @@ export const PhaseTelemetryPanel: React.FC<Props> = ({
                 <div className="hig-content-group rounded-2xl p-3.5 space-y-2.5">
                   <div className="flex items-center justify-between gap-2">
                     <p className="text-[11px] font-semibold text-[var(--hig-ink-2)]">
-                      Trayectoria 2025–2050 (P10–P90)
+                      {isEn ? "2025–2050 Trajectory (P10–P90)" : "Trayectoria 2025–2050 (P10–P90)"}
                     </p>
                     <span className="rounded-full bg-[#30D158]/15 px-2 py-0.5 font-mono-num text-[9px] font-semibold text-[var(--hig-green)]">
                       ISO 23247-8
@@ -711,13 +753,13 @@ export const PhaseTelemetryPanel: React.FC<Props> = ({
                         <Area
                           type="monotone"
                           dataKey="sdi_band"
-                          name="Banda SDI P10–P90"
+                          name={isEn ? "SDI Band P10–P90" : "Banda SDI P10–P90"}
                           stroke="none"
                           fill="var(--hig-green)"
                           fillOpacity={0.2}
                         />
                         <Line type="monotone" dataKey="sdi_score_100" name="SDI-100 (P50)" stroke="var(--hig-green)" strokeWidth={2.2} />
-                        <Line type="monotone" dataKey="sibcs_reserve_margin_pct" name="Margen SIBCS %" stroke="var(--hig-accent)" strokeWidth={1.8} />
+                        <Line type="monotone" dataKey="sibcs_reserve_margin_pct" name={isEn ? "SIBCS Margin %" : "Margen SIBCS %"} stroke="var(--hig-accent)" strokeWidth={1.8} />
                       </ComposedChart>
                     </ResponsiveContainer>
                   </div>
@@ -725,9 +767,9 @@ export const PhaseTelemetryPanel: React.FC<Props> = ({
                   {simulation.vvuq && (
                     <div className="rounded-xl bg-[var(--hig-pill-bg)] p-2.5 space-y-1 text-[10px]">
                       <div className="flex items-center justify-between text-[var(--hig-cyan)] font-semibold">
-                        <span>Validación &amp; VVUQ</span>
+                        <span>{isEn ? "Validation & VVUQ" : "Validación & VVUQ"}</span>
                         <span className="font-mono-num text-[9.5px] text-[var(--hig-green)]">
-                          MAPE Pob 2010–20:{" "}
+                          {isEn ? "Pop 2010–20 MAPE:" : "MAPE Pob 2010–20:"}{" "}
                           {String(simulation.vvuq.validation_error_rmse_or_mape.demographic_2010_2020_mape_pct ?? "8.39")}%
                         </span>
                       </div>
@@ -752,7 +794,7 @@ export const PhaseTelemetryPanel: React.FC<Props> = ({
                   <div className="hig-content-group rounded-2xl p-3.5 space-y-2.5">
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-[11px] font-semibold text-[var(--hig-cyan)]">
-                        Motores Físicos OGC · Cloud Run Jobs
+                        {isEn ? "OGC Physics Engines · Cloud Run Jobs" : "Motores Físicos OGC · Cloud Run Jobs"}
                       </span>
                       {physicsOverlay && onClearPhysicsOverlay && (
                         <button
@@ -761,7 +803,7 @@ export const PhaseTelemetryPanel: React.FC<Props> = ({
                           className="flex items-center gap-1 rounded-full bg-[var(--hig-pill-bg)] px-2 py-0.5 text-[10px] text-[var(--hig-ink-2)] hover:text-[var(--hig-red)] cursor-pointer"
                         >
                           <Trash2 className="h-3 w-3" />
-                          <span>Limpiar</span>
+                          <span>{isEn ? "Clear" : "Limpiar"}</span>
                         </button>
                       )}
                     </div>
@@ -777,7 +819,7 @@ export const PhaseTelemetryPanel: React.FC<Props> = ({
                           <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#FF453A]/18 text-[var(--hig-red)]">
                             <Waves className="h-3.5 w-3.5" />
                           </span>
-                          <span>Inundación 2D Arroyos (SFINCS)</span>
+                          <span>{isEn ? "2D Arroyo Flood (SFINCS)" : "Inundación 2D Arroyos (SFINCS)"}</span>
                         </span>
                         <span className="font-mono-num text-[9.5px] text-[var(--hig-ink-3)]">COG + Vector</span>
                       </button>
@@ -791,7 +833,7 @@ export const PhaseTelemetryPanel: React.FC<Props> = ({
                           <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#0A84FF]/18 text-[var(--hig-accent)]">
                             <Route className="h-3.5 w-3.5" />
                           </span>
-                          <span>Isócronas Red Vial 15-Min (r5py)</span>
+                          <span>{isEn ? "15-Min Road Isochrones (r5py)" : "Isócronas Red Vial 15-Min (r5py)"}</span>
                         </span>
                         <span className="font-mono-num text-[9.5px] text-[var(--hig-ink-3)]">Dijkstra</span>
                       </button>
@@ -805,7 +847,7 @@ export const PhaseTelemetryPanel: React.FC<Props> = ({
                           <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#64D2FF]/18 text-[var(--hig-cyan)]">
                             <Droplets className="h-3.5 w-3.5" />
                           </span>
-                          <span>Hidráulica Tandeo / Morada (WNTR)</span>
+                          <span>{isEn ? "Water Supply & Purple-Line (WNTR)" : "Hidráulica Tandeo / Morada (WNTR)"}</span>
                         </span>
                         <span className="font-mono-num text-[9.5px] text-[var(--hig-ink-3)]">PDD 24h</span>
                       </button>
@@ -833,29 +875,29 @@ export const PhaseTelemetryPanel: React.FC<Props> = ({
                           <div className="space-y-1 pt-0.5 text-[var(--hig-ink-2)] font-mono-num text-[10px]">
                             {physicsOverlay.processId === "arroyo_flood_sfincs" && (
                               <p>
-                                Edif. expuestos (&gt;0.3m):{" "}
+                                {isEn ? "Exposed bldgs (>0.3m):" : "Edif. expuestos (>0.3m):"}{" "}
                                 <strong className="text-[var(--hig-red)]">
                                   {Number(physicsOverlay.result.summary.buildings_exposed_gt_03m || 0).toLocaleString()}
                                 </strong>{" "}
-                                · Máx: {String(physicsOverlay.result.summary.max_depth_m)} m
+                                · {isEn ? "Max" : "Máx"}: {String(physicsOverlay.result.summary.max_depth_m)} m
                               </p>
                             )}
                             {physicsOverlay.processId === "network_isochrone_r5py" && (
                               <p>
-                                Área 15m:{" "}
+                                {isEn ? "15m area:" : "Área 15m:"}{" "}
                                 <strong className="text-[var(--hig-accent)]">{String(physicsOverlay.result.summary.area_15m_ha)} ha</strong>{" "}
-                                · Score red: {String(physicsOverlay.result.summary.network_15m_score)} pts (Δ{" "}
+                                · {isEn ? "Network score:" : "Score red:"} {String(physicsOverlay.result.summary.network_15m_score)} pts (Δ{" "}
                                 {String(physicsOverlay.result.summary.score_delta_network_vs_euclid)})
                               </p>
                             )}
                             {physicsOverlay.processId === "water_network_wntr" && (
                               <p>
-                                Presión:{" "}
+                                {isEn ? "Pressure:" : "Presión:"}{" "}
                                 <strong className="text-[var(--hig-cyan)]">
                                   {String(physicsOverlay.result.summary.baseline_mean_pressure_m)} →{" "}
                                   {String(physicsOverlay.result.summary.scenario_mean_pressure_m)} m
                                 </strong>{" "}
-                                · Sectores ≥15m: {String(physicsOverlay.result.summary.nodes_restored_above_15m)}
+                                · {isEn ? "Sectors ≥15m:" : "Sectores ≥15m:"} {String(physicsOverlay.result.summary.nodes_restored_above_15m)}
                               </p>
                             )}
                             {physicsOverlay.result.artifact_urls?.flood_depth_cog && (
@@ -885,7 +927,9 @@ export const PhaseTelemetryPanel: React.FC<Props> = ({
           <>
             <div className="hig-content-group flex items-center justify-between rounded-2xl px-3.5 py-3">
               <div>
-                <p className="text-[10.5px] text-[var(--hig-ink-2)]">Índice SDI-100 Ontología v3</p>
+                <p className="text-[10.5px] text-[var(--hig-ink-2)]">
+                  {isEn ? "Ontology v3 SDI-100 Index" : "Índice SDI-100 Ontología v3"}
+                </p>
                 <p className="font-mono-num text-[22px] font-semibold tracking-tight text-[var(--hig-green)]">
                   {recommendations.sdi_100.sdi_score_100}
                   <span className="text-[11px] font-normal text-[var(--hig-ink-3)]"> / 100</span>
@@ -904,7 +948,7 @@ export const PhaseTelemetryPanel: React.FC<Props> = ({
             {/* Priority Spatial Action Cards */}
             <div className="space-y-2">
               <p className="px-1 text-[11px] font-semibold text-[var(--hig-ink-2)]">
-                Intervenciones Prioritarias
+                {isEn ? "Priority Interventions" : "Intervenciones Prioritarias"}
               </p>
               {recommendations.priority_actions.map((act) => (
                 <div
@@ -925,7 +969,7 @@ export const PhaseTelemetryPanel: React.FC<Props> = ({
                     className="flex items-center gap-1.5 rounded-full bg-[#30D158]/15 px-3 py-1 text-[11px] font-semibold text-[var(--hig-green)] hover:bg-[#30D158]/25 transition-colors cursor-pointer"
                   >
                     <Navigation className="h-3 w-3" />
-                    <span>Volar al Polígono en 3D</span>
+                    <span>{isEn ? "Fly to 3D Polygon" : "Volar al Polígono en 3D"}</span>
                   </button>
                 </div>
               ))}
@@ -934,7 +978,7 @@ export const PhaseTelemetryPanel: React.FC<Props> = ({
             {/* 6 Ontology Decision Lenses */}
             <div className="space-y-2">
               <p className="px-1 text-[11px] font-semibold text-[var(--hig-ink-2)]">
-                6 Lentes Estratégicas (bcs2050_kg_v3)
+                {isEn ? "6 Strategic Lenses (bcs2050_kg_v3)" : "6 Lentes Estratégicas (bcs2050_kg_v3)"}
               </p>
               <div className="hig-content-group rounded-2xl divide-y divide-[var(--hig-divider)] overflow-hidden">
                 {recommendations.decision_lenses.map((lens) => (
@@ -960,7 +1004,7 @@ export const PhaseTelemetryPanel: React.FC<Props> = ({
               <div className="rounded-2xl bg-[#FF453A]/12 p-3 ring-1 ring-[#FF453A]/30 space-y-1.5">
                 <p className="flex items-center gap-1.5 text-[11px] font-semibold text-[var(--hig-red)]">
                   <ShieldAlert className="h-3.5 w-3.5" />
-                  Contradicciones Territoriales Detectadas
+                  {isEn ? "Territorial Contradictions Detected" : "Contradicciones Territoriales Detectadas"}
                 </p>
                 {recommendations.contradictions.slice(0, 3).map((c, idx) => (
                   <p key={idx} className="text-[10.5px] text-[var(--hig-ink-2)] leading-snug">

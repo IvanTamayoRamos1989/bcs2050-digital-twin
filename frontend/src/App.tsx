@@ -81,8 +81,8 @@ export const App: React.FC = () => {
   const [archMounted, setArchMounted] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const [chatMounted, setChatMounted] = useState(false);
-  const [language, setLanguage] = useState<"es" | "en">("es");
-  const [theme, setTheme] = useState<"dark" | "light">("dark");
+  const [language, setLanguage] = useState<"es" | "en">("en");
+  const [theme, setTheme] = useState<"dark" | "light">("light");
   const [reduceTransparency, setReduceTransparency] = useState<boolean>(false);
   const [largeText, setLargeText] = useState<boolean>(false);
   const [statusToast, setStatusToast] = useState<string | null>(null);
@@ -237,7 +237,16 @@ export const App: React.FC = () => {
           }
         }
         setPhysicsJobStatus((prev) =>
-          prev ? { ...prev, status: "failed", error: "Tiempo de espera agotado consultando Cloud Run Job." } : prev,
+          prev
+            ? {
+                ...prev,
+                status: "failed",
+                error:
+                  language === "en"
+                    ? "Timed out polling Cloud Run Job."
+                    : "Tiempo de espera agotado consultando Cloud Run Job.",
+              }
+            : prev,
         );
       } catch (err) {
         if (physicsRunTokenRef.current !== token) return;
@@ -474,10 +483,17 @@ export const App: React.FC = () => {
       {/* Edge-to-Edge Full-Bleed Dual-Engine 3D Spatial Canvas */}
       <main id="main-content" tabIndex={-1} className="absolute inset-0 h-full w-full">
         {engineMode === "deck3d" ? (
-          <WebGLErrorBoundary fallbackTitle="Visor 3D Analítico (MapLibre + deck.gl)">
+          <WebGLErrorBoundary
+            fallbackTitle={
+              language === "en"
+                ? "Analytical 3D Viewer (MapLibre + deck.gl)"
+                : "Visor 3D Analítico (MapLibre + deck.gl)"
+            }
+          >
             <AnalyticsMap3D
               cameraTarget={cameraTarget}
               basemapMode={basemapMode}
+              theme={theme}
               maptilerKey={clientConfig.maptiler_key}
               activeMetric={activeMetric}
               colorblindSafe={colorblindSafe}
@@ -514,7 +530,7 @@ export const App: React.FC = () => {
             />
           </WebGLErrorBoundary>
         ) : (
-          <WebGLErrorBoundary fallbackTitle="Globo 3D CesiumJS">
+          <WebGLErrorBoundary fallbackTitle={language === "en" ? "CesiumJS 3D Globe" : "Globo 3D CesiumJS"}>
             <Suspense
               fallback={
                 <div className="flex h-full w-full items-center justify-center bg-[var(--hig-bg)] text-xs font-semibold text-[var(--hig-accent)]">
@@ -561,7 +577,10 @@ export const App: React.FC = () => {
         onBasemapModeChange={(b) => {
           setBasemapMode(b);
           const labels: Record<BasemapMode, string> = {
-            obsidian: language === "en" ? "Obsidian Map" : "Mapa base: Obsidian",
+            obsidian:
+              language === "en"
+                ? theme === "light" ? "Light Map" : "Dark Map"
+                : theme === "light" ? "Mapa base: Claro" : "Mapa base: Oscuro",
             satellite: language === "en" ? "HD Satellite" : "Mapa base: Satélite HD",
             terrain: language === "en" ? "3D Relief" : "Mapa base: Relieve 3D",
           };
@@ -724,6 +743,7 @@ export const App: React.FC = () => {
           <ArchitectureModal
             open={archOpen}
             onClose={() => setArchOpen(false)}
+            language={language}
             currentBbox={viewportBbox}
             currentZoom={viewportZoom}
             corridors={corridors}

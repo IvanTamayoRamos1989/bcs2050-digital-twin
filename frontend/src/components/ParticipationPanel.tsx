@@ -130,7 +130,13 @@ export const ParticipationPanel: React.FC<Props> = ({
     try {
       await TwinAPI.moderateParticipationPin(
         pinId,
-        { action, moderator_note: action === "approve" ? "Aprobado en mesa PMDU" : "Rechazado en moderación" },
+        {
+          action,
+          moderator_note:
+            action === "approve"
+              ? isEn ? "Approved at PMDU review desk" : "Aprobado en mesa PMDU"
+              : isEn ? "Rejected during moderation" : "Rechazado en moderación",
+        },
         plannerToken.trim() || undefined,
       );
       setQueuePins((prev) => prev.filter((p) => p.pin_id !== pinId));
@@ -150,7 +156,7 @@ export const ParticipationPanel: React.FC<Props> = ({
       role="dialog"
       aria-modal="true"
       aria-labelledby="participation-dialog-title"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-md p-3 sm:p-5"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/25 backdrop-blur-md p-3 sm:p-5"
     >
       <div className="hig-glass-sidebar flex max-h-[90vh] w-full max-w-2xl flex-col rounded-[28px] overflow-hidden">
         {/* Header */}

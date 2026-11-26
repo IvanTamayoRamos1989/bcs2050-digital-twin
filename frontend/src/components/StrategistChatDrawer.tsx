@@ -44,7 +44,7 @@ export const StrategistChatDrawer: React.FC<Props> = ({
   onClose,
   scopeId,
   scenarioName,
-  language = "es",
+  language = "en",
   onFlyTo,
 }) => {
   const isEn = language === "en";

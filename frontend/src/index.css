@@ -1,6 +1,35 @@
 @import "tailwindcss";
 
 :root {
+  color-scheme: light;
+  --hig-bg: #f5f5f7;
+  --hig-ink: #1d1d1f;
+  --hig-ink-2: rgba(29, 29, 31, 0.72);
+  --hig-ink-3: rgba(29, 29, 31, 0.48);
+  --hig-divider: rgba(60, 60, 67, 0.12);
+  --hig-border: rgba(60, 60, 67, 0.16);
+  --hig-specular: rgba(255, 255, 255, 0.96);
+  --hig-toolbar-bg: rgba(255, 255, 255, 0.82);
+  --hig-sidebar-bg: rgba(255, 255, 255, 0.90);
+  --hig-group-bg: rgba(245, 245, 247, 0.90);
+  --hig-pill-bg: rgba(118, 118, 128, 0.10);
+  --hig-pill-hover: rgba(118, 118, 128, 0.18);
+  --hig-seg-bg: rgba(118, 118, 128, 0.12);
+  --hig-seg-active: #ffffff;
+  --hig-accent: #007aff;
+  --hig-accent-hover: #0066d6;
+  --hig-green: #1d7a36;
+  --hig-amber: #b25000;
+  --hig-red: #c42b1c;
+  --hig-cyan: #0066cc;
+  --hig-select-bg: #ffffff;
+  --hig-shadow: 0 12px 36px rgba(0, 0, 0, 0.10), 0 1px 3px rgba(0, 0, 0, 0.06);
+  --hig-ctrl-bg: rgba(255, 255, 255, 0.88);
+  --hig-track-bg: rgba(60, 60, 67, 0.18);
+  --hig-tooltip-bg: rgba(255, 255, 255, 0.97);
+}
+
+html[data-theme="dark"] {
   color-scheme: dark;
   --hig-bg: #0a0a0d;
   --hig-ink: #f5f5f7;
@@ -27,35 +56,6 @@
   --hig-ctrl-bg: rgba(22, 22, 26, 0.76);
   --hig-track-bg: rgba(255, 255, 255, 0.18);
   --hig-tooltip-bg: rgba(24, 24, 28, 0.95);
-}
-
-html[data-theme="light"] {
-  color-scheme: light;
-  --hig-bg: #f2f2f7;
-  --hig-ink: #1c1c1e;
-  --hig-ink-2: rgba(28, 28, 30, 0.74);
-  --hig-ink-3: rgba(28, 28, 30, 0.50);
-  --hig-divider: rgba(60, 60, 67, 0.14);
-  --hig-border: rgba(60, 60, 67, 0.18);
-  --hig-specular: rgba(255, 255, 255, 0.85);
-  --hig-toolbar-bg: rgba(248, 248, 252, 0.78);
-  --hig-sidebar-bg: rgba(246, 246, 250, 0.88);
-  --hig-group-bg: rgba(255, 255, 255, 0.82);
-  --hig-pill-bg: rgba(118, 118, 128, 0.12);
-  --hig-pill-hover: rgba(118, 118, 128, 0.20);
-  --hig-seg-bg: rgba(118, 118, 128, 0.14);
-  --hig-seg-active: #ffffff;
-  --hig-accent: #007aff;
-  --hig-accent-hover: #0066d6;
-  --hig-green: #1d7a36;
-  --hig-amber: #b25000;
-  --hig-red: #c42b1c;
-  --hig-cyan: #0066cc;
-  --hig-select-bg: #ffffff;
-  --hig-shadow: 0 20px 50px rgba(0, 0, 0, 0.18);
-  --hig-ctrl-bg: rgba(248, 248, 252, 0.84);
-  --hig-track-bg: rgba(60, 60, 67, 0.20);
-  --hig-tooltip-bg: rgba(255, 255, 255, 0.96);
 }
 
 html.hig-text-large {
@@ -118,7 +118,9 @@ body {
 .ios-segment-active {
   background: var(--hig-seg-active);
   color: var(--hig-ink);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.22);
+  box-shadow:
+    0 2px 6px rgba(0, 0, 0, 0.10),
+    0 0 0 0.5px rgba(0, 0, 0, 0.05);
 }
 
 .ios-pill {
@@ -151,9 +153,9 @@ body {
 .ios-ai-pill {
   background: linear-gradient(
     135deg,
-    rgba(10, 132, 255, 0.24) 0%,
-    rgba(191, 90, 242, 0.20) 52%,
-    rgba(48, 209, 88, 0.20) 100%
+    rgba(0, 122, 255, 0.14) 0%,
+    rgba(175, 82, 222, 0.12) 52%,
+    rgba(52, 199, 89, 0.12) 100%
   );
   border: 1px solid var(--hig-border);
   border-radius: 9999px;
@@ -162,7 +164,7 @@ body {
 }
 
 .ios-ai-pill:hover {
-  filter: brightness(1.1);
+  filter: brightness(0.97);
 }
 
 .ios-input {
@@ -258,7 +260,7 @@ body {
   border-radius: 16px !important;
   box-shadow:
     inset 0 1px 0 var(--hig-specular),
-    0 12px 32px rgba(0, 0, 0, 0.32) !important;
+    var(--hig-shadow) !important;
   overflow: hidden;
 }
 
@@ -273,11 +275,11 @@ body {
 }
 
 .maplibregl-ctrl-group button .maplibregl-ctrl-icon {
-  filter: invert(0.92) brightness(1.1);
+  filter: none;
 }
 
-html[data-theme="light"] .maplibregl-ctrl-group button .maplibregl-ctrl-icon {
-  filter: none;
+html[data-theme="dark"] .maplibregl-ctrl-group button .maplibregl-ctrl-icon {
+  filter: invert(0.92) brightness(1.1);
 }
 
 .maplibregl-ctrl-attrib {
@@ -335,28 +337,28 @@ html.hig-reduce-transparency .maplibregl-ctrl-group,
 html.hig-reduce-transparency .maplibregl-ctrl-attrib {
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
-  background: #1c1c1e !important;
-  border-color: rgba(255, 255, 255, 0.22) !important;
+  background: #ffffff !important;
+  border-color: rgba(29, 29, 31, 0.22) !important;
 }
 
 html.hig-reduce-transparency .hig-content-group,
 html.hig-reduce-transparency .ios-surface {
+  background: #f5f5f7 !important;
+}
+
+html[data-theme="dark"].hig-reduce-transparency .hig-glass-toolbar,
+html[data-theme="dark"].hig-reduce-transparency .hig-glass-sidebar,
+html[data-theme="dark"].hig-reduce-transparency .glass-panel,
+html[data-theme="dark"].hig-reduce-transparency .ios-glass,
+html[data-theme="dark"].hig-reduce-transparency .maplibregl-ctrl-group,
+html[data-theme="dark"].hig-reduce-transparency .maplibregl-ctrl-attrib {
+  background: #1c1c1e !important;
+  border-color: rgba(255, 255, 255, 0.22) !important;
+}
+
+html[data-theme="dark"].hig-reduce-transparency .hig-content-group,
+html[data-theme="dark"].hig-reduce-transparency .ios-surface {
   background: #2c2c2e !important;
-}
-
-html[data-theme="light"].hig-reduce-transparency .hig-glass-toolbar,
-html[data-theme="light"].hig-reduce-transparency .hig-glass-sidebar,
-html[data-theme="light"].hig-reduce-transparency .glass-panel,
-html[data-theme="light"].hig-reduce-transparency .ios-glass,
-html[data-theme="light"].hig-reduce-transparency .maplibregl-ctrl-group,
-html[data-theme="light"].hig-reduce-transparency .maplibregl-ctrl-attrib {
-  background: #f2f2f7 !important;
-  border-color: rgba(28, 28, 30, 0.28) !important;
-}
-
-html[data-theme="light"].hig-reduce-transparency .hig-content-group,
-html[data-theme="light"].hig-reduce-transparency .ios-surface {
-  background: #ffffff !important;
 }
 
 @media (prefers-reduced-transparency: reduce) {
@@ -366,10 +368,20 @@ html[data-theme="light"].hig-reduce-transparency .ios-surface {
   .ios-glass {
     backdrop-filter: none !important;
     -webkit-backdrop-filter: none !important;
-    background: #1c1c1e !important;
+    background: #ffffff !important;
   }
   .hig-content-group,
   .ios-surface {
+    background: #f5f5f7 !important;
+  }
+  html[data-theme="dark"] .hig-glass-toolbar,
+  html[data-theme="dark"] .hig-glass-sidebar,
+  html[data-theme="dark"] .glass-panel,
+  html[data-theme="dark"] .ios-glass {
+    background: #1c1c1e !important;
+  }
+  html[data-theme="dark"] .hig-content-group,
+  html[data-theme="dark"] .ios-surface {
     background: #2c2c2e !important;
   }
 }
@@ -384,12 +396,12 @@ html[data-theme="light"].hig-reduce-transparency .ios-surface {
     border-color: var(--hig-ink) !important;
   }
   :root {
+    --hig-ink-2: #1d1d1f;
+    --hig-ink-3: rgba(29, 29, 31, 0.85);
+  }
+  html[data-theme="dark"] {
     --hig-ink-2: #f5f5f7;
     --hig-ink-3: rgba(245, 245, 247, 0.85);
-  }
-  html[data-theme="light"] {
-    --hig-ink-2: #1c1c1e;
-    --hig-ink-3: rgba(28, 28, 30, 0.85);
   }
 }
 

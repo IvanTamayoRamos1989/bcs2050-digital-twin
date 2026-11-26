@@ -33,6 +33,7 @@ import {
 interface Props {
   cameraTarget: CameraPreset | null;
   basemapMode: BasemapMode;
+  theme?: "dark" | "light";
   maptilerKey?: string;
   activeMetric: AgebMetricKey;
   colorblindSafe?: boolean;
@@ -62,13 +63,47 @@ interface Props {
   onQuickJumpCity: (citySlug: string) => void;
 }
 
-function buildMapStyle(mode: BasemapMode, maptilerKeyOverride?: string): maplibregl.StyleSpecification {
+function buildMapStyle(
+  mode: BasemapMode,
+  maptilerKeyOverride?: string,
+  theme: "dark" | "light" = "light",
+): maplibregl.StyleSpecification {
   const maptilerKey = (maptilerKeyOverride ?? import.meta.env.VITE_MAPTILER_KEY ?? "").trim();
   const sources: Record<string, maplibregl.SourceSpecification> = {};
   const layers: maplibregl.LayerSpecification[] = [];
 
   if (mode === "obsidian") {
-    if (maptilerKey) {
+    if (theme === "light") {
+      if (maptilerKey) {
+        sources.base = {
+          type: "raster",
+          tiles: [`https://api.maptiler.com/maps/dataviz-light/256/{z}/{x}/{y}@2x.png?key=${maptilerKey}`],
+          tileSize: 256,
+          maxzoom: 19,
+        };
+        layers.push({ id: "base-layer", type: "raster", source: "base" });
+      } else {
+        sources.esriLightBase = {
+          type: "raster",
+          tiles: ["https://services.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}"],
+          tileSize: 256,
+          maxzoom: 16,
+        };
+        sources.esriLightRef = {
+          type: "raster",
+          tiles: ["https://services.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}"],
+          tileSize: 256,
+          maxzoom: 16,
+        };
+        layers.push({ id: "light-base-layer", type: "raster", source: "esriLightBase" });
+        layers.push({
+          id: "light-ref-layer",
+          type: "raster",
+          source: "esriLightRef",
+          paint: { "raster-opacity": 0.78 },
+        });
+      }
+    } else if (maptilerKey) {
       sources.base = {
         type: "raster",
         tiles: [`https://api.maptiler.com/maps/dataviz-dark/256/{z}/{x}/{y}@2x.png?key=${maptilerKey}`],
@@ -158,10 +193,11 @@ function buildMapStyle(mode: BasemapMode, maptilerKeyOverride?: string): maplibr
 export const AnalyticsMap3D: React.FC<Props> = ({
   cameraTarget,
   basemapMode,
+  theme = "light",
   maptilerKey = "",
   activeMetric,
   colorblindSafe = true,
-  language = "es",
+  language = "en",
   layers,
   extrusionScale,
   agebs3dMode,
@@ -336,7 +372,7 @@ export const AnalyticsMap3D: React.FC<Props> = ({
     if (!containerRef.current || mapRef.current) return;
     const map = new maplibregl.Map({
       container: containerRef.current,
-      style: buildMapStyle(basemapMode, maptilerKey),
+      style: buildMapStyle(basemapMode, maptilerKey, theme),
       center: [-111.55, 25.15],
       zoom: 6.4,
       pitch: 36,
@@ -388,8 +424,8 @@ export const AnalyticsMap3D: React.FC<Props> = ({
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
-    map.setStyle(buildMapStyle(basemapMode, maptilerKey));
-  }, [basemapMode, maptilerKey]);
+    map.setStyle(buildMapStyle(basemapMode, maptilerKey, theme));
+  }, [basemapMode, maptilerKey, theme]);
 
   // Smooth camera flights
   useEffect(() => {
@@ -465,7 +501,7 @@ export const AnalyticsMap3D: React.FC<Props> = ({
           data: geoCache.municipalities,
           stroked: true,
           filled: false,
-          getLineColor: [148, 163, 184, 130],
+          getLineColor: theme === "light" ? [71, 85, 105, 130] : [148, 163, 184, 130],
           getLineWidth: 1.5,
           lineWidthUnits: "pixels",
           pickable: false,
@@ -497,11 +533,18 @@ export const AnalyticsMap3D: React.FC<Props> = ({
             setHoverInfo({
               x,
               y,
-              title: `Acuífero ${p.aquifer_code || ""} · ${p.aquifer_name || ""}`,
-              lines: [
-                `DMA 2023: ${p.dma_2023_hm3} hm³/año`,
-                `Explotación: ${p.exploitation_ratio_pct}% | ${p.veda_status || ""}`,
-              ],
+              title: isEn
+                ? `Aquifer ${p.aquifer_code || ""} · ${p.aquifer_name || ""}`
+                : `Acuífero ${p.aquifer_code || ""} · ${p.aquifer_name || ""}`,
+              lines: isEn
+                ? [
+                    `DMA 2023: ${p.dma_2023_hm3} hm³/yr`,
+                    `Exploitation: ${p.exploitation_ratio_pct}% | ${p.veda_status || ""}`,
+                  ]
+                : [
+                    `DMA 2023: ${p.dma_2023_hm3} hm³/año`,
+                    `Explotación: ${p.exploitation_ratio_pct}% | ${p.veda_status || ""}`,
+                  ],
             });
           },
         }),
@@ -579,7 +622,9 @@ export const AnalyticsMap3D: React.FC<Props> = ({
             return interpolateMetricColor(val, metricMeta, alpha, colorblindSafe);
           },
           getLineColor: (f: GeoJSON.Feature) =>
-            f.properties?.cvegeo_ageb === selectedAgebId ? [255, 255, 255, 255] : [203, 213, 225, 95],
+            f.properties?.cvegeo_ageb === selectedAgebId
+              ? theme === "light" ? [0, 122, 255, 255] : [255, 255, 255, 255]
+              : theme === "light" ? [100, 116, 139, 95] : [203, 213, 225, 95],
           getLineWidth: (f: GeoJSON.Feature) => (f.properties?.cvegeo_ageb === selectedAgebId ? 3 : 1),
           lineWidthUnits: "pixels",
           getElevation: (f: GeoJSON.Feature) => {
@@ -605,11 +650,17 @@ export const AnalyticsMap3D: React.FC<Props> = ({
               x,
               y,
               title: `${p.municipality_name || "BCS"} · AGEB ${p.cvegeo_ageb || ""}`,
-              lines: [
-                `${metricMeta.shortLabel}: ${p[activeMetric] ?? 0} ${metricMeta.unit}`,
-                `Población 2025: ${(p.pobtot_2025_eic_calibrated || 0).toLocaleString()} | Edificios 3D: ${(p.buildings_3d_count || 0).toLocaleString()}`,
-                `Ciudad 15-Min: ${p.city15_score} | Infill 2050: +${p.infill_homes_potential} viv`,
-              ],
+              lines: isEn
+                ? [
+                    `${metricMeta.shortLabelEn}: ${p[activeMetric] ?? 0} ${metricMeta.unit}`,
+                    `2025 Pop: ${(p.pobtot_2025_eic_calibrated || 0).toLocaleString()} | 3D Bldgs: ${(p.buildings_3d_count || 0).toLocaleString()}`,
+                    `15-Min City: ${p.city15_score} | 2050 Infill: +${p.infill_homes_potential} homes`,
+                  ]
+                : [
+                    `${metricMeta.shortLabel}: ${p[activeMetric] ?? 0} ${metricMeta.unit}`,
+                    `Población 2025: ${(p.pobtot_2025_eic_calibrated || 0).toLocaleString()} | Edificios 3D: ${(p.buildings_3d_count || 0).toLocaleString()}`,
+                    `Ciudad 15-Min: ${p.city15_score} | Infill 2050: +${p.infill_homes_potential} viv`,
+                  ],
             });
           },
           onClick: ({ coordinate, object }) => {
@@ -647,11 +698,18 @@ export const AnalyticsMap3D: React.FC<Props> = ({
             setHoverInfo({
               x,
               y,
-              title: `Zonificación ${object.land_use_code || object.category}`,
-              lines: [
-                `${object.category} (${object.area_ha.toFixed(2)} ha)`,
-                `COS máx: ${object.cos_max ?? "N/D"} | CUS máx: ${object.cus_max ?? "N/D"} | Niveles: ${object.max_levels ?? "N/D"}`,
-              ],
+              title: isEn
+                ? `Zoning ${object.land_use_code || object.category}`
+                : `Zonificación ${object.land_use_code || object.category}`,
+              lines: isEn
+                ? [
+                    `${object.category} (${object.area_ha.toFixed(2)} ha)`,
+                    `Max COS: ${object.cos_max ?? "N/A"} | Max CUS: ${object.cus_max ?? "N/A"} | Floors: ${object.max_levels ?? "N/A"}`,
+                  ]
+                : [
+                    `${object.category} (${object.area_ha.toFixed(2)} ha)`,
+                    `COS máx: ${object.cos_max ?? "N/D"} | CUS máx: ${object.cus_max ?? "N/D"} | Niveles: ${object.max_levels ?? "N/D"}`,
+                  ],
             });
           },
         }),
@@ -688,7 +746,9 @@ export const AnalyticsMap3D: React.FC<Props> = ({
               title: "OGC 3D Tiles 1.1 · Streaming glTF 2.0",
               lines: [
                 `Tile: ${object.id || "bcs_buildings_v11"} · EXT_structural_metadata`,
-                "Edificación real BCS (396,823 polígonos) · Clic para inspeccionar",
+                isEn
+                  ? "BCS Real Buildings (396,823 polygons) · Click to inspect"
+                  : "Edificación real BCS (396,823 polígonos) · Clic para inspeccionar",
               ],
             });
           },
@@ -730,15 +790,22 @@ export const AnalyticsMap3D: React.FC<Props> = ({
           },
           onHover: ({ x, y, object }) => {
             if (!object) return setHoverInfo(null);
-            const surgeTxt = object.surge_risk === 2 ? "ALTO (<6m)" : object.surge_risk === 1 ? "MODERADO (<10m)" : "SEGURO";
+            const surgeTxt = isEn
+              ? object.surge_risk === 2 ? "HIGH (<6m)" : object.surge_risk === 1 ? "MODERATE (<10m)" : "SAFE"
+              : object.surge_risk === 2 ? "ALTO (<6m)" : object.surge_risk === 1 ? "MODERADO (<10m)" : "SEGURO";
             setHoverInfo({
               x,
               y,
-              title: `Edificio 3D · ${object.city_name}`,
-              lines: [
-                `Altura: ${object.height_m} m (${object.floors} niveles) · GFA ${Math.round(object.gfa_m2).toLocaleString()} m²`,
-                `Solar Techo: ${object.solar_kwp} kWp | Cota: ${object.ground_elev_m} m (${surgeTxt})`,
-              ],
+              title: isEn ? `3D Building · ${object.city_name}` : `Edificio 3D · ${object.city_name}`,
+              lines: isEn
+                ? [
+                    `Height: ${object.height_m} m (${object.floors} floors) · GFA ${Math.round(object.gfa_m2).toLocaleString()} m²`,
+                    `Rooftop Solar: ${object.solar_kwp} kWp | Elev: ${object.ground_elev_m} m (${surgeTxt})`,
+                  ]
+                : [
+                    `Altura: ${object.height_m} m (${object.floors} niveles) · GFA ${Math.round(object.gfa_m2).toLocaleString()} m²`,
+                    `Solar Techo: ${object.solar_kwp} kWp | Cota: ${object.ground_elev_m} m (${surgeTxt})`,
+                  ],
             });
           },
           onClick: ({ object }) => {
@@ -783,8 +850,10 @@ export const AnalyticsMap3D: React.FC<Props> = ({
             setHoverInfo({
               x,
               y,
-              title: `Subestación ${p.name || "SIBCS"}`,
-              lines: [`Voltaje: ${p.voltage || "N/D"} | Operador: ${p.operator || "CFE"}`],
+              title: isEn ? `Substation ${p.name || "SIBCS"}` : `Subestación ${p.name || "SIBCS"}`,
+              lines: isEn
+                ? [`Voltage: ${p.voltage || "N/A"} | Operator: ${p.operator || "CFE"}`]
+                : [`Voltaje: ${p.voltage || "N/D"} | Operador: ${p.operator || "CFE"}`],
             });
           },
         }),
@@ -811,10 +880,10 @@ export const AnalyticsMap3D: React.FC<Props> = ({
             setHoverInfo({
               x,
               y,
-              title: `${p.project_name || "Proyecto Estratégico"}`,
+              title: `${p.project_name || (isEn ? "Strategic Project" : "Proyecto Estratégico")}`,
               lines: [
                 `${p.category || ""} · ${p.capacity_value || ""} ${p.capacity_unit || ""}`,
-                `Estatus: ${p.status_2025_2026 || ""} | COD: ${p.target_cod_year || ""}`,
+                `${isEn ? "Status" : "Estatus"}: ${p.status_2025_2026 || ""} | COD: ${p.target_cod_year || ""}`,
               ],
             });
           },
@@ -845,7 +914,7 @@ export const AnalyticsMap3D: React.FC<Props> = ({
             setHoverInfo({
               x,
               y,
-              title: `${p.facility_name || "Equipamiento"}`,
+              title: `${p.facility_name || (isEn ? "Facility" : "Equipamiento")}`,
               lines: [`Sector: ${p.sector || ""}`, `${p.localidad_name || ""}`],
             });
           },
@@ -904,7 +973,7 @@ export const AnalyticsMap3D: React.FC<Props> = ({
               x,
               y,
               title: object.name,
-              lines: [`Flujo Regional Índice: ${object.flow_index}/100`],
+              lines: [isEn ? `Regional Flow Index: ${object.flow_index}/100` : `Flujo Regional Índice: ${object.flow_index}/100`],
             });
           },
         }),
@@ -931,11 +1000,16 @@ export const AnalyticsMap3D: React.FC<Props> = ({
             setHoverInfo({
               x,
               y,
-              title: `Vuelo ${object.callsign || object.icao24}`,
-              lines: [
-                `País: ${object.country} | Altitud: ${Math.round(object.altitude_m)} m`,
-                `Velocidad: ${Math.round(object.velocity_ms * 3.6)} km/h`,
-              ],
+              title: `${isEn ? "Flight" : "Vuelo"} ${object.callsign || object.icao24}`,
+              lines: isEn
+                ? [
+                    `Country: ${object.country} | Altitude: ${Math.round(object.altitude_m)} m`,
+                    `Speed: ${Math.round(object.velocity_ms * 3.6)} km/h`,
+                  ]
+                : [
+                    `País: ${object.country} | Altitud: ${Math.round(object.altitude_m)} m`,
+                    `Velocidad: ${Math.round(object.velocity_ms * 3.6)} km/h`,
+                  ],
             });
           },
         }),
@@ -960,8 +1034,8 @@ export const AnalyticsMap3D: React.FC<Props> = ({
             setHoverInfo({
               x,
               y,
-              title: `Buque ${object.name || object.mmsi}`,
-              lines: [`Tipo: ${object.type} | MMSI: ${object.mmsi}`],
+              title: `${isEn ? "Vessel" : "Buque"} ${object.name || object.mmsi}`,
+              lines: [`${isEn ? "Type" : "Tipo"}: ${object.type} | MMSI: ${object.mmsi}`],
             });
           },
         }),
@@ -1000,16 +1074,22 @@ export const AnalyticsMap3D: React.FC<Props> = ({
               const valStr =
                 obs?.result !== null && obs?.result !== undefined
                   ? `${obs.result} ${unit}`.trim()
-                  : "Piloto SCADA en espera";
+                  : isEn ? "SCADA Pilot Standby" : "Piloto SCADA en espera";
               setHoverInfo({
                 x,
                 y,
                 title: `OGC Thing · ${object.name}`,
-                lines: [
-                  `ID: ${object["@iot.id"]} · Estado: ${object.properties?.feed_status || "LIVE"}`,
-                  `${ds?.name || "Medición"}: ${valStr}`,
-                  `Fuente: ${object.properties?.source || "OGC SensorThings v1.1"}`,
-                ],
+                lines: isEn
+                  ? [
+                      `ID: ${object["@iot.id"]} · Status: ${object.properties?.feed_status || "LIVE"}`,
+                      `${ds?.name || "Reading"}: ${valStr}`,
+                      `Source: ${object.properties?.source || "OGC SensorThings v1.1"}`,
+                    ]
+                  : [
+                      `ID: ${object["@iot.id"]} · Estado: ${object.properties?.feed_status || "LIVE"}`,
+                      `${ds?.name || "Medición"}: ${valStr}`,
+                      `Fuente: ${object.properties?.source || "OGC SensorThings v1.1"}`,
+                    ],
               });
             },
           }),
@@ -1071,23 +1151,31 @@ export const AnalyticsMap3D: React.FC<Props> = ({
               setHoverInfo({
                 x,
                 y,
-                title: `Inundación 2D · Tirante ${p.depth_m} m (${p.severity})`,
-                lines: [`Cota DEM: ${p.elev_m} m`, p.in_arroyo ? "Zona de flujo de arroyo activo" : "Llanura / costa"],
+                title: isEn
+                  ? `2D Flood · Depth ${p.depth_m} m (${p.severity})`
+                  : `Inundación 2D · Tirante ${p.depth_m} m (${p.severity})`,
+                lines: isEn
+                  ? [`DEM Elev: ${p.elev_m} m`, p.in_arroyo ? "Active arroyo channel flow" : "Floodplain / coastal zone"]
+                  : [`Cota DEM: ${p.elev_m} m`, p.in_arroyo ? "Zona de flujo de arroyo activo" : "Llanura / costa"],
               });
             } else if (p.kind === "isochrone_band") {
               setHoverInfo({
                 x,
                 y,
-                title: `Isócrona Red Vial · ${p.label || `${p.minutes} min`}`,
-                lines: [`Área alcanzada: ${p.area_ha} ha`, p.include_transit ? "Incluye rutas de autobús" : "Solo peatonal"],
+                title: isEn
+                  ? `Road Network Isochrone · ${p.label || `${p.minutes} min`}`
+                  : `Isócrona Red Vial · ${p.label || `${p.minutes} min`}`,
+                lines: isEn
+                  ? [`Reachable area: ${p.area_ha} ha`, p.include_transit ? "Includes transit routes" : "Walk-only"]
+                  : [`Área alcanzada: ${p.area_ha} ha`, p.include_transit ? "Incluye rutas de autobús" : "Solo peatonal"],
               });
             } else if (p.kind === "water_node") {
               setHoverInfo({
                 x,
                 y,
-                title: `Nodo WNTR · ${p.label || p.node_id}`,
+                title: isEn ? `WNTR Node · ${p.label || p.node_id}` : `Nodo WNTR · ${p.label || p.node_id}`,
                 lines: [
-                  `Presión mín: ${p.baseline_min_pressure_m} -> ${p.scenario_min_pressure_m} m (+${p.pressure_gain_m} m)`,
+                  `${isEn ? "Min pressure" : "Presión mín"}: ${p.baseline_min_pressure_m} -> ${p.scenario_min_pressure_m} m (+${p.pressure_gain_m} m)`,
                   `${p.status}`,
                 ],
               });
@@ -1095,15 +1183,21 @@ export const AnalyticsMap3D: React.FC<Props> = ({
               setHoverInfo({
                 x,
                 y,
-                title: `Tramo Hidráulico ${p.pipe_id}`,
-                lines: [`Diámetro: ${p.diameter_mm} mm · Long: ${p.length_m} m`, `Gasto pico: ${p.peak_flow_lps} lps`],
+                title: isEn ? `Hydraulic Pipe ${p.pipe_id}` : `Tramo Hidráulico ${p.pipe_id}`,
+                lines: isEn
+                  ? [`Diameter: ${p.diameter_mm} mm · Length: ${p.length_m} m`, `Peak flow: ${p.peak_flow_lps} lps`]
+                  : [`Diámetro: ${p.diameter_mm} mm · Long: ${p.length_m} m`, `Gasto pico: ${p.peak_flow_lps} lps`],
               });
             } else if (p.kind === "reachable_poi" || p.kind === "isochrone_origin") {
               setHoverInfo({
                 x,
                 y,
-                title: `${p.name || p.label || "Punto"}`,
-                lines: [p.sector ? `Sector alcanzable: ${p.sector}` : "Punto origen red 15-min"],
+                title: `${p.name || p.label || (isEn ? "Point" : "Punto")}`,
+                lines: [
+                  p.sector
+                    ? `${isEn ? "Reachable sector" : "Sector alcanzable"}: ${p.sector}`
+                    : isEn ? "15-min network origin" : "Punto origen red 15-min",
+                ],
               });
             }
           },
@@ -1181,6 +1275,7 @@ export const AnalyticsMap3D: React.FC<Props> = ({
     corridorArcs,
     extrusionScale,
     geoCache,
+    isEn,
     layers,
     liveTelemetry,
     pendingPinCoords,
@@ -1190,6 +1285,7 @@ export const AnalyticsMap3D: React.FC<Props> = ({
     phase,
     selectedAgebId,
     simulation,
+    theme,
     tileset3dUrl,
     tilesetError,
     zoom,
@@ -1245,7 +1341,7 @@ export const AnalyticsMap3D: React.FC<Props> = ({
       )}
 
       {/* Bottom Floating HIG Dynamic Island Telemetry & Quick Actions */}
-      <div className="hig-glass-toolbar pointer-events-auto absolute max-sm:bottom-3 max-sm:left-2.5 max-sm:max-w-[calc(100vw-110px)] max-sm:px-3 max-sm:gap-2 sm:bottom-4 sm:left-1/2 sm:max-w-[calc(100vw-130px)] sm:-translate-x-1/2 sm:px-4 sm:gap-2.5 z-20 flex items-center overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden rounded-full py-2 text-[11.5px] whitespace-nowrap">
+      <div className="hig-glass-toolbar pointer-events-auto absolute max-sm:bottom-3 max-sm:left-2.5 max-sm:max-w-[calc(100vw-122px)] max-sm:px-3 max-sm:gap-2 sm:bottom-4 sm:left-1/2 sm:max-w-[calc(100vw-130px)] sm:-translate-x-1/2 sm:px-4 sm:gap-2.5 z-20 flex items-center overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden rounded-full py-2 text-[11.5px] whitespace-nowrap">
         <span className="flex items-center gap-1.5 font-mono-num text-[var(--hig-ink-2)]">
           <Compass className="h-3.5 w-3.5 text-[var(--hig-accent)]" />
           Z {zoom.toFixed(1)}
@@ -1255,7 +1351,7 @@ export const AnalyticsMap3D: React.FC<Props> = ({
           <div className="flex items-center gap-2">
             <span className="flex items-center gap-1.5 font-medium text-[#BF5AF2]">
               <Film className="h-3.5 w-3.5 text-[#BF5AF2] animate-pulse" />
-              <span>{tourStepTitle || "Recorrido aéreo 3D..."}</span>
+              <span>{tourStepTitle || (isEn ? "3D Aerial Tour..." : "Recorrido aéreo 3D...")}</span>
             </span>
             <button
               type="button"
@@ -1263,22 +1359,22 @@ export const AnalyticsMap3D: React.FC<Props> = ({
               className="flex items-center gap-1 rounded-full bg-[#FF453A]/20 px-2.5 py-0.5 text-[10.5px] font-semibold text-[var(--hig-red)] hover:bg-[#FF453A]/30 cursor-pointer"
             >
               <Square className="h-2.5 w-2.5 fill-current" />
-              <span>Detener</span>
+              <span>{isEn ? "Stop" : "Detener"}</span>
             </button>
           </div>
         ) : zoom >= 11.5 && layers.buildings3d && phase !== "scenarios" && Boolean(tileset3dUrl) && !tilesetError ? (
           <span className="flex items-center gap-1.5 font-mono-num text-[var(--hig-cyan)]">
             <Building2 className="h-3.5 w-3.5" />
             {tilesLoadedCount > 0
-              ? `OGC 3D Tiles 1.1 · ${tilesLoadedCount} tiles .glb`
+              ? `OGC 3D Tiles 1.1 · ${tilesLoadedCount} .glb tiles`
               : "OGC 3D Tiles 1.1 · Streaming"}
           </span>
         ) : zoom >= 11.8 ? (
           <span className="flex items-center gap-1.5 font-mono-num text-[var(--hig-green)]">
             <Building2 className="h-3.5 w-3.5" />
             {loadingBuildings
-              ? "Cargando R-Tree 3D..."
-              : `${buildings.length.toLocaleString()} edif. 3D`}
+              ? isEn ? "Loading 3D R-Tree..." : "Cargando R-Tree 3D..."
+              : `${buildings.length.toLocaleString()} ${isEn ? "3D bldgs" : "edif. 3D"}`}
           </span>
         ) : (
           <div className="flex items-center gap-1.5">
@@ -1286,21 +1382,21 @@ export const AnalyticsMap3D: React.FC<Props> = ({
             <button
               type="button"
               onClick={() => onQuickJumpCity("la_paz")}
-              className="rounded-full bg-[#0A84FF]/18 px-2.5 py-0.5 text-[10.5px] font-semibold text-[var(--hig-accent)] hover:bg-[#0A84FF]/28 transition-colors cursor-pointer"
+              className="rounded-full bg-[#0A84FF]/15 px-2.5 py-0.5 text-[10.5px] font-semibold text-[var(--hig-accent)] hover:bg-[#0A84FF]/25 transition-colors cursor-pointer"
             >
               La Paz 3D
             </button>
             <button
               type="button"
               onClick={() => onQuickJumpCity("cabo_san_lucas")}
-              className="rounded-full bg-[#30D158]/18 px-2.5 py-0.5 text-[10.5px] font-semibold text-[var(--hig-green)] hover:bg-[#30D158]/28 transition-colors cursor-pointer"
+              className="rounded-full bg-[#30D158]/15 px-2.5 py-0.5 text-[10.5px] font-semibold text-[var(--hig-green)] hover:bg-[#30D158]/25 transition-colors cursor-pointer"
             >
               Los Cabos 3D
             </button>
             <button
               type="button"
               onClick={() => onQuickJumpCity("loreto")}
-              className="rounded-full bg-[#BF5AF2]/18 px-2.5 py-0.5 text-[10.5px] font-semibold text-[#BF5AF2] hover:bg-[#BF5AF2]/28 transition-colors cursor-pointer"
+              className="rounded-full bg-[#BF5AF2]/15 px-2.5 py-0.5 text-[10.5px] font-semibold text-[#8944AB] hover:bg-[#BF5AF2]/25 transition-colors cursor-pointer"
             >
               Loreto 3D
             </button>
@@ -1312,14 +1408,18 @@ export const AnalyticsMap3D: React.FC<Props> = ({
             <button
               type="button"
               onClick={() => onStartTour?.("el_tezal")}
-              title="Iniciar recorrido aéreo tipo InfraWorks / Lumion sobre El Tezal"
-              className="flex items-center gap-1.5 rounded-full bg-[#0A84FF]/18 px-2.5 py-0.5 text-[10.5px] font-semibold text-[var(--hig-accent)] hover:bg-[#0A84FF]/28 transition-colors cursor-pointer"
+              title={
+                isEn
+                  ? "Launch InfraWorks / Lumion-style 3D aerial tour over El Tezal"
+                  : "Iniciar recorrido aéreo tipo InfraWorks / Lumion sobre El Tezal"
+              }
+              className="flex items-center gap-1.5 rounded-full bg-[#0A84FF]/15 px-2.5 py-0.5 text-[10.5px] font-semibold text-[var(--hig-accent)] hover:bg-[#0A84FF]/25 transition-colors cursor-pointer"
             >
               <Film className="h-3 w-3" />
-              <span>Vuelo El Tezal</span>
+              <span>{isEn ? "El Tezal Flight" : "Vuelo El Tezal"}</span>
             </button>
             <select
-              aria-label="Seleccionar recorrido aéreo"
+              aria-label={isEn ? "Select aerial tour" : "Seleccionar recorrido aéreo"}
               value=""
               onChange={(e) => {
                 if (e.target.value) onStartTour?.(e.target.value);
@@ -1330,13 +1430,21 @@ export const AnalyticsMap3D: React.FC<Props> = ({
               {(tours && tours.length > 0
                 ? tours
                 : [
-                    { id: "el_tezal", short_label: "Vuelo El Tezal" },
-                    { id: "la_paz_malecon", short_label: "Vuelo Malecón LPZ" },
-                    { id: "loreto_bahia", short_label: "Vuelo Loreto" },
+                    { id: "el_tezal", short_label: isEn ? "El Tezal Flight" : "Vuelo El Tezal" },
+                    { id: "la_paz_malecon", short_label: isEn ? "La Paz Waterfront" : "Vuelo Malecón LPZ" },
+                    { id: "loreto_bahia", short_label: isEn ? "Loreto Bay" : "Vuelo Loreto" },
                   ]
               ).map((t) => (
                 <option key={t.id} value={t.id} className="bg-[var(--hig-select-bg)] text-[var(--hig-ink)]">
-                  {t.short_label}
+                  {isEn
+                    ? t.id === "el_tezal"
+                      ? "El Tezal Flight"
+                      : t.id === "la_paz_malecon"
+                        ? "La Paz Waterfront"
+                        : t.id === "loreto_bahia"
+                          ? "Loreto Bay"
+                          : t.short_label
+                    : t.short_label}
                 </option>
               ))}
             </select>
@@ -1346,8 +1454,12 @@ export const AnalyticsMap3D: React.FC<Props> = ({
         <button
           type="button"
           onClick={() => onOpenExportModal?.()}
-          title="Exportar a Civil 3D (.DXF), Lumion/Unreal (.OBJ) y BIM ISO 19650"
-          className="flex items-center gap-1.5 rounded-full bg-[#FF9F0A]/18 px-2.5 py-0.5 text-[10.5px] font-semibold text-[var(--hig-amber)] hover:bg-[#FF9F0A]/28 transition-colors cursor-pointer"
+          title={
+            isEn
+              ? "Export to Civil 3D (.DXF), Lumion/Unreal (.OBJ), and ISO 19650 BIM"
+              : "Exportar a Civil 3D (.DXF), Lumion/Unreal (.OBJ) y BIM ISO 19650"
+          }
+          className="flex items-center gap-1.5 rounded-full bg-[#FF9F0A]/15 px-2.5 py-0.5 text-[10.5px] font-semibold text-[var(--hig-amber)] hover:bg-[#FF9F0A]/25 transition-colors cursor-pointer"
         >
           <Box className="h-3 w-3" />
           <span>CAD / BIM / 3D</span>

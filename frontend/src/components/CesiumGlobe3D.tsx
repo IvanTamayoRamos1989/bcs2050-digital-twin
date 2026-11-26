@@ -73,7 +73,7 @@ export const CesiumGlobe3D: React.FC<Props> = ({
   agebs3dMode,
   layers,
   colorblindSafe = true,
-  language = "es",
+  language = "en",
   googleMapsApiKey = "",
   cesiumIonToken = "",
   onInspectLocation,

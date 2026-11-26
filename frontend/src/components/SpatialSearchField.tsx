@@ -23,17 +23,17 @@ interface Props {
   onOpenChange?: (open: boolean) => void;
 }
 
-const SCOPE_LABELS: Record<string, { title: string; subtitleEs: string; subtitleEn: string }> = {
-  "03": { title: "Estado BCS (03)", subtitleEs: "Ámbito estatal · 5 municipios", subtitleEn: "State scope · 5 municipalities" },
-  "03003": { title: "La Paz (03003)", subtitleEs: "Municipio · Corredor Centro", subtitleEn: "Municipality · Central Corridor" },
-  "03008": { title: "Los Cabos (03008)", subtitleEs: "Municipio · Corredor Sur", subtitleEn: "Municipality · Southern Corridor" },
-  "03009": { title: "Loreto (03009)", subtitleEs: "Municipio · Corredor Norte", subtitleEn: "Municipality · Northern Corridor" },
-  "03001": { title: "Comondú (03001)", subtitleEs: "Municipio · Corredor Valle", subtitleEn: "Municipality · Valley Corridor" },
-  "03002": { title: "Mulegé (03002)", subtitleEs: "Municipio · Corredor Norte", subtitleEn: "Municipality · Northern Corridor" },
-  "CORR-SUR-CABOS": { title: "Corredor Sur · Los Cabos", subtitleEs: "Corredor estratégico", subtitleEn: "Strategic corridor" },
-  "CORR-CENTRO-LA-PAZ": { title: "Corredor Centro · La Paz", subtitleEs: "Corredor estratégico", subtitleEn: "Strategic corridor" },
-  "CORR-VALLE-COMONDU": { title: "Corredor Valle · Comondú", subtitleEs: "Corredor estratégico", subtitleEn: "Strategic corridor" },
-  "CORR-NORTE-LORETO-MULEGE": { title: "Corredor Norte · Loreto–Mulegé", subtitleEs: "Corredor estratégico", subtitleEn: "Strategic corridor" },
+const SCOPE_LABELS: Record<string, { titleEs: string; titleEn: string; subtitleEs: string; subtitleEn: string }> = {
+  "03": { titleEs: "Estado BCS (03)", titleEn: "BCS State (03)", subtitleEs: "Ámbito estatal · 5 municipios", subtitleEn: "Statewide scope · 5 municipalities" },
+  "03003": { titleEs: "La Paz (03003)", titleEn: "La Paz (03003)", subtitleEs: "Municipio · Corredor Centro", subtitleEn: "Municipality · Central Corridor" },
+  "03008": { titleEs: "Los Cabos (03008)", titleEn: "Los Cabos (03008)", subtitleEs: "Municipio · Corredor Sur", subtitleEn: "Municipality · South Corridor" },
+  "03009": { titleEs: "Loreto (03009)", titleEn: "Loreto (03009)", subtitleEs: "Municipio · Corredor Norte", subtitleEn: "Municipality · North Corridor" },
+  "03001": { titleEs: "Comondú (03001)", titleEn: "Comondú (03001)", subtitleEs: "Municipio · Corredor Valle", subtitleEn: "Municipality · Valley Corridor" },
+  "03002": { titleEs: "Mulegé (03002)", titleEn: "Mulegé (03002)", subtitleEs: "Municipio · Corredor Norte", subtitleEn: "Municipality · North Corridor" },
+  "CORR-SUR-CABOS": { titleEs: "Corredor Sur · Los Cabos", titleEn: "South Corridor · Los Cabos", subtitleEs: "Corredor estratégico", subtitleEn: "Strategic corridor" },
+  "CORR-CENTRO-LA-PAZ": { titleEs: "Corredor Centro · La Paz", titleEn: "Central Corridor · La Paz", subtitleEs: "Corredor estratégico", subtitleEn: "Strategic corridor" },
+  "CORR-VALLE-COMONDU": { titleEs: "Corredor Valle · Comondú", titleEn: "Valley Corridor · Comondú", subtitleEs: "Corredor estratégico", subtitleEn: "Strategic corridor" },
+  "CORR-NORTE-LORETO-MULEGE": { titleEs: "Corredor Norte · Loreto–Mulegé", titleEn: "North Corridor · Loreto–Mulegé", subtitleEs: "Corredor estratégico", subtitleEn: "Strategic corridor" },
 };
 
 export const SpatialSearchField: React.FC<Props> = ({
@@ -103,7 +103,9 @@ export const SpatialSearchField: React.FC<Props> = ({
   const scopeMeta = SCOPE_LABELS[scopeId];
   const triggerLabel = activeCity
     ? activeCity.name
-    : scopeMeta?.title || "Estado BCS (03)";
+    : scopeMeta
+      ? (isEn ? scopeMeta.titleEn : scopeMeta.titleEs)
+      : (isEn ? "BCS State (03)" : "Estado BCS (03)");
 
   const entries = useMemo<SearchEntry[]>(() => {
     const q = query.trim().toLowerCase();
@@ -128,7 +130,7 @@ export const SpatialSearchField: React.FC<Props> = ({
       list.push({
         id: `scope:${id}`,
         group: "scope",
-        title: meta.title,
+        title: isEn ? meta.titleEn : meta.titleEs,
         subtitle: isEn ? meta.subtitleEn : meta.subtitleEs,
         run: () => onScopeChange(id, cam),
       });
@@ -138,15 +140,24 @@ export const SpatialSearchField: React.FC<Props> = ({
       tours && tours.length > 0
         ? tours
         : [
-            { id: "el_tezal", short_label: "Vuelo El Tezal" },
-            { id: "la_paz_malecon", short_label: "Vuelo Malecón LPZ" },
-            { id: "loreto_bahia", short_label: "Vuelo Loreto" },
+            { id: "el_tezal", short_label: isEn ? "El Tezal Flight" : "Vuelo El Tezal" },
+            { id: "la_paz_malecon", short_label: isEn ? "La Paz Waterfront Tour" : "Vuelo Malecón LPZ" },
+            { id: "loreto_bahia", short_label: isEn ? "Loreto Bay Tour" : "Vuelo Loreto" },
           ];
     for (const t of tourList) {
+      const tourTitle = isEn
+        ? t.id === "el_tezal"
+          ? "El Tezal Flight"
+          : t.id === "la_paz_malecon"
+            ? "La Paz Waterfront Tour"
+            : t.id === "loreto_bahia"
+              ? "Loreto Bay Tour"
+              : t.short_label || t.id
+        : t.short_label || t.id;
       list.push({
         id: `tour:${t.id}`,
         group: "tour",
-        title: t.short_label || t.id,
+        title: tourTitle,
         subtitle: isEn ? "3D Aerial Fly-through" : "Recorrido Aéreo 3D",
         run: () => onStartTour(t.id),
       });
