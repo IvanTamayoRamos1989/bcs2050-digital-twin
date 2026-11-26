@@ -58,6 +58,8 @@ const INITIAL_LAYERS: LayerVisibility = {
   corridorArcs: true,
   plannedProjects: true,
   liveTelemetry: true,
+  airTraffic: true,
+  marineTraffic: true,
   citizenPins: true,
   waterNetworkLc: false,
   arroyosRivers: false,
@@ -297,15 +299,22 @@ export const App: React.FC = () => {
       })
       .catch(() => {});
     refreshParticipationPins();
-    const fetchLive = () => {
+    const fetchLiveSummary = () => {
       TwinAPI.getLiveTelemetry().then(setLiveTelemetry).catch(() => {});
+    };
+    const fetchSensors = () => {
       TwinAPI.getSensorThings()
         .then((res) => setSensorThings(res.value || []))
         .catch(() => {});
     };
-    fetchLive();
-    const timer = window.setInterval(fetchLive, 60000);
-    return () => window.clearInterval(timer);
+    fetchLiveSummary();
+    fetchSensors();
+    const timer = window.setInterval(fetchLiveSummary, 15000);
+    const sensorTimer = window.setInterval(fetchSensors, 60000);
+    return () => {
+      window.clearInterval(timer);
+      window.clearInterval(sensorTimer);
+    };
   }, [refreshParticipationPins]);
 
   // Refresh Goal Gap when scope or goalTargets change
@@ -574,6 +583,7 @@ export const App: React.FC = () => {
                 terrainExaggeration={terrainExaggeration}
                 agebs3dMode={agebs3dMode}
                 layers={layers}
+                liveTelemetry={liveTelemetry}
                 colorblindSafe={colorblindSafe}
                 language={language}
                 googleMapsApiKey={clientConfig.google_maps_api_key}
@@ -654,6 +664,7 @@ export const App: React.FC = () => {
         }}
         language={language}
         onLanguageChange={setLanguage}
+        onFlyTo={(cam) => setCameraTarget({ ...cam })}
       />
 
       {/* Passive HIG Status Feedback Pill */}

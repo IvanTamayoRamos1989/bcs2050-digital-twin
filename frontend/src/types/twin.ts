@@ -503,12 +503,46 @@ export interface LiveTelemetrySummary {
   aircraft: {
     count: number;
     stale: boolean;
-    aircraft: { icao24: string; callsign: string; country: string; lon: number; lat: number; altitude_m: number; velocity_ms: number; heading: number }[];
+    source?: string;
+    notice?: string;
+    aircraft: {
+      icao24: string;
+      callsign: string;
+      registration?: string;
+      aircraft_type?: string;
+      aircraft_desc?: string;
+      country: string;
+      lon: number;
+      lat: number;
+      altitude_m: number;
+      altitude_ft?: number;
+      velocity_ms: number;
+      speed_kt?: number;
+      heading: number;
+      vertical_rate_fpm?: number;
+      squawk?: string;
+      on_ground?: boolean;
+      provider?: string;
+    }[];
   };
   marine: {
     count: number;
     connected: boolean;
-    vessels: { mmsi: string; name: string; type: string; lon: number; lat: number; cog?: number; heading?: number }[];
+    source?: string;
+    notice?: string;
+    vessels: {
+      mmsi: string;
+      name: string;
+      type: string;
+      lon: number;
+      lat: number;
+      sog?: number;
+      cog?: number;
+      heading?: number;
+      destination?: string;
+      corridor_zone?: string;
+      last_seen_at?: string;
+    }[];
   };
   cyclones: { count: number; active_storms: unknown[]; source: string };
   feeds?: {
@@ -579,6 +613,8 @@ export interface LayerVisibility {
   corridorArcs: boolean;
   plannedProjects: boolean;
   liveTelemetry: boolean;
+  airTraffic: boolean;
+  marineTraffic: boolean;
   citizenPins: boolean;
   waterNetworkLc: boolean;
   arroyosRivers: boolean;

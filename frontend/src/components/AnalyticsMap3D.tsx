@@ -3,7 +3,7 @@ import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { MapboxOverlay } from "@deck.gl/mapbox";
 import { Tile3DLayer } from "@deck.gl/geo-layers";
-import { ArcLayer, GeoJsonLayer, PolygonLayer, ScatterplotLayer } from "@deck.gl/layers";
+import { ArcLayer, GeoJsonLayer, IconLayer, LineLayer, PolygonLayer, ScatterplotLayer, TextLayer } from "@deck.gl/layers";
 import { Box, Building2, Compass, Film, Mountain, Square, ZoomIn } from "lucide-react";
 import { TwinAPI } from "../api/client";
 import type {
@@ -70,6 +70,22 @@ interface Props {
   ) => void;
   onQuickJumpCity: (citySlug: string) => void;
 }
+
+const AIRCRAFT_ICON_URL =
+  "data:image/svg+xml;charset=utf-8," +
+  encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><path fill="#FFFFFF" d="M32 4c2.4 0 4 2.2 4 5.5v14.8l19 11.4c1.2.7 1.8 1.8 1.5 2.9-.3 1.1-1.3 1.6-2.7 1.2L36 34.8v13.2l6.2 4.6c.8.6 1.2 1.4.9 2.2-.3.7-1.1 1.1-2 .9L32 53.5l-9.1 2.2c-.9.2-1.7-.2-2-.9-.3-.8.1-1.6.9-2.2L28 48V34.8l-17.8 5c-1.4.4-2.4-.1-2.7-1.2-.3-1.1.3-2.2 1.5-2.9L28 24.3V9.5C28 6.2 29.6 4 32 4z"/></svg>',
+  );
+
+const VESSEL_ICON_URL =
+  "data:image/svg+xml;charset=utf-8," +
+  encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><path fill="#FFFFFF" d="M32 5L47 43l-15-6-15 6L32 5z"/><circle fill="#FFFFFF" cx="32" cy="51" r="4.5"/></svg>',
+  );
+
+const TRAFFIC_ICON_MAPPING = {
+  marker: { x: 0, y: 0, width: 64, height: 64, anchorY: 32, mask: true },
+};
 
 function rgbToCss(rgba: [number, number, number, number]): string {
   return `rgb(${rgba[0]}, ${rgba[1]}, ${rgba[2]})`;
@@ -1794,66 +1810,161 @@ export const AnalyticsMap3D: React.FC<Props> = ({
       );
     }
 
-    // 14. Live Aircraft (OpenSky) & AIS Vessels
-    if (layers.liveTelemetry && liveTelemetry?.aircraft?.aircraft?.length) {
+    // 14. Real-Time Air Traffic (ADS-B: adsb.fi / adsb.lol / OpenSky) & Maritime Vessels (AISStream)
+    if (layers.airTraffic && liveTelemetry?.aircraft?.aircraft?.length) {
+      type AircraftItem = NonNullable<LiveTelemetrySummary["aircraft"]>["aircraft"][number];
+      const airData = liveTelemetry.aircraft.aircraft;
+      const airborne = airData.filter((a) => !a.on_ground && (a.altitude_m || 0) > 100);
+      if (airborne.length > 0) {
+        list.push(
+          new LineLayer<AircraftItem>({
+            id: "live-aircraft-alt-stems",
+            data: airborne,
+            getSourcePosition: (d) => [d.lon, d.lat, 0],
+            getTargetPosition: (d) => [d.lon, d.lat, Math.min(4800, Math.max(80, (d.altitude_m || 0) * 0.42))],
+            getColor: [245, 158, 11, 130],
+            getWidth: 1.5,
+            widthUnits: "pixels",
+            pickable: false,
+          }),
+        );
+      }
       list.push(
-        new ScatterplotLayer({
+        new IconLayer<AircraftItem>({
           id: "live-aircraft",
-          data: liveTelemetry.aircraft.aircraft,
-          getPosition: (d) => [d.lon, d.lat],
-          getRadius: 480,
-          radiusMinPixels: 4,
-          radiusMaxPixels: 9,
-          getFillColor: [250, 204, 21, 245],
-          getLineColor: [15, 23, 42, 255],
-          lineWidthMinPixels: 1,
-          stroked: true,
+          data: airData,
+          iconAtlas: AIRCRAFT_ICON_URL,
+          iconMapping: TRAFFIC_ICON_MAPPING,
+          getIcon: () => "marker",
+          getPosition: (d) => [d.lon, d.lat, d.on_ground ? 12 : Math.min(4800, Math.max(80, (d.altitude_m || 0) * 0.42))],
+          getSize: 24,
+          sizeMinPixels: 18,
+          sizeMaxPixels: 30,
+          getAngle: (d) => -(d.heading || 0),
+          getColor: (d) => (d.on_ground ? [148, 163, 184, 235] : [245, 158, 11, 250]),
+          billboard: false,
           pickable: true,
           onHover: ({ x, y, object }) => {
             if (!object) return setHoverInfo(null);
+            const altFt = object.altitude_ft ?? Math.round((object.altitude_m || 0) / 0.3048);
+            const spdKt = object.speed_kt ?? Math.round((object.velocity_ms || 0) / 0.514444);
+            const kmh = Math.round((object.velocity_ms || 0) * 3.6);
             setHoverInfo({
               x,
               y,
-              title: `${isEn ? "Flight" : "Vuelo"} ${object.callsign || object.icao24}`,
+              title: `${isEn ? "Live Flight" : "Vuelo en Vivo"} · ${object.callsign || object.icao24}`,
               lines: isEn
                 ? [
-                    `Country: ${object.country} | Altitude: ${Math.round(object.altitude_m)} m`,
-                    `Speed: ${Math.round(object.velocity_ms * 3.6)} km/h`,
+                    `${object.aircraft_desc || object.aircraft_type || "Aircraft"}${object.registration ? ` (${object.registration})` : ""}${object.country ? ` · ${object.country}` : ""}`,
+                    `Alt: ${altFt.toLocaleString()} ft (${Math.round(object.altitude_m || 0).toLocaleString()} m) | Speed: ${spdKt} kt (${kmh} km/h)`,
+                    `Hdg: ${Math.round(object.heading || 0)}°${object.squawk ? ` | Squawk: ${object.squawk}` : ""} · ${object.provider || liveTelemetry.aircraft.source || "ADS-B"}`,
                   ]
                 : [
-                    `País: ${object.country} | Altitud: ${Math.round(object.altitude_m)} m`,
-                    `Velocidad: ${Math.round(object.velocity_ms * 3.6)} km/h`,
+                    `${object.aircraft_desc || object.aircraft_type || "Aeronave"}${object.registration ? ` (${object.registration})` : ""}${object.country ? ` · ${object.country}` : ""}`,
+                    `Altitud: ${altFt.toLocaleString()} ft (${Math.round(object.altitude_m || 0).toLocaleString()} m) | Vel: ${spdKt} kt (${kmh} km/h)`,
+                    `Rumbo: ${Math.round(object.heading || 0)}°${object.squawk ? ` | Squawk: ${object.squawk}` : ""} · ${object.provider || liveTelemetry.aircraft.source || "ADS-B"}`,
                   ],
             });
           },
+          onClick: ({ object }) => {
+            if (!object) return;
+            lastInspectHandledAtRef.current = Date.now();
+            onInspectLocation(object.lon, object.lat, null, null, Math.round(object.altitude_m || 0));
+          },
         }),
       );
+      if (zoom >= 6.5) {
+        list.push(
+          new TextLayer<AircraftItem>({
+            id: "live-aircraft-labels",
+            data: airData,
+            getPosition: (d) => [d.lon, d.lat, d.on_ground ? 12 : Math.min(4800, Math.max(80, (d.altitude_m || 0) * 0.42))],
+            getText: (d) => `${d.callsign || d.icao24}${d.altitude_m > 100 ? ` · ${Math.round((d.altitude_ft ?? d.altitude_m / 0.3048) / 1000)}k ft` : ""}`,
+            getSize: 10.5,
+            sizeUnits: "pixels",
+            getColor: theme === "light" ? [146, 64, 14, 245] : [253, 224, 71, 245],
+            getPixelOffset: [0, 16],
+            background: true,
+            getBackgroundColor: theme === "light" ? [255, 255, 255, 210] : [15, 23, 42, 210],
+            backgroundPadding: [4, 2],
+            fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+            fontWeight: 700,
+            pickable: false,
+          }),
+        );
+      }
     }
-    if (layers.liveTelemetry && liveTelemetry?.marine?.vessels?.length) {
+    if (layers.marineTraffic && liveTelemetry?.marine?.vessels?.length) {
+      type VesselItem = NonNullable<LiveTelemetrySummary["marine"]>["vessels"][number];
+      const vesselData = liveTelemetry.marine.vessels;
       list.push(
-        new ScatterplotLayer({
+        new IconLayer<VesselItem>({
           id: "live-vessels-ais",
-          data: liveTelemetry.marine.vessels,
-          getPosition: (d) => [d.lon, d.lat],
-          getRadius: 420,
-          radiusMinPixels: 4,
-          radiusMaxPixels: 8,
-          getFillColor: [34, 211, 238, 245],
-          getLineColor: [15, 23, 42, 255],
-          lineWidthMinPixels: 1,
-          stroked: true,
+          data: vesselData,
+          iconAtlas: VESSEL_ICON_URL,
+          iconMapping: TRAFFIC_ICON_MAPPING,
+          getIcon: () => "marker",
+          getPosition: (d) => [d.lon, d.lat, 8],
+          getSize: 22,
+          sizeMinPixels: 16,
+          sizeMaxPixels: 26,
+          getAngle: (d) => -(Number(d.heading ?? d.cog ?? 0)),
+          getColor: (d) => {
+            const t = String(d.type || "");
+            if (t.includes("Passenger") || t.includes("Ferry")) return [0, 122, 255, 245];
+            if (t.includes("Cargo")) return [0, 199, 190, 245];
+            if (t.includes("Tanker")) return [255, 149, 0, 245];
+            if (t.includes("Fishing") || t.includes("Yacht")) return [48, 209, 88, 245];
+            return [88, 86, 214, 245];
+          },
+          billboard: false,
           pickable: true,
           onHover: ({ x, y, object }) => {
             if (!object) return setHoverInfo(null);
             setHoverInfo({
               x,
               y,
-              title: `${isEn ? "Vessel" : "Buque"} ${object.name || object.mmsi}`,
-              lines: [`${isEn ? "Type" : "Tipo"}: ${object.type} | MMSI: ${object.mmsi}`],
+              title: `${isEn ? "Live Vessel" : "Embarcación AIS"} · ${object.name || object.mmsi}`,
+              lines: isEn
+                ? [
+                    `Type: ${object.type || "Vessel"} · MMSI ${object.mmsi}`,
+                    `Speed: ${object.sog ?? 0} kt | Heading: ${Math.round(Number(object.heading ?? object.cog ?? 0))}°${object.destination ? ` | Dest: ${object.destination}` : ""}`,
+                    "Source: AISStream.io Live WebSocket",
+                  ]
+                : [
+                    `Tipo: ${object.type || "Embarcación"} · MMSI ${object.mmsi}`,
+                    `Vel: ${object.sog ?? 0} kt | Rumbo: ${Math.round(Number(object.heading ?? object.cog ?? 0))}°${object.destination ? ` | Dest: ${object.destination}` : ""}`,
+                    "Fuente: AISStream.io WebSocket Vivo",
+                  ],
             });
+          },
+          onClick: ({ object }) => {
+            if (!object) return;
+            lastInspectHandledAtRef.current = Date.now();
+            onInspectLocation(object.lon, object.lat, null, null, 0);
           },
         }),
       );
+      if (zoom >= 7.2) {
+        list.push(
+          new TextLayer<VesselItem>({
+            id: "live-vessels-labels",
+            data: vesselData,
+            getPosition: (d) => [d.lon, d.lat, 8],
+            getText: (d) => d.name || d.mmsi,
+            getSize: 10,
+            sizeUnits: "pixels",
+            getColor: theme === "light" ? [3, 105, 161, 240] : [125, 211, 252, 240],
+            getPixelOffset: [0, 15],
+            background: true,
+            getBackgroundColor: theme === "light" ? [255, 255, 255, 205] : [15, 23, 42, 205],
+            backgroundPadding: [4, 2],
+            fontFamily: "system-ui, -apple-system, sans-serif",
+            fontWeight: 600,
+            pickable: false,
+          }),
+        );
+      }
     }
 
     // 14b. OGC SensorThings API v1.1 Live & Pilot Stations

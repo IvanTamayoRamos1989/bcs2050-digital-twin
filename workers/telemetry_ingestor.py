@@ -22,12 +22,13 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from backend.config import get_firestore_database, get_telemetry_pubsub_topic, use_bigquery, use_firestore_cache  # noqa: E402
+from backend.config import get_aisstream_api_key, get_firestore_database, get_telemetry_pubsub_topic, use_bigquery, use_firestore_cache  # noqa: E402
 from backend.live_feeds import (  # noqa: E402
     FIRESTORE_COLLECTION,
     FIRESTORE_LATEST_DOC,
     seed_in_memory_snapshot,
 )
+from backend.realtime_traffic import fetch_realtime_aircraft, harvest_aisstream_batch  # noqa: E402
 
 logger = logging.getLogger("bcs2050.workers.telemetry_ingestor")
 
@@ -123,74 +124,64 @@ def _fetch_opensky(
     fetcher: Callable[[str, float], Any],
     prev_snapshot: dict[str, Any] | None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
-    t0 = time.perf_counter()
-    now_iso = _utc_now_iso()
-    url = "https://opensky-network.org/api/states/all?lamin=22.0&lomin=-116.0&lamax=28.5&lomax=-108.5"
-    try:
-        data = fetcher(url, 8.0)
-        states = data.get("states") or []
-        items: list[dict[str, Any]] = []
-        for s in states[:120]:
-            if len(s) < 11 or s[5] is None or s[6] is None:
-                continue
-            items.append(
-                {
-                    "icao24": s[0],
-                    "callsign": str(s[1] or s[0] or "").strip(),
-                    "country": s[2] or "",
-                    "lon": float(s[5]),
-                    "lat": float(s[6]),
-                    "altitude_m": float(s[7] or (s[13] if len(s) > 13 else 0.0) or 0.0),
-                    "velocity_ms": float(s[9] or 0.0),
-                    "heading": float(s[10] or 0.0),
-                }
-            )
-        latency_ms = round((time.perf_counter() - t0) * 1000.0, 1)
-        payload = {"count": len(items), "aircraft": items, "source": "OpenSky Network", "stale": False, "notice": ""}
-        meta = {
-            "upstream_ok": True,
-            "fetched_at": now_iso,
-            "latency_ms": latency_ms,
-            "source": "OpenSky Network",
-            "notice": "",
-            "count": len(items),
-        }
+    payload, meta = fetch_realtime_aircraft(fetcher=fetcher)
+    if meta.get("upstream_ok"):
         return payload, meta
-    except Exception as exc:  # noqa: BLE001
-        latency_ms = round((time.perf_counter() - t0) * 1000.0, 1)
-        prev_air = (prev_snapshot or {}).get("aircraft") or {}
-        prev_meta = ((prev_snapshot or {}).get("feeds") or {}).get("aircraft") or {}
-        prev_fetched = prev_meta.get("fetched_at") or (prev_snapshot or {}).get("ingested_at")
-        if prev_air.get("aircraft") and _is_recent_iso(prev_fetched, 1800):
-            preserved = dict(prev_air)
-            preserved["stale"] = True
-            preserved["notice"] = f"Upstream error ({exc}); serving cached aircraft."
-            meta = {
-                "upstream_ok": False,
-                "fetched_at": prev_fetched,
-                "latency_ms": latency_ms,
-                "source": "OpenSky Network",
-                "notice": f"Fallback to prior snapshot ({exc})",
-                "count": int(preserved.get("count") or len(preserved.get("aircraft") or [])),
-            }
-            return preserved, meta
 
-        payload = {"count": 0, "aircraft": [], "source": "OpenSky Network", "stale": True, "notice": str(exc)}
-        meta = {
+    prev_air = (prev_snapshot or {}).get("aircraft") or {}
+    prev_meta = ((prev_snapshot or {}).get("feeds") or {}).get("aircraft") or {}
+    prev_fetched = prev_meta.get("fetched_at") or (prev_snapshot or {}).get("ingested_at")
+    if prev_air.get("aircraft") and _is_recent_iso(prev_fetched, 1800):
+        preserved = dict(prev_air)
+        preserved["stale"] = True
+        preserved["notice"] = f"Upstream error ({meta.get('notice')}); serving cached aircraft."
+        fallback_meta = {
             "upstream_ok": False,
-            "fetched_at": now_iso,
-            "latency_ms": latency_ms,
-            "source": "OpenSky Network",
-            "notice": str(exc),
-            "count": 0,
+            "fetched_at": prev_fetched,
+            "latency_ms": meta.get("latency_ms"),
+            "source": preserved.get("source") or "ADS-B / OpenSky",
+            "notice": f"Fallback to prior snapshot ({meta.get('notice')})",
+            "count": int(preserved.get("count") or len(preserved.get("aircraft") or [])),
         }
-        return payload, meta
+        return preserved, fallback_meta
+    return payload, meta
 
 
 def _fetch_marine_ais(
     fetcher: Callable[[str, float], Any],
     prev_snapshot: dict[str, Any] | None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
+    ais_key = get_aisstream_api_key()
+    prev_marine = (prev_snapshot or {}).get("marine") or {}
+    prev_meta = ((prev_snapshot or {}).get("feeds") or {}).get("marine") or {}
+    prev_fetched = prev_meta.get("fetched_at") or (prev_snapshot or {}).get("ingested_at")
+    if ais_key:
+        import asyncio
+
+        payload, meta = asyncio.run(
+            harvest_aisstream_batch(
+                ais_key,
+                duration_s=18.0,
+                prev_vessels=prev_marine.get("vessels") or [],
+            )
+        )
+        if meta.get("upstream_ok"):
+            return payload, meta
+        if prev_marine.get("vessels") and _is_recent_iso(prev_fetched, 1800):
+            preserved = dict(prev_marine)
+            preserved["connected"] = False
+            preserved["notice"] = meta.get("notice") or "AISStream paused; serving recent vessel cache."
+            fallback_meta = {
+                "upstream_ok": False,
+                "fetched_at": prev_fetched,
+                "latency_ms": meta.get("latency_ms"),
+                "source": "AISStream.io WebSocket",
+                "notice": preserved["notice"],
+                "count": int(preserved.get("count") or len(preserved.get("vessels") or [])),
+            }
+            return preserved, fallback_meta
+        return payload, meta
+
     t0 = time.perf_counter()
     now_iso = _utc_now_iso()
     base = os.environ.get(

@@ -14,7 +14,8 @@ import time
 from datetime import datetime, timezone
 from typing import Any
 
-from backend.config import get_firestore_database, use_firestore_cache
+from backend.config import enable_realtime_traffic, get_firestore_database, use_firestore_cache
+from backend.realtime_traffic import REALTIME_TRAFFIC_HUB
 
 logger = logging.getLogger("bcs2050.live_feeds")
 
@@ -296,8 +297,25 @@ def get_live_telemetry_summary() -> dict[str, Any]:
     marine = snap.get("marine") or {"count": 0, "connected": False, "vessels": []}
     cyclones = snap.get("cyclones") or {"count": 0, "active_storms": [], "source": "NOAA NHC"}
 
+    air_feed_raw = dict(raw_feeds.get("aircraft") or {})
+    marine_feed_raw = dict(raw_feeds.get("marine") or {})
+    if enable_realtime_traffic():
+        REALTIME_TRAFFIC_HUB.seed_vessels_if_empty(marine.get("vessels") or [])
+        air_overlay = REALTIME_TRAFFIC_HUB.get_aircraft_overlay()
+        if air_overlay is not None:
+            live_air_payload, live_air_meta = air_overlay
+            if live_air_meta.get("upstream_ok") or not (air.get("aircraft") or []):
+                air = live_air_payload
+                air_feed_raw = live_air_meta
+        marine_overlay = REALTIME_TRAFFIC_HUB.get_marine_overlay()
+        if marine_overlay is not None:
+            live_mar_payload, live_mar_meta = marine_overlay
+            if live_mar_payload.get("vessels") or live_mar_meta.get("upstream_ok"):
+                marine = live_mar_payload
+                marine_feed_raw = live_mar_meta
+
     weather_has_data = any(isinstance(v, dict) and v.get("temp_c") is not None for v in weather.values())
-    air_has_data = len(air.get("aircraft") or []) > 0 or bool(raw_feeds.get("aircraft", {}).get("upstream_ok"))
+    air_has_data = len(air.get("aircraft") or []) > 0 or bool(air_feed_raw.get("upstream_ok"))
     marine_has_data = bool(marine.get("connected")) or len(marine.get("vessels") or []) > 0
     cyc_has_data = isinstance(cyclones.get("active_storms"), list)
 
@@ -315,11 +333,11 @@ def get_live_telemetry_summary() -> dict[str, Any]:
     )
     air_meta = _compute_feed_freshness(
         feed_meta={
-            "fetched_at": raw_feeds.get("aircraft", {}).get("fetched_at") or snap.get("ingested_at"),
-            "upstream_ok": raw_feeds.get("aircraft", {}).get("upstream_ok", False),
-            "latency_ms": raw_feeds.get("aircraft", {}).get("latency_ms"),
+            "fetched_at": air_feed_raw.get("fetched_at") or snap.get("ingested_at"),
+            "upstream_ok": air_feed_raw.get("upstream_ok", False),
+            "latency_ms": air_feed_raw.get("latency_ms"),
             "source": air.get("source", "OpenSky Network"),
-            "notice": raw_feeds.get("aircraft", {}).get("notice") or air.get("notice", ""),
+            "notice": air_feed_raw.get("notice") or air.get("notice", ""),
             "count": int(air.get("count") or 0),
         },
         now_epoch=now_epoch,
@@ -327,11 +345,11 @@ def get_live_telemetry_summary() -> dict[str, Any]:
     )
     marine_meta = _compute_feed_freshness(
         feed_meta={
-            "fetched_at": raw_feeds.get("marine", {}).get("fetched_at") or snap.get("ingested_at"),
-            "upstream_ok": bool(marine.get("connected")) and bool(raw_feeds.get("marine", {}).get("upstream_ok", True)),
-            "latency_ms": raw_feeds.get("marine", {}).get("latency_ms"),
+            "fetched_at": marine_feed_raw.get("fetched_at") or snap.get("ingested_at"),
+            "upstream_ok": bool(marine.get("connected")) and bool(marine_feed_raw.get("upstream_ok", True)),
+            "latency_ms": marine_feed_raw.get("latency_ms"),
             "source": marine.get("source", "AIS Stream Proxy"),
-            "notice": raw_feeds.get("marine", {}).get("notice") or marine.get("notice", ""),
+            "notice": marine_feed_raw.get("notice") or marine.get("notice", ""),
             "count": int(marine.get("count") or 0),
         },
         now_epoch=now_epoch,

@@ -243,3 +243,55 @@ def test_telemetry_ingestor_worker_cycle_and_resilience() -> None:
     )
     assert len(rows) == 18
     assert any(r["feed_name"] == "weather" and r["municipality_code"] == "03008" for r in rows)
+
+
+def test_realtime_adsb_and_ais_parsers() -> None:
+    from backend.realtime_traffic import fetch_realtime_aircraft, parse_ais_message
+
+    def _mock_adsb(url: str, timeout: float = 7.0):
+        assert "adsb.fi" in url
+        return {
+            "ac": [
+                {
+                    "hex": "0d0e51",
+                    "flight": "VOI3257 ",
+                    "r": "XA-VSF",
+                    "t": "A20N",
+                    "desc": "AIRBUS A-320neo",
+                    "lat": 24.15,
+                    "lon": -110.31,
+                    "alt_baro": 18000,
+                    "gs": 360.0,
+                    "track": 145.2,
+                }
+            ]
+        }
+
+    air_payload, air_meta = fetch_realtime_aircraft(fetcher=_mock_adsb)
+    assert air_meta["upstream_ok"] is True
+    assert air_payload["count"] == 1
+    assert air_payload["aircraft"][0]["callsign"] == "VOI3257"
+    assert air_payload["aircraft"][0]["altitude_ft"] == 18000
+    assert air_payload["aircraft"][0]["provider"] == "adsb.fi"
+
+    static_msg = {
+        "MessageType": "ShipStaticData",
+        "MetaData": {"MMSI": 345001122, "ShipName": "B/M COROMUEL", "latitude": 24.22, "longitude": -110.32},
+        "Message": {"ShipStaticData": {"Type": 60, "Destination": "MAZATLAN"}},
+    }
+    vessel = parse_ais_message(static_msg)
+    assert vessel is not None
+    assert vessel["type"] == "Passenger / Ferry"
+    assert vessel["destination"] == "MAZATLAN"
+    assert vessel["corridor_zone"] == "bcs_waters"
+
+    pos_msg = {
+        "MessageType": "PositionReport",
+        "MetaData": {"MMSI": 345001122},
+        "Message": {"PositionReport": {"UserID": 345001122, "Latitude": 24.25, "Longitude": -110.29, "Sog": 16.5, "Cog": 112.0, "TrueHeading": 115}},
+    }
+    updated = parse_ais_message(pos_msg, vessel)
+    assert updated is not None
+    assert updated["name"] == "B/M COROMUEL"
+    assert updated["sog"] == 16.5
+    assert updated["heading"] == 115.0

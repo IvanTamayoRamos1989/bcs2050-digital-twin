@@ -24,12 +24,14 @@ from backend.cad_bim_bridge import (
 )
 from backend.config import (
     FRONTEND_DIST_DIR,
+    enable_realtime_traffic,
     get_3dtiles_tileset_url,
     get_allowed_origins,
     get_public_client_config,
     get_runtime_capabilities,
 )
 from backend.live_feeds import get_live_telemetry_summary
+from backend.realtime_traffic import REALTIME_TRAFFIC_HUB
 from backend.metadata_catalog import (
     CANONICAL_KPI_RECONCILIATION,
     build_iso19115_metadata_catalog,
@@ -63,7 +65,11 @@ from backend.spatial_store import (
 @asynccontextmanager
 async def _lifespan(_app: FastAPI):
     ensure_spatial_data_ready()
+    if enable_realtime_traffic():
+        REALTIME_TRAFFIC_HUB.start()
     yield
+    if enable_realtime_traffic():
+        REALTIME_TRAFFIC_HUB.stop()
 
 
 app = FastAPI(

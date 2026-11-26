@@ -140,15 +140,17 @@ const LAYER_GROUPS: LayerGroupDef[] = [
     defaultOpen: true,
     items: [
       { key: "hazardAtlas", labelEs: "Inundación, Marea y Calor", labelEn: "Flood, Surge & Heat Atlas", count: "641", dot: "bg-[#FF3B30]" },
-      { key: "liveTelemetry", labelEs: "Monitoreo Vivo AIS/Aéreo", labelEn: "Live Telemetry / OGC", count: "LIVE", dot: "bg-[#007AFF]" },
+      { key: "liveTelemetry", labelEs: "Sensores OGC y Clima", labelEn: "OGC Weather & Sensors", count: "LIVE", dot: "bg-[#007AFF]" },
     ],
   },
   {
     id: "mobility",
     titleEn: "Mobility & Logistics",
     titleEs: "Movilidad y Logística",
-    defaultOpen: false,
+    defaultOpen: true,
     items: [
+      { key: "airTraffic", labelEs: "Tráfico Aéreo Vivo (ADS-B)", labelEn: "Live Air Traffic (ADS-B)", count: "LIVE", dot: "bg-[#F59E0B]" },
+      { key: "marineTraffic", labelEs: "Tráfico Marítimo Vivo (AIS)", labelEn: "Live Marine Traffic (AIS)", count: "LIVE", dot: "bg-[#007AFF]" },
       { key: "transit", labelEs: "Rutas y Paradas Transporte", labelEn: "Transit Routes & Stops", count: "1,170", dot: "bg-[#5856D6]" },
       { key: "mobilityArterials", labelEs: "Vialidades y Ciclovías", labelEn: "Arterials & Bikeways", count: "194", dot: "bg-[#FF9500]" },
       { key: "corridorArcs", labelEs: "Arcos Corredores BCS", labelEn: "Corridor Flow Arcs", count: "6", dot: "bg-[#32ADE6]" },

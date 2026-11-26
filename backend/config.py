@@ -48,6 +48,14 @@ def use_firestore_cache() -> bool:
     return os.environ.get("BCS2050_USE_FIRESTORE", "false").strip().lower() in {"1", "true", "yes"}
 
 
+def enable_realtime_traffic() -> bool:
+    return os.environ.get("BCS2050_ENABLE_REALTIME_TRAFFIC", "false").strip().lower() in {"1", "true", "yes"}
+
+
+def get_aisstream_api_key() -> str:
+    return os.environ.get("AISSTREAM_API_KEY", "").strip()
+
+
 def get_firestore_database() -> str:
     return os.environ.get("BCS2050_FIRESTORE_DATABASE", "bcs-studio").strip() or "bcs-studio"
 
@@ -178,6 +186,8 @@ def get_runtime_capabilities() -> dict[str, bool]:
         "physics_cloud_run_jobs": use_cloud_run_jobs(),
         "vvuq_uncertainty_framework": True,
         "wntr_hydraulic_solver": True,
+        "realtime_air_traffic_adsb": True,
+        "realtime_marine_ais_stream": bool(get_aisstream_api_key()),
     }
 
 

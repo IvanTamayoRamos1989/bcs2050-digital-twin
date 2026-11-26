@@ -3,7 +3,7 @@ import * as Cesium from "cesium";
 import "cesium/Build/Cesium/Widgets/widgets.css";
 import { Globe2, KeyRound, Layers } from "lucide-react";
 import { TwinAPI } from "../api/client";
-import type { AgebMetricKey, CameraPreset, LayerVisibility } from "../types/twin";
+import type { AgebMetricKey, CameraPreset, LayerVisibility, LiveTelemetrySummary } from "../types/twin";
 import { METRIC_CATALOG, interpolateMetricColor } from "../utils/colorScales";
 
 (window as unknown as { CESIUM_BASE_URL?: string }).CESIUM_BASE_URL = "/cesium";
@@ -17,6 +17,7 @@ interface Props {
   terrainExaggeration?: number;
   agebs3dMode: boolean;
   layers: LayerVisibility;
+  liveTelemetry?: LiveTelemetrySummary | null;
   colorblindSafe?: boolean;
   language?: "es" | "en";
   googleMapsApiKey?: string;
@@ -82,6 +83,7 @@ export const CesiumGlobe3D: React.FC<Props> = ({
   terrainExaggeration = 1.5,
   agebs3dMode,
   layers,
+  liveTelemetry = null,
   colorblindSafe = true,
   language = "en",
   googleMapsApiKey = "",
@@ -322,6 +324,61 @@ export const CesiumGlobe3D: React.FC<Props> = ({
       viewer.scene.verticalExaggeration = terrain3dEnabled ? Math.max(1.0, terrainExaggeration) : 1.0;
     }
   }, [terrain3dEnabled, terrainExaggeration, worldTerrainLoaded]);
+
+  // Sync Real-Time Air Traffic (ADS-B) & Marine Traffic (AIS) entities onto Cesium Globe
+  useEffect(() => {
+    const viewer = viewerRef.current;
+    if (!viewer || viewer.isDestroyed()) return;
+    const existing = viewer.dataSources.getByName("bcs_live_traffic");
+    existing.forEach((d) => viewer.dataSources.remove(d, true));
+
+    const ds = new Cesium.CustomDataSource("bcs_live_traffic");
+    if (layers.airTraffic && liveTelemetry?.aircraft?.aircraft?.length) {
+      for (const a of liveTelemetry.aircraft.aircraft) {
+        ds.entities.add({
+          position: Cesium.Cartesian3.fromDegrees(a.lon, a.lat, Math.max(80, a.altitude_m || 0)),
+          point: {
+            pixelSize: 9,
+            color: Cesium.Color.fromBytes(245, 158, 11, 245),
+            outlineColor: Cesium.Color.WHITE,
+            outlineWidth: 2,
+          },
+          label: {
+            text: a.callsign || a.icao24,
+            font: "10px monospace",
+            fillColor: Cesium.Color.WHITE,
+            showBackground: true,
+            backgroundColor: Cesium.Color.fromAlpha(Cesium.Color.BLACK, 0.55),
+            pixelOffset: new Cesium.Cartesian2(0, -14),
+            distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 650000),
+          },
+        });
+      }
+    }
+    if (layers.marineTraffic && liveTelemetry?.marine?.vessels?.length) {
+      for (const v of liveTelemetry.marine.vessels) {
+        ds.entities.add({
+          position: Cesium.Cartesian3.fromDegrees(v.lon, v.lat, 8),
+          point: {
+            pixelSize: 8,
+            color: Cesium.Color.fromBytes(10, 132, 255, 245),
+            outlineColor: Cesium.Color.WHITE,
+            outlineWidth: 2,
+          },
+          label: {
+            text: v.name || v.mmsi,
+            font: "10px sans-serif",
+            fillColor: Cesium.Color.WHITE,
+            showBackground: true,
+            backgroundColor: Cesium.Color.fromAlpha(Cesium.Color.BLACK, 0.55),
+            pixelOffset: new Cesium.Cartesian2(0, -12),
+            distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 350000),
+          },
+        });
+      }
+    }
+    viewer.dataSources.add(ds);
+  }, [layers.airTraffic, layers.marineTraffic, liveTelemetry]);
 
   // Switch cleanly between Photorealistic 3D Tiles mode and Analytical OGC 3D Tiles mode
   useEffect(() => {

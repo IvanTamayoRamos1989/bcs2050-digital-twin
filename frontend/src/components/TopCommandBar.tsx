@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
+  Anchor,
   Bot,
   ChevronRight,
   ExternalLink,
@@ -9,6 +10,7 @@ import {
   Moon,
   PanelLeft,
   PanelRight,
+  Plane,
   Radio,
   ShieldCheck,
   SlidersHorizontal,
@@ -70,6 +72,7 @@ interface Props {
   onToggleChat: () => void;
   language: "es" | "en";
   onLanguageChange: (lang: "es" | "en") => void;
+  onFlyTo?: (cam: CameraPreset) => void;
 }
 
 export const TopCommandBar: React.FC<Props> = ({
@@ -112,6 +115,7 @@ export const TopCommandBar: React.FC<Props> = ({
   onToggleChat,
   language,
   onLanguageChange,
+  onFlyTo,
 }) => {
   void _phase;
   void _onPhaseChange;
@@ -124,6 +128,10 @@ export const TopCommandBar: React.FC<Props> = ({
   const totalBuildings = overview?.state.buildings_3d_count ?? 396823;
   const isEn = language === "en";
   const weatherFeed = liveTelemetry?.feeds?.weather;
+  const airCount = liveTelemetry?.aircraft?.count ?? 0;
+  const marineCount = liveTelemetry?.marine?.count ?? 0;
+  const firstAircraft = liveTelemetry?.aircraft?.aircraft?.[0];
+  const firstVessel = liveTelemetry?.marine?.vessels?.[0];
   const overallStatus = liveTelemetry?.overall_status || weatherFeed?.status || "CACHED";
   const statusDotClass =
     overallStatus === "LIVE"
@@ -354,6 +362,18 @@ export const TopCommandBar: React.FC<Props> = ({
                 ? `${Math.round(liveTelemetry.weather.la_paz.temp_c)}°`
                 : "BCS"}
             </span>
+            {airCount > 0 && (
+              <span className="hidden 2xl:inline-flex items-center gap-0.5 text-[10px] font-semibold text-[#D97706]">
+                <Plane className="h-2.5 w-2.5" aria-hidden="true" />
+                {airCount}
+              </span>
+            )}
+            {marineCount > 0 && (
+              <span className="hidden 2xl:inline-flex items-center gap-0.5 text-[10px] font-semibold text-[var(--hig-accent)]">
+                <Anchor className="h-2.5 w-2.5" aria-hidden="true" />
+                {marineCount}
+              </span>
+            )}
           </button>
 
           {livePopoverOpen && (
@@ -416,24 +436,57 @@ export const TopCommandBar: React.FC<Props> = ({
                 })}
               </div>
 
-              <div className="mt-3 flex items-center justify-between gap-2">
-                <button
-                  type="button"
-                  onClick={onToggleLive}
-                  className="rounded-full bg-[var(--hig-accent)]/18 px-3 py-1.5 text-[10.5px] font-semibold text-[var(--hig-accent)] hover:bg-[var(--hig-accent)]/28 cursor-pointer"
-                >
-                  {liveActive
-                    ? isEn ? "Hide 3D Sensors" : "Ocultar Sensores 3D"
-                    : isEn ? "Show 3D Sensors" : "Mostrar Sensores 3D"}
-                </button>
-                <a
-                  href="/FROST-Server/v1.1/Things"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="font-mono-num text-[10px] text-[var(--hig-accent)] hover:underline"
-                >
-                  /FROST-Server ({sensorCount})
-                </a>
+              <div className="mt-2.5 space-y-2">
+                {(firstAircraft || firstVessel) && onFlyTo && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {firstAircraft && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onFlyTo({ lon: firstAircraft.lon, lat: firstAircraft.lat, zoom: 9.2, pitch: 52, bearing: -12 });
+                          setLivePopoverOpen(false);
+                        }}
+                        className="flex flex-1 items-center justify-center gap-1 rounded-full bg-[#FF9F0A]/15 px-2.5 py-1 text-[10.5px] font-semibold text-[#D97706] hover:bg-[#FF9F0A]/25 cursor-pointer whitespace-nowrap"
+                      >
+                        <Plane className="h-3 w-3" aria-hidden="true" />
+                        <span>{isEn ? `Track ${firstAircraft.callsign || "Flight"}` : `Ver ${firstAircraft.callsign || "Vuelo"}`}</span>
+                      </button>
+                    )}
+                    {firstVessel && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onFlyTo({ lon: firstVessel.lon, lat: firstVessel.lat, zoom: 9.2, pitch: 48, bearing: -12 });
+                          setLivePopoverOpen(false);
+                        }}
+                        className="flex flex-1 items-center justify-center gap-1 rounded-full bg-[#0A84FF]/15 px-2.5 py-1 text-[10.5px] font-semibold text-[var(--hig-accent)] hover:bg-[#0A84FF]/25 cursor-pointer whitespace-nowrap"
+                      >
+                        <Anchor className="h-3 w-3" aria-hidden="true" />
+                        <span>{isEn ? `Track ${firstVessel.name || "Vessel"}` : `Ver ${firstVessel.name || "Buque"}`}</span>
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between gap-2">
+                  <button
+                    type="button"
+                    onClick={onToggleLive}
+                    className="rounded-full bg-[var(--hig-accent)]/18 px-3 py-1.5 text-[10.5px] font-semibold text-[var(--hig-accent)] hover:bg-[var(--hig-accent)]/28 cursor-pointer"
+                  >
+                    {liveActive
+                      ? isEn ? "Hide 3D Sensors" : "Ocultar Sensores 3D"
+                      : isEn ? "Show 3D Sensors" : "Mostrar Sensores 3D"}
+                  </button>
+                  <a
+                    href="/FROST-Server/v1.1/Things"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="font-mono-num text-[10px] text-[var(--hig-accent)] hover:underline"
+                  >
+                    /FROST-Server ({sensorCount})
+                  </a>
+                </div>
               </div>
             </div>
           )}

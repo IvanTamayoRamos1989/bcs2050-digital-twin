@@ -46,7 +46,8 @@ RUN apt-get update \
     networkx>=3.3 \
     wntr>=1.5.0 \
     rasterio>=1.4.0 \
-    google-genai>=1.0.0
+    google-genai>=1.0.0 \
+    "websockets>=13.0"
 
 COPY bcs2050_intelligence /app/bcs2050_intelligence
 COPY backend /app/bcs2050_digital_twin/backend
