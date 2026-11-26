@@ -411,6 +411,30 @@ export interface ChatCitation {
   excerpt?: string | null;
 }
 
+export interface ChatMapLegendItem {
+  label: string;
+  color: string;
+}
+
+export interface ChatMapAction {
+  intent: string;
+  title: string;
+  subtitle?: string;
+  matched_count: number;
+  layers_to_enable?: (keyof LayerVisibility)[];
+  layers_to_disable?: (keyof LayerVisibility)[];
+  active_metric?: AgebMetricKey | null;
+  active_challenge?: ChallengeId | null;
+  agebs_3d_mode?: boolean | null;
+  terrain_3d_enabled?: boolean | null;
+  terrain_exaggeration?: number | null;
+  basemap_mode?: BasemapMode | null;
+  fly_to?: CameraPreset | null;
+  legend?: ChatMapLegendItem[];
+  highlight_geojson?: GeoJSON.FeatureCollection | null;
+  clear_highlight?: boolean;
+}
+
 export interface ChatResponse {
   query: string;
   scope_id: string;
@@ -424,6 +448,7 @@ export interface ChatResponse {
   implan_context_used?: boolean;
   answer_markdown: string;
   fly_to: CameraPreset | null;
+  map_action?: ChatMapAction | null;
   lineage: string[];
 }
 

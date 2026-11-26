@@ -4,7 +4,7 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import { MapboxOverlay } from "@deck.gl/mapbox";
 import { Tile3DLayer } from "@deck.gl/geo-layers";
 import { ArcLayer, GeoJsonLayer, IconLayer, LineLayer, PolygonLayer, ScatterplotLayer, TextLayer } from "@deck.gl/layers";
-import { Box, Building2, Compass, Film, Mountain, Square, ZoomIn } from "lucide-react";
+import { Box, Building2, Compass, Film, Mountain, Sparkles, Square, X, ZoomIn } from "lucide-react";
 import { TwinAPI } from "../api/client";
 import type {
   ActivePhysicsOverlay,
@@ -14,6 +14,7 @@ import type {
   BasemapMode,
   BuildingRecord,
   CameraPreset,
+  ChatMapAction,
   CitizenPin,
   CorridorArc,
   LayerVisibility,
@@ -49,6 +50,8 @@ interface Props {
   liveTelemetry: LiveTelemetrySummary | null;
   sensorThings?: SensorThingRecord[];
   physicsOverlay?: ActivePhysicsOverlay | null;
+  aiMapHighlight?: ChatMapAction | null;
+  onClearAiHighlight?: () => void;
   citizenPins?: CitizenPin[];
   pendingPinCoords?: { lon: number; lat: number } | null;
   pinPlacementMode?: boolean;
@@ -326,6 +329,8 @@ export const AnalyticsMap3D: React.FC<Props> = ({
   liveTelemetry,
   sensorThings = [],
   physicsOverlay = null,
+  aiMapHighlight = null,
+  onClearAiHighlight,
   citizenPins = [],
   pendingPinCoords = null,
   pinPlacementMode = false,
@@ -2194,10 +2199,58 @@ export const AnalyticsMap3D: React.FC<Props> = ({
       );
     }
 
+    // 17. Aino-Style AI Spatial Chat Highlight Overlay
+    if (aiMapHighlight?.highlight_geojson?.features && aiMapHighlight.highlight_geojson.features.length > 0) {
+      list.push(
+        new GeoJsonLayer({
+          id: `ai-spatial-highlight-${aiMapHighlight.intent}`,
+          data: aiMapHighlight.highlight_geojson,
+          stroked: true,
+          filled: true,
+          pointType: "circle",
+          getPointRadius: 260,
+          pointRadiusMinPixels: 7,
+          pointRadiusMaxPixels: 14,
+          getFillColor: (f: GeoJSON.Feature) =>
+            (f.properties?._ai_color as [number, number, number, number]) || [10, 132, 255, 165],
+          getLineColor: (f: GeoJSON.Feature) =>
+            (f.properties?._ai_line_color as [number, number, number, number]) || [255, 255, 255, 235],
+          getLineWidth: 2.2,
+          lineWidthMinPixels: 1.5,
+          lineWidthUnits: "pixels",
+          pickable: true,
+          autoHighlight: true,
+          highlightColor: [255, 255, 255, 140],
+          onHover: ({ x, y, object }) => {
+            if (!object) return setHoverInfo(null);
+            const p = object.properties || {};
+            setHoverInfo({
+              x,
+              y,
+              title: String(p._ai_title || aiMapHighlight.title || "AI Spatial Filter"),
+              lines: [
+                String(p._ai_detail || aiMapHighlight.subtitle || ""),
+                isEn ? "Aino Spatial Filter · Click to inspect" : "Filtro Espacial IA · Clic para inspeccionar",
+              ].filter(Boolean),
+            });
+          },
+          onClick: ({ coordinate }) => {
+            if (!coordinate) return;
+            lastInspectHandledAtRef.current = Date.now();
+            const elev = mapRef.current
+              ? queryRealElevationRef.current(mapRef.current, [coordinate[0], coordinate[1]])
+              : null;
+            onInspectLocation(coordinate[0], coordinate[1], null, null, elev);
+          },
+        }),
+      );
+    }
+
     return list;
   }, [
     activeMetric,
     agebs3dMode,
+    aiMapHighlight,
     buildings,
     citizenPins,
     colorblindSafe,
@@ -2253,6 +2306,46 @@ export const AnalyticsMap3D: React.FC<Props> = ({
           >
             {isEn ? "Cancel" : "Cancelar"}
           </button>
+        </div>
+      )}
+
+      {/* Aino-Style Active Spatial Chat Filter Legend Pill */}
+      {!pinPlacementMode && aiMapHighlight && (
+        <div
+          role="region"
+          aria-label={isEn ? "Active AI map visualization" : "Visualización IA activa en mapa"}
+          className="hig-glass-toolbar pointer-events-auto absolute left-1/2 top-[72px] z-20 flex max-w-[calc(100vw-40px)] -translate-x-1/2 flex-wrap items-center gap-2 rounded-full px-3.5 py-1.5 text-[11px] shadow-md"
+        >
+          <span className="flex items-center gap-1.5 font-semibold text-[var(--hig-accent)]">
+            <Sparkles className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+            <span>{aiMapHighlight.title}</span>
+          </span>
+          <span className="font-mono-num rounded-full bg-[var(--hig-accent)]/15 px-2 py-0.5 text-[10px] font-semibold text-[var(--hig-accent)]">
+            {aiMapHighlight.matched_count}
+          </span>
+          {aiMapHighlight.legend && aiMapHighlight.legend.length > 0 && (
+            <>
+              <span className="hidden md:inline-block h-3 w-px bg-[var(--hig-divider)]" />
+              <div className="hidden md:flex items-center gap-2.5">
+                {aiMapHighlight.legend.map((lg) => (
+                  <span key={lg.label} className="inline-flex items-center gap-1 text-[10.5px] text-[var(--hig-ink-2)] whitespace-nowrap">
+                    <span className="h-2 w-2 rounded-full shrink-0 ring-1 ring-black/10" style={{ backgroundColor: lg.color }} />
+                    <span>{lg.label}</span>
+                  </span>
+                ))}
+              </div>
+            </>
+          )}
+          {onClearAiHighlight && (
+            <button
+              type="button"
+              onClick={onClearAiHighlight}
+              aria-label={isEn ? "Clear AI map visualization" : "Quitar filtro IA del mapa"}
+              className="flex h-5 w-5 items-center justify-center rounded-full bg-[var(--hig-pill-bg)] text-[var(--hig-ink-2)] hover:text-[var(--hig-ink)] cursor-pointer"
+            >
+              <X className="h-3 w-3" />
+            </button>
+          )}
         </div>
       )}
 

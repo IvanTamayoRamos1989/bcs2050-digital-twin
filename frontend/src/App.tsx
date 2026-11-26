@@ -25,6 +25,7 @@ import type {
   BasemapMode,
   CameraPreset,
   ChallengeId,
+  ChatMapAction,
   CitizenPin,
   ClientConfigResponse,
   CorridorPreset,
@@ -155,6 +156,7 @@ export const App: React.FC = () => {
   // Coupled Physics Workers (OGC API - Processes -> Cloud Run Jobs)
   const [physicsJobStatus, setPhysicsJobStatus] = useState<OgcPhysicsJobStatus | null>(null);
   const [physicsOverlay, setPhysicsOverlay] = useState<ActivePhysicsOverlay | null>(null);
+  const [aiMapHighlight, setAiMapHighlight] = useState<ChatMapAction | null>(null);
   const physicsRunTokenRef = useRef<number>(0);
 
   useEffect(() => {
@@ -430,6 +432,46 @@ export const App: React.FC = () => {
     [language, showToast],
   );
 
+  const handleApplyMapAction = useCallback(
+    (action: ChatMapAction) => {
+      if (action.clear_highlight) {
+        setAiMapHighlight(null);
+        if (action.fly_to) setCameraTarget({ ...action.fly_to });
+        showToast(language === "en" ? "Map highlight cleared" : "Filtro de mapa limpiado");
+        return;
+      }
+
+      if ((action.layers_to_enable && action.layers_to_enable.length > 0) || (action.layers_to_disable && action.layers_to_disable.length > 0)) {
+        setLayers((prev) => {
+          const next = { ...prev };
+          for (const k of action.layers_to_disable || []) {
+            if (k in next) next[k] = false;
+          }
+          for (const k of action.layers_to_enable || []) {
+            if (k in next) next[k] = true;
+          }
+          return next;
+        });
+      }
+      if (action.active_challenge) setActiveChallenge(action.active_challenge);
+      if (action.active_metric) setActiveMetric(action.active_metric);
+      if (typeof action.agebs_3d_mode === "boolean") setAgebs3dMode(action.agebs_3d_mode);
+      if (typeof action.terrain_3d_enabled === "boolean") setTerrain3dEnabled(action.terrain_3d_enabled);
+      if (typeof action.terrain_exaggeration === "number") setTerrainExaggeration(action.terrain_exaggeration);
+      if (action.basemap_mode) setBasemapMode(action.basemap_mode);
+
+      if ((action.highlight_geojson?.features && action.highlight_geojson.features.length > 0) || (action.legend && action.legend.length > 0)) {
+        setAiMapHighlight(action);
+      }
+      if (action.fly_to) {
+        setEngineMode("deck3d");
+        setCameraTarget({ ...action.fly_to });
+      }
+      showToast(`${language === "en" ? "Map synced" : "Mapa actualizado"} · ${action.title}`);
+    },
+    [language, showToast],
+  );
+
   const handleStartTour = useCallback(
     (tourId: string) => {
       const target = tours.find((t) => t.id === tourId);
@@ -543,6 +585,8 @@ export const App: React.FC = () => {
               liveTelemetry={liveTelemetry}
               sensorThings={sensorThings}
               physicsOverlay={physicsOverlay}
+              aiMapHighlight={aiMapHighlight}
+              onClearAiHighlight={() => setAiMapHighlight(null)}
               citizenPins={citizenPins}
               pendingPinCoords={pendingPinCoords}
               pinPlacementMode={pinPlacementMode}
@@ -777,6 +821,7 @@ export const App: React.FC = () => {
             scenarioName={scenarioName}
             language={language}
             onFlyTo={(cam) => setCameraTarget({ ...cam })}
+            onApplyMapAction={handleApplyMapAction}
           />
         </Suspense>
       )}

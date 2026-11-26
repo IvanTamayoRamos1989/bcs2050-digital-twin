@@ -210,3 +210,47 @@ def test_live_vertex_and_bigquery_rag_roundtrip(monkeypatch: pytest.MonkeyPatch)
     assert len(res["citations"]) >= 1
     assert any(c.get("distance") is not None for c in res["citations"])
     assert len(res["answer_markdown"]) > 120
+
+
+def test_aino_prompt_to_map_spatial_actions(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("BCS2050_USE_BIGQUERY", "false")
+    monkeypatch.setenv("BCS2050_USE_VERTEX_STRATEGIST", "false")
+
+    r_water = client.post(
+        "/api/twin/chat",
+        json={"query": "Show me the water stressed areas", "scope_id": "03", "language": "en"},
+    )
+    assert r_water.status_code == 200
+    d_water = r_water.json()
+    ma_w = d_water.get("map_action")
+    assert ma_w is not None
+    assert ma_w["intent"] == "water_stress"
+    assert ma_w["matched_count"] >= 21
+    assert "aquifers" in ma_w["layers_to_enable"]
+    assert len(ma_w["highlight_geojson"]["features"]) >= 21
+    assert len(ma_w["legend"]) >= 2
+    assert ma_w["fly_to"] is not None
+
+    r_prot = client.post(
+        "/api/twin/chat",
+        json={"query": "Where is the land protected?", "scope_id": "03", "language": "en"},
+    )
+    assert r_prot.status_code == 200
+    ma_p = r_prot.json().get("map_action")
+    assert ma_p is not None
+    assert ma_p["intent"] == "protected_land"
+    assert ma_p["matched_count"] == 76
+    assert "anps" in ma_p["layers_to_enable"]
+    assert len(ma_p["highlight_geojson"]["features"]) == 76
+
+    r_inf = client.post(
+        "/api/twin/chat",
+        json={"query": "Show top 2050 infill housing in La Paz", "scope_id": "03", "language": "en"},
+    )
+    assert r_inf.status_code == 200
+    ma_i = r_inf.json().get("map_action")
+    assert ma_i is not None
+    assert ma_i["intent"] == "infill_housing"
+    assert ma_i["active_metric"] == "infill_homes_potential"
+    assert ma_i["matched_count"] <= 30
+    assert abs(ma_i["fly_to"]["lat"] - 24.1426) < 0.35

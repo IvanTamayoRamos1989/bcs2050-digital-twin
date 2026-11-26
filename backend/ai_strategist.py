@@ -12,6 +12,7 @@ from typing import Any
 
 from backend.config import get_chat_model, get_gemini_location, use_bigquery, use_vertex_strategist
 from backend.metadata_catalog import CANONICAL_KPI_RECONCILIATION
+from backend.spatial_chat_engine import resolve_spatial_map_action
 from backend.simulation_bridge import (
     answer_strategist_chat,
     compute_goal_gap,
@@ -402,6 +403,7 @@ def answer_strategist_chat_grounded(
         precomputed_recs=recs,
         precomputed_sim=sim,
     )
+    map_action = resolve_spatial_map_action(query=query, scope_id=scope_id, language=lang)
 
     tools_used = [
         "ontology_engine.scenario_simulator",
@@ -409,6 +411,8 @@ def answer_strategist_chat_grounded(
         "spatial_store.sqlite_rtree",
         "metadata_catalog.kpi_reconciliation",
     ]
+    if map_action:
+        tools_used.append("spatial_engine.aino_prompt_to_map")
     if rag_chunks:
         tools_used.append("bigquery.vector_search_rag")
     if implan_ctx.get("connected"):
@@ -416,6 +420,8 @@ def answer_strategist_chat_grounded(
 
     citations = _format_citations(rag_chunks, implan_ctx)
     lineage = list(baseline.get("lineage") or [])
+    if map_action:
+        lineage.append(f"Spatial Filter: {map_action['title']} ({map_action['matched_count']} features)")
     if rag_chunks:
         lineage.append(f"BigQuery VECTOR_SEARCH ({len(rag_chunks)} chunks · text-multilingual-embedding-002)")
     if implan_ctx.get("connected"):
@@ -443,6 +449,16 @@ def answer_strategist_chat_grounded(
                     "scope_name": baseline["scope_name"],
                     "municipality_metrics": active_scope_meta,
                 },
+                "spatial_map_visualization": (
+                    {
+                        "title": map_action["title"],
+                        "matched_count": map_action["matched_count"],
+                        "layers_activated": map_action.get("layers_to_enable", []),
+                        "details": map_action.get("analysis_context", {}),
+                    }
+                    if map_action
+                    else None
+                ),
                 "official_state_baseline": {
                     "population_2025": st.get("population_2025"),
                     "buildings_3d_count": st.get("buildings_3d_count"),
@@ -511,9 +527,10 @@ def answer_strategist_chat_grounded(
                 + "GROUNDING RULES: "
                 "1. Base every number, place, and factual claim strictly on the JSON context provided. NEVER invent figures, aquifer values, CAPEX amounts, or doc IDs. "
                 "2. Clearly label empirical official baselines as [OFICIAL] (or [OFFICIAL] in English) vs counterfactual 2050 projections as [MODELADO] (or [MODELED] in English). "
-                "3. Cite retrieved evidence inline in square brackets using exact doc_id values, e.g. [DOC-IMPLAN-LCB-V3-COMPENDIO] or [CONAGUA-DOF-2023]. "
-                "4. If the user asks about data not contained in the JSON context, explicitly state the data gap instead of extrapolating. "
-                "5. Keep the structure executive, scannable markdown (3 concise paragraphs or bullet synthesis + one short line on data lineage/limitations)."
+                "3. When spatial_map_visualization is present in context, tell the user briefly what has been visualized on the 3D map right now and summarize the specific matched areas/numbers from spatial_map_visualization.details. "
+                "4. Cite retrieved evidence inline in square brackets using exact doc_id values, e.g. [DOC-IMPLAN-LCB-V3-COMPENDIO] or [CONAGUA-DOF-2023]. "
+                "5. If the user asks about data not contained in the JSON context, explicitly state the data gap instead of extrapolating. "
+                "6. Keep the structure executive, scannable markdown (3 concise paragraphs or bullet synthesis + one short line on data lineage/limitations)."
             )
 
             prompt = (
@@ -549,12 +566,22 @@ def answer_strategist_chat_grounded(
             logger.warning("Vertex AI Gemini generation failed, using deterministic fallback: %s", exc)
             engine_mode = "deterministic_fallback"
 
-    if engine_mode == "deterministic_fallback" and lang == "en":
-        answer_markdown = (
-            f"**[Deterministic Fallback · {baseline['scope_name']}]** "
-            f"(Live Vertex AI synthesis unavailable in this offline/CI context; showing verified telemetry & Ontology v3.0 summary.)\n\n"
-            + answer_markdown
-        )
+    if engine_mode == "deterministic_fallback":
+        spatial_prefix = ""
+        if map_action and map_action.get("subtitle"):
+            if lang == "en":
+                spatial_prefix = f"**Map View Activated · {map_action['title']}** ({map_action['subtitle']}).\n\n"
+            else:
+                spatial_prefix = f"**Vista 3D Activada · {map_action['title']}** ({map_action['subtitle']}).\n\n"
+        if lang == "en":
+            answer_markdown = (
+                f"**[Deterministic Fallback · {baseline['scope_name']}]** "
+                f"(Live Vertex AI synthesis unavailable in this offline/CI context; showing verified telemetry & Ontology v3.0 summary.)\n\n"
+                + spatial_prefix
+                + answer_markdown
+            )
+        elif spatial_prefix:
+            answer_markdown = spatial_prefix + answer_markdown
 
     uncertainty_note = _build_uncertainty_note(
         language=lang,
@@ -562,6 +589,10 @@ def answer_strategist_chat_grounded(
         rag_count=len(rag_chunks),
         implan_connected=bool(implan_ctx.get("connected")),
     )
+
+    public_map_action = None
+    if map_action:
+        public_map_action = {k: v for k, v in map_action.items() if k != "analysis_context"}
 
     return {
         "query": query,
@@ -575,6 +606,7 @@ def answer_strategist_chat_grounded(
         "uncertainty_note": uncertainty_note,
         "implan_context_used": bool(implan_ctx.get("connected")),
         "answer_markdown": answer_markdown,
-        "fly_to": baseline["fly_to"],
+        "fly_to": (map_action or {}).get("fly_to") or baseline["fly_to"],
+        "map_action": public_map_action,
         "lineage": lineage,
     }

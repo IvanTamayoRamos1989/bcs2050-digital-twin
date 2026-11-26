@@ -1,7 +1,7 @@
 import React, { useState } from "react";
-import { AlertTriangle, BookOpen, Bot, Cpu, Navigation, Send, ShieldCheck, X } from "lucide-react";
+import { AlertTriangle, BookOpen, Bot, Cpu, Map, Navigation, Send, ShieldCheck, Sparkles, X } from "lucide-react";
 import { TwinAPI } from "../api/client";
-import type { CameraPreset, ChatCitation } from "../types/twin";
+import type { CameraPreset, ChatCitation, ChatMapAction } from "../types/twin";
 
 interface Props {
   open: boolean;
@@ -10,12 +10,14 @@ interface Props {
   scenarioName: string;
   language?: "es" | "en";
   onFlyTo: (cam: CameraPreset) => void;
+  onApplyMapAction?: (action: ChatMapAction) => void;
 }
 
 interface ChatMsg {
   role: "user" | "assistant";
   text: string;
   flyTo?: CameraPreset | null;
+  mapAction?: ChatMapAction | null;
   lineage?: string[];
   engineMode?: string;
   modelUsed?: string | null;
@@ -26,16 +28,18 @@ interface ChatMsg {
 
 const QUICK_PROMPTS: Record<"es" | "en", string[]> = {
   es: [
-    "¿Dónde absorber vivienda infill 2050 sin romper agua o POER?",
-    "Evalúa el déficit hídrico CONAGUA e IMPLAN Los Cabos v3",
-    "¿Qué potencial solar en techos tienen La Paz y Los Cabos?",
-    "¿Cuántos edificios 3D están bajo cota +6m ante huracanes?",
+    "Muéstrame las zonas con estrés hídrico",
+    "¿Dónde están las áreas naturales protegidas?",
+    "Muestra zonas de riesgo por inundación en Los Cabos",
+    "Muestra los mejores AGEBs para vivienda infill en La Paz",
+    "Muestra el tráfico aéreo y marítimo en vivo",
   ],
   en: [
-    "Where can Los Cabos absorb 2050 infill housing without breaking water limits?",
-    "Evaluate CONAGUA aquifer deficit and IMPLAN Los Cabos v3 water layers",
-    "What is the rooftop solar PV potential across 396,823 3D buildings?",
-    "How many 3D buildings sit below +6m coastal surge elevation?",
+    "Show me the water stressed areas",
+    "Where is the land protected?",
+    "Show flood & hurricane risk in Los Cabos",
+    "Show top 2050 infill housing in La Paz",
+    "Show live air and marine traffic",
   ],
 };
 
@@ -46,6 +50,7 @@ export const StrategistChatDrawer: React.FC<Props> = ({
   scenarioName,
   language = "en",
   onFlyTo,
+  onApplyMapAction,
 }) => {
   const isEn = language === "en";
   const [input, setInput] = useState("");
@@ -54,9 +59,9 @@ export const StrategistChatDrawer: React.FC<Props> = ({
     {
       role: "assistant",
       text: isEn
-        ? "I am **BCS2050 AI Territorial Strategist**. Ask me about 15-min infill housing, CONAGUA aquifer deficits, IMPLAN Los Cabos v3 zoning, rooftop solar across 396,823 3D buildings, or +6m cyclonic surge risk."
-        : "Soy el **Estratega Territorial BCS2050**. Pregúntame sobre vivienda infill 15-min, déficit de acuíferos CONAGUA, zonificación IMPLAN Los Cabos v3, solar en 396,823 techos 3D o riesgo costero +6m.",
-      lineage: ["Vertex AI Gemini", "BigQuery VECTOR_SEARCH", "Ontology v3.0"],
+        ? "I am **BCS2050 AI Territorial Strategist**. Ask me in plain language to visualize anything directly on the 3D map — e.g. \"Show me the water stressed areas\", \"Where is the land protected?\", flood risk, infill capacity, solar roofs, or live flights & vessels."
+        : "Soy el **Estratega Territorial BCS2050**. Pídeme en lenguaje natural que visualice capas directamente en el mapa 3D — p. ej. \"Muéstrame las zonas con estrés hídrico\", \"¿Dónde está la tierra protegida?\", riesgos, vivienda infill o tráfico aéreo/marítimo.",
+      lineage: ["Vertex AI Gemini", "Aino Spatial AI", "BigQuery RAG"],
     },
   ]);
 
@@ -75,12 +80,18 @@ export const StrategistChatDrawer: React.FC<Props> = ({
         scenario_name: scenarioName,
         language,
       });
+      if (res.map_action) {
+        onApplyMapAction?.(res.map_action);
+      } else if (res.fly_to) {
+        onFlyTo(res.fly_to);
+      }
       setMessages((prev) => [
         ...prev,
         {
           role: "assistant",
           text: res.answer_markdown,
           flyTo: res.fly_to,
+          mapAction: res.map_action ?? null,
           lineage: res.lineage,
           engineMode: res.engine_mode,
           modelUsed: res.model_used,
@@ -184,7 +195,38 @@ export const StrategistChatDrawer: React.FC<Props> = ({
 
             <div className="whitespace-pre-wrap">{m.text.replace(/\*\*/g, "")}</div>
 
-            {m.flyTo && (
+            {m.mapAction ? (
+              <div className="mt-2.5 rounded-xl bg-[#0A84FF]/10 border border-[var(--hig-accent)]/25 p-2.5 space-y-1.5">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="inline-flex items-center gap-1.5 text-[10.5px] font-semibold text-[var(--hig-accent)]">
+                    <Sparkles className="h-3 w-3 shrink-0" />
+                    <span>{isEn ? "Visualized on 3D Map" : "Visualizado en Mapa 3D"}</span>
+                  </span>
+                  <span className="font-mono-num rounded-full bg-[var(--hig-pill-bg)] px-2 py-0.5 text-[9.5px] font-semibold text-[var(--hig-ink)]">
+                    {m.mapAction.matched_count}
+                  </span>
+                </div>
+                <p className="text-[11px] font-medium text-[var(--hig-ink)]">{m.mapAction.title}</p>
+                {m.mapAction.legend && m.mapAction.legend.length > 0 && (
+                  <div className="flex flex-wrap gap-2 pt-0.5">
+                    {m.mapAction.legend.map((lg) => (
+                      <span key={lg.label} className="inline-flex items-center gap-1 text-[9.5px] text-[var(--hig-ink-2)]">
+                        <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: lg.color }} />
+                        <span>{lg.label}</span>
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <button
+                  type="button"
+                  onClick={() => onApplyMapAction?.(m.mapAction!)}
+                  className="mt-1 inline-flex items-center gap-1.5 rounded-full bg-[var(--hig-accent)] px-3 py-1 text-[10px] font-semibold text-white hover:bg-[var(--hig-accent-hover)] transition-colors cursor-pointer"
+                >
+                  <Map className="h-3 w-3" />
+                  <span>{isEn ? "Focus on Map" : "Enfocar en Mapa"}</span>
+                </button>
+              </div>
+            ) : m.flyTo ? (
               <button
                 type="button"
                 onClick={() => onFlyTo(m.flyTo!)}
@@ -193,7 +235,7 @@ export const StrategistChatDrawer: React.FC<Props> = ({
                 <Navigation className="h-3 w-3" />
                 <span>{isEn ? "Fly to site in 3D" : "Volar al sitio en 3D"}</span>
               </button>
-            )}
+            ) : null}
 
             {/* Structured RAG & Official Citations */}
             {m.citations && m.citations.length > 0 && (
