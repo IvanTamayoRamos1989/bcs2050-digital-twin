@@ -644,6 +644,60 @@ def run_enrichment() -> dict[str, tuple[int, float]]:
                 existing_stops.append(f)
     results["transit_stops.geojson"] = _write_fc("transit_stops.geojson", existing_stops)
 
+    # 12. Topography Elevation Contours (10m urban + 200m regional from Copernicus DEM / Foster RFI)
+    sql_contours = """
+    SELECT ST_AsText(geom) AS geom_wkt, scope, city_zone, elevation_m, interval_m, source_dem
+    FROM `bcs2050.bcs2050_gis.foster_rfi__topography_contours`
+    WHERE geom IS NOT NULL
+      AND (
+        scope = 'URBAN_10M'
+        OR (scope = 'REGIONAL_50M' AND MOD(CAST(ROUND(elevation_m) AS INT64), 200) = 0)
+      )
+    """
+    contour_rows = list(bq.query(sql_contours, location=loc).result())
+
+    def _build_contours(reg_tol: float, urb_tol: float, decimals: int) -> list[dict[str, Any]]:
+        built: list[dict[str, Any]] = []
+        for r in contour_rows:
+            g = _parse_geom(r)
+            if not g or not _in_bcs_bounds(g):
+                continue
+            sc = str(r.scope or "REGIONAL_50M")
+            elev = round(float(r.elevation_m or 0.0), 1)
+            if elev.is_integer():
+                elev = int(elev)
+            tol = urb_tol if sc == "URBAN_10M" else reg_tol
+            work = g.simplify(tol, preserve_topology=True) if tol > 0 else g
+            if work.is_empty:
+                work = g
+            work = _to_2d_and_round(work, decimals=decimals)
+            if work.is_empty or not _in_bcs_bounds(work):
+                continue
+            intv = int(r.interval_m or (10 if sc == "URBAN_10M" else 50))
+            is_index = (int(round(float(elev))) % (50 if sc == "URBAN_10M" else 400)) == 0
+            props = {
+                "elevation_m": elev,
+                "interval_m": intv,
+                "scope": sc,
+                "city_zone": _clean_val(r.city_zone) or "Baja California Sur",
+                "is_index": is_index,
+            }
+            built.append({"type": "Feature", "geometry": mapping(work), "properties": props})
+        return built
+
+    contour_feats: list[dict[str, Any]] = []
+    for reg_tol, urb_tol, decimals in (
+        (0.0005, 0.00018, 4),
+        (0.0008, 0.00022, 4),
+    ):
+        contour_feats = _build_contours(reg_tol=reg_tol, urb_tol=urb_tol, decimals=decimals)
+        size_bytes = len(
+            json.dumps({"type": "FeatureCollection", "features": contour_feats}, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+        )
+        if size_bytes <= int(3.2 * 1024 * 1024):
+            break
+    results["topography_contours.geojson"] = _write_fc("topography_contours.geojson", contour_feats)
+
     return results
 
 

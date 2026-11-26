@@ -378,18 +378,30 @@ export const PhaseTelemetryPanel: React.FC<Props> = ({
             {/* Deep Click-to-Inspect Telemetry Card */}
             {inspection ? (
               <div className="hig-content-group rounded-2xl p-3.5 ring-1 ring-[var(--hig-accent)]/35 space-y-2.5">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between gap-2">
                   <span className="flex items-center gap-1.5 font-mono-num text-[11px] font-semibold text-[var(--hig-cyan)]">
-                    <MapPin className="h-3.5 w-3.5" />
-                    {inspection.coordinates.lon}, {inspection.coordinates.lat}
+                    <MapPin className="h-3.5 w-3.5 shrink-0" />
+                    <span>
+                      {inspection.coordinates.lon}, {inspection.coordinates.lat}
+                    </span>
                   </span>
-                  <button
-                    type="button"
-                    onClick={onClearInspection}
-                    className="rounded-full bg-[var(--hig-pill-bg)] px-2.5 py-0.5 text-[10.5px] font-medium text-[var(--hig-ink-2)] hover:text-[var(--hig-ink)] cursor-pointer"
-                  >
-                    {isEn ? "Close" : "Cerrar"}
-                  </button>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {(inspection.terrain_elevation_m != null || inspection.building?.ground_elev_m != null) && (
+                      <span className="font-mono-num rounded-full bg-[#30D158]/15 px-2 py-0.5 text-[10px] font-semibold text-[var(--hig-green)]">
+                        {Math.round(
+                          Number(inspection.terrain_elevation_m ?? inspection.building?.ground_elev_m),
+                        ).toLocaleString()}{" "}
+                        {isEn ? "m ASL" : "msnm"}
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={onClearInspection}
+                      className="rounded-full bg-[var(--hig-pill-bg)] px-2.5 py-0.5 text-[10.5px] font-medium text-[var(--hig-ink-2)] hover:text-[var(--hig-ink)] cursor-pointer"
+                    >
+                      {isEn ? "Close" : "Cerrar"}
+                    </button>
+                  </div>
                 </div>
 
                 {inspection.building && (

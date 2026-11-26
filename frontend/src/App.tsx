@@ -69,6 +69,7 @@ const INITIAL_LAYERS: LayerVisibility = {
   coastalEcosystems: false,
   culturalHeritage: false,
   wasteManagement: false,
+  topographyContours: true,
 };
 
 const isSmallViewport = () => typeof window !== "undefined" && window.innerWidth < 1024;
@@ -117,6 +118,8 @@ export const App: React.FC = () => {
   const [layers, setLayers] = useState<LayerVisibility>(INITIAL_LAYERS);
   const [extrusionScale, setExtrusionScale] = useState<number>(1.0);
   const [agebs3dMode, setAgebs3dMode] = useState<boolean>(false);
+  const [terrain3dEnabled, setTerrain3dEnabled] = useState<boolean>(true);
+  const [terrainExaggeration, setTerrainExaggeration] = useState<number>(1.5);
 
   const [cameraTarget, setCameraTarget] = useState<CameraPreset | null>(null);
   const [inspection, setInspection] = useState<InspectResponse | null>(null);
@@ -376,10 +379,22 @@ export const App: React.FC = () => {
   }, []);
 
   const handleInspectLocation = useCallback(
-    (lon: number, lat: number, buildingPk?: number | null, agebCvegeo?: string | null) => {
+    (
+      lon: number,
+      lat: number,
+      buildingPk?: number | null,
+      agebCvegeo?: string | null,
+      terrainElevM?: number | null,
+    ) => {
       TwinAPI.inspect({ lon, lat, building_pk: buildingPk, ageb_cvegeo: agebCvegeo })
         .then((res) => {
-          setInspection(res);
+          const resolvedElev =
+            terrainElevM != null
+              ? Math.round(terrainElevM)
+              : typeof res.building?.ground_elev_m === "number"
+                ? Math.round(res.building.ground_elev_m)
+                : null;
+          setInspection({ ...res, terrain_elevation_m: resolvedElev });
           setRightCollapsed(false);
           if (typeof window !== "undefined" && window.innerWidth < 768) {
             setLeftCollapsed(true);
@@ -510,6 +525,8 @@ export const App: React.FC = () => {
               language={language}
               layers={layers}
               extrusionScale={extrusionScale}
+              terrain3dEnabled={terrain3dEnabled}
+              terrainExaggeration={terrainExaggeration}
               agebs3dMode={agebs3dMode}
               phase={phase}
               simulation={simulation}
@@ -553,6 +570,8 @@ export const App: React.FC = () => {
                 activeCitySlug={activeCitySlug || "la_paz"}
                 activeMetric={activeMetric}
                 extrusionScale={extrusionScale}
+                terrain3dEnabled={terrain3dEnabled}
+                terrainExaggeration={terrainExaggeration}
                 agebs3dMode={agebs3dMode}
                 layers={layers}
                 colorblindSafe={colorblindSafe}
@@ -589,10 +608,10 @@ export const App: React.FC = () => {
           const labels: Record<BasemapMode, string> = {
             obsidian:
               language === "en"
-                ? theme === "light" ? "Light Map" : "Dark Map"
-                : theme === "light" ? "Mapa base: Claro" : "Mapa base: Oscuro",
-            satellite: language === "en" ? "HD Satellite" : "Mapa base: Satélite HD",
-            terrain: language === "en" ? "3D Relief" : "Mapa base: Relieve 3D",
+                ? theme === "light" ? "Light 3D Terrain" : "Dark 3D Terrain"
+                : theme === "light" ? "Terreno 3D Claro" : "Terreno 3D Oscuro",
+            satellite: language === "en" ? "HD Satellite 3D" : "Satélite HD 3D",
+            terrain: language === "en" ? "Topographic 3D" : "Topográfico 3D",
           };
           showToast(labels[b]);
         }}
@@ -663,6 +682,10 @@ export const App: React.FC = () => {
           onToggleLayer={handleToggleLayer}
           extrusionScale={extrusionScale}
           onExtrusionScaleChange={setExtrusionScale}
+          terrain3dEnabled={terrain3dEnabled}
+          onToggleTerrain3d={() => setTerrain3dEnabled((v) => !v)}
+          terrainExaggeration={terrainExaggeration}
+          onTerrainExaggerationChange={setTerrainExaggeration}
           agebs3dMode={agebs3dMode}
           onToggleAgebs3d={() => setAgebs3dMode((v) => !v)}
         />

@@ -293,12 +293,22 @@ export const CitizenScorecardPanel: React.FC<Props> = ({
         </div>
 
         {inspection?.coordinates && (
-          <p className="flex items-center gap-1 font-mono-num text-[10.5px] text-[var(--hig-ink-3)] px-1">
-            <MapPin className="h-3 w-3 text-[var(--hig-accent)]" />
-            <span>
-              {inspection.coordinates.lat.toFixed(4)}, {inspection.coordinates.lon.toFixed(4)}
+          <div className="flex items-center justify-between gap-2 font-mono-num text-[10.5px] text-[var(--hig-ink-3)] px-1">
+            <span className="flex items-center gap-1">
+              <MapPin className="h-3 w-3 text-[var(--hig-accent)]" />
+              <span>
+                {inspection.coordinates.lat.toFixed(4)}, {inspection.coordinates.lon.toFixed(4)}
+              </span>
             </span>
-          </p>
+            {(inspection.terrain_elevation_m != null || inspection.building?.ground_elev_m != null) && (
+              <span className="rounded-full bg-[#30D158]/15 px-2 py-0.5 text-[10px] font-semibold text-[var(--hig-green)]">
+                {Math.round(
+                  Number(inspection.terrain_elevation_m ?? inspection.building?.ground_elev_m),
+                ).toLocaleString()}{" "}
+                {isEn ? "m ASL" : "msnm"}
+              </span>
+            )}
+          </div>
         )}
       </div>
     </aside>

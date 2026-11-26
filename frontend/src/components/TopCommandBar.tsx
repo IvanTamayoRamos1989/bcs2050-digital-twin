@@ -161,7 +161,7 @@ export const TopCommandBar: React.FC<Props> = ({
   const basemapOptions: { id: BasemapMode; labelEs: string; labelEn: string }[] = [
     { id: "obsidian", labelEs: theme === "light" ? "Claro" : "Oscuro", labelEn: theme === "light" ? "Light" : "Dark" },
     { id: "satellite", labelEs: "Satélite", labelEn: "Satellite" },
-    { id: "terrain", labelEs: "Relieve", labelEn: "Relief" },
+    { id: "terrain", labelEs: "Topo", labelEn: "Topo" },
   ];
 
   return (

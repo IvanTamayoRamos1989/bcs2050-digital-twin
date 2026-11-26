@@ -747,6 +747,22 @@ TWIN_LOCAL_DATASET_RECORDS: list[dict[str, Any]] = [
         distribution_url="/api/twin/layer/waste_routes_lpz",
         dataset_scope="digital_twin_layer",
     ),
+    _rec(
+        identifier="topography_contours",
+        title="BCS Topography Elevation Contours (10m Urban / 200m Regional, 0–2,050m ASL)",
+        abstract="Real elevation contour lines derived from Copernicus DEM 30m/10m spanning 0 m coastal plains to 2,050 m Sierra de la Laguna.",
+        source_agency="Copernicus GLO-30 / 10m DEM · Foster + Partners RFI / BCS2050",
+        source_url="https://spacedata.copernicus.eu/collections/copernicus-digital-elevation-model",
+        reference_date="2026-11-23",
+        update_cadence="Estático (Actualización LiDAR)",
+        crs="EPSG:4326 (Elevación vertical EGM2008)",
+        spatial_accuracy_note="Curvas de nivel a 10 m en zonas urbanas y 200 m regionales derivadas de Copernicus DEM.",
+        data_nature="OFFICIAL_INVENTORY",
+        license_spdx="CC-BY-4.0",
+        attribution_text="Copernicus GLO-30 / 10m DEM · Foster + Partners RFI / BCS2050.",
+        distribution_url="/api/twin/layer/topography_contours",
+        dataset_scope="digital_twin_layer",
+    ),
 ]
 
 

@@ -116,6 +116,10 @@ COLLECTION_META: dict[str, dict[str, Any]] = {
         "title": "La Paz Municipal Waste Collection Zones",
         "description": "Urban solid-waste collection routing sectors from Visor Urbano La Paz.",
     },
+    "topography_contours": {
+        "title": "BCS Topography Elevation Contours (10m Urban / 200m Regional, 0–2,050m ASL)",
+        "description": "Real elevation contour lines derived from Copernicus DEM 30m/10m spanning 0 m coastal plains to 2,050 m Sierra de la Laguna.",
+    },
     "records": {
         "title": "Catálogo OGC API - Records (167 registros ISO 19115 + SPDX)",
         "description": "Metadatos buscables de las capas del Gemelo Digital y panel.bcs2050.com.",

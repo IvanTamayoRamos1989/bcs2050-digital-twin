@@ -55,6 +55,7 @@ LAYER_FILES: dict[str, str] = {
     "coastal_ecosystems": "coastal_ecosystems.geojson",
     "cultural_heritage": "cultural_heritage.geojson",
     "waste_routes_lpz": "waste_routes_lpz.geojson",
+    "topography_contours": "topography_contours.geojson",
 }
 
 _HYDRATE_LOCK = threading.Lock()

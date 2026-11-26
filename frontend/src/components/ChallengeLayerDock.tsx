@@ -27,6 +27,10 @@ interface Props {
   onToggleLayer: (k: keyof LayerVisibility) => void;
   extrusionScale: number;
   onExtrusionScaleChange: (v: number) => void;
+  terrain3dEnabled: boolean;
+  onToggleTerrain3d: () => void;
+  terrainExaggeration: number;
+  onTerrainExaggerationChange: (v: number) => void;
   agebs3dMode: boolean;
   onToggleAgebs3d: () => void;
 }
@@ -109,6 +113,7 @@ const LAYER_GROUPS: LayerGroupDef[] = [
     defaultOpen: true,
     items: [
       { key: "buildings3d", labelEs: "Edificios 3D Reales", labelEn: "3D Real Buildings", count: "396,823", dot: "bg-[#007AFF]" },
+      { key: "topographyContours", labelEs: "Curvas de Nivel (10m/200m)", labelEn: "Elevation Contours (10m/200m)", count: "5,724", dot: "bg-[#A2845E]" },
       { key: "agebs", labelEs: "AGEBs City Science", labelEn: "City Science AGEBs", count: "1,155", dot: "bg-[#30D158]" },
       { key: "zoning", labelEs: "Zonificación CUS/COS", labelEn: "PMDU Zoning CUS/COS", count: "79,515", dot: "bg-[#FF9F0A]" },
       { key: "landTenure", labelEs: "Ejidos RAN & Reservas", labelEn: "Ejidos & Land Reserves", count: "124", dot: "bg-[#B25000]" },
@@ -190,6 +195,10 @@ export const ChallengeLayerDock: React.FC<Props> = ({
   onToggleLayer,
   extrusionScale,
   onExtrusionScaleChange,
+  terrain3dEnabled,
+  onToggleTerrain3d,
+  terrainExaggeration,
+  onTerrainExaggerationChange,
   agebs3dMode,
   onToggleAgebs3d,
 }) => {
@@ -348,36 +357,77 @@ export const ChallengeLayerDock: React.FC<Props> = ({
           </div>
         </div>
 
-        {/* 3D Extrusion Controls */}
+        {/* 3D Terrain Model & Extrusion Controls */}
         <div className="hig-content-group rounded-2xl p-3.5 space-y-3">
           <div className="flex items-center justify-between">
-            <label htmlFor="extrusion-slider" className="text-[12px] font-medium text-[var(--hig-ink)]">
-              {isEn ? "3D Extrusion" : "Extrusión 3D"}
-            </label>
-            <span className="font-mono-num text-[12px] font-semibold text-[var(--hig-accent)]">
-              {extrusionScale.toFixed(1)}×
+            <span className="text-[12px] font-semibold text-[var(--hig-ink)]">
+              {isEn ? "3D Terrain Relief" : "Modelo de Terreno 3D"}
             </span>
-          </div>
-          <input
-            id="extrusion-slider"
-            aria-label={isEn ? "3D extrusion scale" : "Factor de extrusión 3D"}
-            type="range"
-            min={0.5}
-            max={4.0}
-            step={0.1}
-            value={extrusionScale}
-            onChange={(e) => onExtrusionScaleChange(Number(e.target.value))}
-            className="ios-slider"
-          />
-          <label className="flex items-center justify-between pt-1.5 border-t border-[var(--hig-divider)] text-[12px] text-[var(--hig-ink-2)] cursor-pointer">
-            <span>{isEn ? "Extrude 3D AGEB Prisms" : "Extruir Prismas AGEB 3D"}</span>
             <IosSwitch
-              checked={agebs3dMode}
-              onChange={onToggleAgebs3d}
-              ariaLabel={isEn ? "Extrude 3D AGEB Prisms" : "Extruir Prismas AGEB 3D"}
-              accent="blue"
+              checked={terrain3dEnabled}
+              onChange={onToggleTerrain3d}
+              ariaLabel={isEn ? "Enable 3D terrain elevation" : "Activar relieve de terreno 3D"}
+              accent="green"
             />
-          </label>
+          </div>
+
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <label htmlFor="terrain-exag-slider" className="text-[11.5px] font-medium text-[var(--hig-ink-2)]">
+                {isEn ? "Terrain Vertical Scale" : "Escala Vertical Terreno"}
+              </label>
+              <span className="font-mono-num text-[11.5px] font-semibold text-[var(--hig-green)]">
+                {!terrain3dEnabled
+                  ? isEn ? "Flat" : "Plano"
+                  : terrainExaggeration === 1
+                    ? "1.0× True"
+                    : `${terrainExaggeration.toFixed(1)}×`}
+              </span>
+            </div>
+            <input
+              id="terrain-exag-slider"
+              aria-label={isEn ? "Terrain vertical exaggeration" : "Exageración vertical del terreno"}
+              type="range"
+              min={0.5}
+              max={3.0}
+              step={0.1}
+              disabled={!terrain3dEnabled}
+              value={terrainExaggeration}
+              onChange={(e) => onTerrainExaggerationChange(Number(e.target.value))}
+              className="ios-slider disabled:opacity-45"
+            />
+          </div>
+
+          <div className="pt-2 border-t border-[var(--hig-divider)] space-y-2.5">
+            <div className="flex items-center justify-between">
+              <label htmlFor="extrusion-slider" className="text-[11.5px] font-medium text-[var(--hig-ink-2)]">
+                {isEn ? "Building Extrusion" : "Extrusión Edificios"}
+              </label>
+              <span className="font-mono-num text-[11.5px] font-semibold text-[var(--hig-accent)]">
+                {extrusionScale.toFixed(1)}×
+              </span>
+            </div>
+            <input
+              id="extrusion-slider"
+              aria-label={isEn ? "3D extrusion scale" : "Factor de extrusión 3D"}
+              type="range"
+              min={0.5}
+              max={4.0}
+              step={0.1}
+              value={extrusionScale}
+              onChange={(e) => onExtrusionScaleChange(Number(e.target.value))}
+              className="ios-slider"
+            />
+            <label className="flex items-center justify-between pt-1.5 border-t border-[var(--hig-divider)] text-[12px] text-[var(--hig-ink-2)] cursor-pointer">
+              <span>{isEn ? "Extrude 3D AGEB Prisms" : "Extruir Prismas AGEB 3D"}</span>
+              <IosSwitch
+                checked={agebs3dMode}
+                onChange={onToggleAgebs3d}
+                ariaLabel={isEn ? "Extrude 3D AGEB Prisms" : "Extruir Prismas AGEB 3D"}
+                accent="blue"
+              />
+            </label>
+          </div>
         </div>
 
         {/* Geospatial Layer Toggles — 6 Orderly Apple HIG Grouped Sections */}

@@ -4,7 +4,7 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import { MapboxOverlay } from "@deck.gl/mapbox";
 import { Tile3DLayer } from "@deck.gl/geo-layers";
 import { ArcLayer, GeoJsonLayer, PolygonLayer, ScatterplotLayer } from "@deck.gl/layers";
-import { Box, Building2, Compass, Film, Square, ZoomIn } from "lucide-react";
+import { Box, Building2, Compass, Film, Mountain, Square, ZoomIn } from "lucide-react";
 import { TwinAPI } from "../api/client";
 import type {
   ActivePhysicsOverlay,
@@ -40,6 +40,8 @@ interface Props {
   language?: "es" | "en";
   layers: LayerVisibility;
   extrusionScale: number;
+  terrain3dEnabled?: boolean;
+  terrainExaggeration?: number;
   agebs3dMode: boolean;
   phase: AretianPhase;
   simulation: SimulationResponse | null;
@@ -59,14 +61,44 @@ interface Props {
   onStopTour?: () => void;
   onViewportChange?: (bbox: [number, number, number, number], zoom: number) => void;
   onOpenExportModal?: () => void;
-  onInspectLocation: (lon: number, lat: number, buildingPk?: number | null, agebCvegeo?: string | null) => void;
+  onInspectLocation: (
+    lon: number,
+    lat: number,
+    buildingPk?: number | null,
+    agebCvegeo?: string | null,
+    terrainElevM?: number | null,
+  ) => void;
   onQuickJumpCity: (citySlug: string) => void;
+}
+
+function rgbToCss(rgba: [number, number, number, number]): string {
+  return `rgb(${rgba[0]}, ${rgba[1]}, ${rgba[2]})`;
+}
+
+function buildDemSourceSpec(maptilerKey: string): maplibregl.SourceSpecification {
+  return maptilerKey
+    ? {
+        type: "raster-dem",
+        tiles: [`https://api.maptiler.com/tiles/terrain-rgb-v2/{z}/{x}/{y}.webp?key=${maptilerKey}`],
+        tileSize: 256,
+        encoding: "mapbox",
+        maxzoom: 14,
+      }
+    : {
+        type: "raster-dem",
+        tiles: ["https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png"],
+        tileSize: 256,
+        encoding: "terrarium",
+        maxzoom: 15,
+      };
 }
 
 function buildMapStyle(
   mode: BasemapMode,
   maptilerKeyOverride?: string,
   theme: "dark" | "light" = "light",
+  terrain3dEnabled = true,
+  terrainExaggeration = 1.5,
 ): maplibregl.StyleSpecification {
   const maptilerKey = (maptilerKeyOverride ?? import.meta.env.VITE_MAPTILER_KEY ?? "").trim();
   const sources: Record<string, maplibregl.SourceSpecification> = {};
@@ -137,6 +169,24 @@ function buildMapStyle(
         paint: { "raster-opacity": 0.72 },
       });
     }
+  } else if (mode === "terrain") {
+    if (maptilerKey) {
+      sources.maptilerTopo = {
+        type: "raster",
+        tiles: [`https://api.maptiler.com/maps/outdoor-v2/256/{z}/{x}/{y}@2x.png?key=${maptilerKey}`],
+        tileSize: 256,
+        maxzoom: 20,
+      };
+      layers.push({ id: "topo-layer", type: "raster", source: "maptilerTopo" });
+    } else {
+      sources.esriTopo = {
+        type: "raster",
+        tiles: ["https://services.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}"],
+        tileSize: 256,
+        maxzoom: 19,
+      };
+      layers.push({ id: "topo-layer", type: "raster", source: "esriTopo" });
+    }
   } else {
     if (maptilerKey) {
       sources.maptilerSat = {
@@ -164,29 +214,80 @@ function buildMapStyle(
     }
   }
 
-  if (mode === "terrain") {
-    sources.terrainDem = maptilerKey
+  // Distinct DEM sources for 3D terrain displacement & architectural hillshade relief
+  sources.terrainDem = buildDemSourceSpec(maptilerKey);
+  sources.hillshadeDem = buildDemSourceSpec(maptilerKey);
+
+  const hillshadePaint: maplibregl.HillshadeLayerSpecification["paint"] =
+    mode === "obsidian" && theme === "light"
       ? {
-          type: "raster-dem",
-          tiles: [`https://api.maptiler.com/tiles/terrain-rgb-v2/{z}/{x}/{y}.webp?key=${maptilerKey}`],
-          tileSize: 256,
-          encoding: "mapbox",
-          maxzoom: 14,
+          "hillshade-exaggeration": 0.52,
+          "hillshade-illumination-direction": 315,
+          "hillshade-shadow-color": "#7C8EA6",
+          "hillshade-highlight-color": "#FFFFFF",
+          "hillshade-accent-color": "#CBD5E1",
+        }
+      : mode === "obsidian"
+        ? {
+            "hillshade-exaggeration": 0.55,
+            "hillshade-illumination-direction": 315,
+            "hillshade-shadow-color": "#020617",
+            "hillshade-highlight-color": "#64748B",
+            "hillshade-accent-color": "#1E293B",
+          }
+        : mode === "terrain"
+          ? {
+              "hillshade-exaggeration": 0.58,
+              "hillshade-illumination-direction": 315,
+              "hillshade-shadow-color": "#64748B",
+              "hillshade-highlight-color": "#FFFFFF",
+              "hillshade-accent-color": "#94A3B8",
+            }
+          : {
+              "hillshade-exaggeration": 0.28,
+              "hillshade-illumination-direction": 315,
+              "hillshade-shadow-color": "#0F172A",
+              "hillshade-highlight-color": "#F8FAFC",
+              "hillshade-accent-color": "#334155",
+            };
+
+  layers.push({
+    id: "terrain-hillshade",
+    type: "hillshade",
+    source: "hillshadeDem",
+    layout: {
+      visibility: terrain3dEnabled && terrainExaggeration > 0 ? "visible" : "none",
+    },
+    paint: hillshadePaint,
+  });
+
+  const sky: maplibregl.SkySpecification =
+    theme === "light"
+      ? {
+          "sky-color": "#DCE8F5",
+          "sky-horizon-blend": 0.45,
+          "horizon-color": "#F5F7FA",
+          "horizon-fog-blend": 0.5,
+          "fog-color": "#F5F7FA",
+          "fog-ground-blend": 0.45,
         }
       : {
-          type: "raster-dem",
-          tiles: ["https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png"],
-          tileSize: 256,
-          encoding: "terrarium",
-          maxzoom: 15,
+          "sky-color": "#0B1220",
+          "sky-horizon-blend": 0.4,
+          "horizon-color": "#1E293B",
+          "horizon-fog-blend": 0.5,
+          "fog-color": "#0F172A",
+          "fog-ground-blend": 0.45,
         };
-  }
 
   return {
     version: 8,
     sources,
     layers,
-    ...(mode === "terrain" ? { terrain: { source: "terrainDem", exaggeration: 1.8 } } : {}),
+    sky,
+    ...(terrain3dEnabled && terrainExaggeration > 0
+      ? { terrain: { source: "terrainDem", exaggeration: terrainExaggeration } }
+      : {}),
   };
 }
 
@@ -200,6 +301,8 @@ export const AnalyticsMap3D: React.FC<Props> = ({
   language = "en",
   layers,
   extrusionScale,
+  terrain3dEnabled = true,
+  terrainExaggeration = 1.5,
   agebs3dMode,
   phase,
   simulation,
@@ -231,10 +334,40 @@ export const AnalyticsMap3D: React.FC<Props> = ({
   const activeTourRef = useRef<string | null>(activeTourId ?? null);
   const onStopTourRef = useRef(onStopTour);
   const onViewportChangeRef = useRef(onViewportChange);
+  const onInspectLocationRef = useRef(onInspectLocation);
   const phaseRef = useRef<AretianPhase>(phase);
+  const terrainActiveRef = useRef<boolean>(terrain3dEnabled && terrainExaggeration > 0);
   const tilesetErrorRef = useRef<boolean>(false);
   const pinPlacementModeRef = useRef<boolean>(pinPlacementMode);
   const onMapClickForPinRef = useRef(onMapClickForPin);
+  const lastInspectHandledAtRef = useRef<number>(0);
+
+  const queryRealElevation = useCallback((map: maplibregl.Map, lngLat: maplibregl.LngLatLike): number | null => {
+    try {
+      const rawDelta = map.queryTerrainElevation(lngLat);
+      if (rawDelta == null || !Number.isFinite(rawDelta)) return null;
+      const centerElev = (map as unknown as { transform?: { elevation?: number } }).transform?.elevation ?? 0;
+      const exag = terrain3dEnabled && terrainExaggeration > 0 ? terrainExaggeration : 1.0;
+      const absReal = (rawDelta + centerElev) / Math.max(0.01, exag);
+      if (absReal < 0 && absReal > -2.0) return 0;
+      return Math.max(0, Math.round(absReal));
+    } catch {
+      return null;
+    }
+  }, [terrain3dEnabled, terrainExaggeration]);
+
+  const queryRealElevationRef = useRef(queryRealElevation);
+  useEffect(() => {
+    queryRealElevationRef.current = queryRealElevation;
+  }, [queryRealElevation]);
+
+  useEffect(() => {
+    onInspectLocationRef.current = onInspectLocation;
+  }, [onInspectLocation]);
+
+  useEffect(() => {
+    terrainActiveRef.current = terrain3dEnabled && terrainExaggeration > 0;
+  }, [terrain3dEnabled, terrainExaggeration]);
 
   useEffect(() => {
     pinPlacementModeRef.current = pinPlacementMode;
@@ -263,7 +396,9 @@ export const AnalyticsMap3D: React.FC<Props> = ({
     }
   }, [phase]);
 
-  const [zoom, setZoom] = useState<number>(6.4);
+  const [zoom, setZoom] = useState<number>(6.6);
+  const [liveElevationM, setLiveElevationM] = useState<number | null>(null);
+  const [styleVersion, setStyleVersion] = useState<number>(0);
   const [buildings, setBuildings] = useState<BuildingRecord[]>([]);
   const [zoning, setZoning] = useState<ZoningParcelRecord[]>([]);
   const [loadingBuildings, setLoadingBuildings] = useState(false);
@@ -313,6 +448,7 @@ export const AnalyticsMap3D: React.FC<Props> = ({
     if (layers.coastalEcosystems && !geoCache.coastal_ecosystems) needed.push("coastal_ecosystems");
     if (layers.culturalHeritage && !geoCache.cultural_heritage) needed.push("cultural_heritage");
     if (layers.wasteManagement && !geoCache.waste_routes_lpz) needed.push("waste_routes_lpz", "waste_sites");
+    if (layers.topographyContours && !geoCache.topography_contours) needed.push("topography_contours");
     if (!geoCache.municipalities) needed.push("municipalities");
 
     if (needed.length === 0) return;
@@ -349,7 +485,7 @@ export const AnalyticsMap3D: React.FC<Props> = ({
     const bbox: [number, number, number, number] = [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()];
     onViewportChangeRef.current?.(bbox, roundedZoom);
 
-    if (z >= 11.8 && (phaseRef.current === "scenarios" || tilesetErrorRef.current)) {
+    if (z >= 11.8 && (terrainActiveRef.current || phaseRef.current === "scenarios" || tilesetErrorRef.current)) {
       abortBldgRef.current?.abort();
       const ctrl = new AbortController();
       abortBldgRef.current = ctrl;
@@ -382,11 +518,11 @@ export const AnalyticsMap3D: React.FC<Props> = ({
     if (!containerRef.current || mapRef.current) return;
     const map = new maplibregl.Map({
       container: containerRef.current,
-      style: buildMapStyle(basemapMode, maptilerKey, theme),
+      style: buildMapStyle(basemapMode, maptilerKey, theme, terrain3dEnabled, terrainExaggeration),
       center: [-111.55, 25.15],
-      zoom: 6.4,
-      pitch: 36,
-      bearing: -8,
+      zoom: 6.6,
+      pitch: 48,
+      bearing: -14,
       maxPitch: 75,
       antialias: true,
     });
@@ -399,11 +535,34 @@ export const AnalyticsMap3D: React.FC<Props> = ({
     map.addControl(overlay);
 
     let timer: number | null = null;
+    let elevRaf: number | null = null;
     const onMoveEnd = () => {
       if (timer) window.clearTimeout(timer);
-      timer = window.setTimeout(() => fetchViewportFeatures(map), 200);
+      timer = window.setTimeout(() => {
+        fetchViewportFeatures(map);
+        setLiveElevationM(queryRealElevationRef.current(map, map.getCenter()));
+      }, 200);
     };
-    map.on("load", () => fetchViewportFeatures(map));
+    map.on("style.load", () => {
+      setStyleVersion((v) => v + 1);
+    });
+    map.on("load", () => {
+      fetchViewportFeatures(map);
+      setLiveElevationM(queryRealElevationRef.current(map, map.getCenter()));
+    });
+    map.on("idle", () => {
+      setLiveElevationM((prev) => prev ?? queryRealElevationRef.current(map, map.getCenter()));
+    });
+    map.on("mousemove", (ev) => {
+      if (elevRaf !== null) return;
+      elevRaf = window.requestAnimationFrame(() => {
+        elevRaf = null;
+        const elev = queryRealElevationRef.current(map, ev.lngLat);
+        if (elev !== null) {
+          setLiveElevationM(elev);
+        }
+      });
+    });
     map.on("moveend", onMoveEnd);
     const stopActiveTourOnUserInput = () => {
       if (activeTourRef.current) {
@@ -415,7 +574,14 @@ export const AnalyticsMap3D: React.FC<Props> = ({
     map.on("click", (ev) => {
       if (pinPlacementModeRef.current && onMapClickForPinRef.current) {
         onMapClickForPinRef.current(ev.lngLat.lng, ev.lngLat.lat);
+        return;
       }
+      window.setTimeout(() => {
+        if (Date.now() - lastInspectHandledAtRef.current < 90) return;
+        const elev = queryRealElevationRef.current(map, ev.lngLat);
+        lastInspectHandledAtRef.current = Date.now();
+        onInspectLocationRef.current(ev.lngLat.lng, ev.lngLat.lat, null, null, elev);
+      }, 45);
     });
 
     mapRef.current = map;
@@ -423,6 +589,7 @@ export const AnalyticsMap3D: React.FC<Props> = ({
 
     return () => {
       if (timer) window.clearTimeout(timer);
+      if (elevRaf !== null) window.cancelAnimationFrame(elevRaf);
       map.remove();
       mapRef.current = null;
       overlayRef.current = null;
@@ -430,12 +597,36 @@ export const AnalyticsMap3D: React.FC<Props> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Update basemap style dynamically
+  // Update basemap style dynamically (do not reset style when only terrain slider changes)
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
-    map.setStyle(buildMapStyle(basemapMode, maptilerKey, theme));
+    map.setStyle(buildMapStyle(basemapMode, maptilerKey, theme, terrain3dEnabled, terrainExaggeration));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [basemapMode, maptilerKey, theme]);
+
+  // Dynamically toggle 3D Terrain DEM displacement & Hillshade intensity without full style reload
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const applyTerrain = () => {
+      if (!map.getSource("terrainDem")) return;
+      const active = terrain3dEnabled && terrainExaggeration > 0;
+      map.setTerrain(active ? { source: "terrainDem", exaggeration: terrainExaggeration } : null);
+      if (map.getLayer("terrain-hillshade")) {
+        map.setLayoutProperty("terrain-hillshade", "visibility", active ? "visible" : "none");
+      }
+      setLiveElevationM(queryRealElevation(map, map.getCenter()));
+      if (active) {
+        fetchViewportFeatures(map);
+      }
+    };
+    if (map.isStyleLoaded()) {
+      applyTerrain();
+    } else {
+      map.once("style.load", applyTerrain);
+    }
+  }, [terrain3dEnabled, terrainExaggeration, styleVersion, fetchViewportFeatures, queryRealElevation]);
 
   // Smooth camera flights
   useEffect(() => {
@@ -496,6 +687,260 @@ export const AnalyticsMap3D: React.FC<Props> = ({
       setTourStepTitle("");
     };
   }, [activeTourId, tours]);
+
+  // Sync Native MapLibre 3D-Draped Elevation Contours (10m Urban / 200m Regional)
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    const syncContours = () => {
+      const emptyFc: GeoJSON.FeatureCollection = { type: "FeatureCollection", features: [] };
+      const contourFc = geoCache.topography_contours || emptyFc;
+      const src = map.getSource("bcs-topography-contours") as maplibregl.GeoJSONSource | undefined;
+      if (src) {
+        src.setData(contourFc);
+      } else {
+        map.addSource("bcs-topography-contours", {
+          type: "geojson",
+          data: contourFc,
+        });
+      }
+
+      const vis = layers.topographyContours ? "visible" : "none";
+      const lineOpacityReg = theme === "light" ? 0.48 : 0.56;
+      const lineOpacityUrb = theme === "light" ? 0.62 : 0.72;
+      const colorExpr: maplibregl.ExpressionSpecification = [
+        "interpolate",
+        ["linear"],
+        ["coalesce", ["get", "elevation_m"], 0],
+        0, "#0284C7",
+        10, "#0E7490",
+        50, "#64748B",
+        250, "#9A7B56",
+        600, "#B45309",
+        1200, "#9A3412",
+        1800, "#7C2D12",
+      ];
+
+      if (!map.getLayer("topography-contours-regional")) {
+        map.addLayer({
+          id: "topography-contours-regional",
+          type: "line",
+          source: "bcs-topography-contours",
+          minzoom: 5.5,
+          filter: ["==", ["get", "scope"], "REGIONAL_50M"],
+          layout: {
+            visibility: vis,
+            "line-join": "round",
+            "line-cap": "round",
+          },
+          paint: {
+            "line-color": colorExpr,
+            "line-width": ["case", ["boolean", ["get", "is_index"], false], 1.35, 0.75],
+            "line-opacity": lineOpacityReg,
+          },
+        });
+      } else {
+        map.setLayoutProperty("topography-contours-regional", "visibility", vis);
+        map.setPaintProperty("topography-contours-regional", "line-opacity", lineOpacityReg);
+      }
+
+      if (!map.getLayer("topography-contours-urban")) {
+        map.addLayer({
+          id: "topography-contours-urban",
+          type: "line",
+          source: "bcs-topography-contours",
+          minzoom: 10.2,
+          filter: ["==", ["get", "scope"], "URBAN_10M"],
+          layout: {
+            visibility: vis,
+            "line-join": "round",
+            "line-cap": "round",
+          },
+          paint: {
+            "line-color": colorExpr,
+            "line-width": ["case", ["boolean", ["get", "is_index"], false], 1.25, 0.6],
+            "line-opacity": lineOpacityUrb,
+          },
+        });
+      } else {
+        map.setLayoutProperty("topography-contours-urban", "visibility", vis);
+        map.setPaintProperty("topography-contours-urban", "line-opacity", lineOpacityUrb);
+      }
+    };
+
+    if (map.isStyleLoaded()) {
+      syncContours();
+    } else {
+      map.once("style.load", syncContours);
+    }
+  }, [geoCache.topography_contours, layers.topographyContours, theme, styleVersion]);
+
+  // Build Terrain-Seated 3D Buildings GeoJSON when 3D Terrain is active
+  const terrainBuildingsGeoJson = useMemo<GeoJSON.FeatureCollection>(() => {
+    const useNativeTerrainBuildings =
+      terrain3dEnabled && terrainExaggeration > 0 && layers.buildings3d && buildings.length > 0 && zoom >= 11.5;
+    if (!useNativeTerrainBuildings) {
+      return { type: "FeatureCollection", features: [] };
+    }
+    const deltas = phase === "scenarios" && simulation ? simulation.ageb_deltas : {};
+    const features: GeoJSON.Feature[] = [];
+    for (const d of buildings) {
+      if (!d.polygon || d.polygon.length < 3) continue;
+      const ring = [...d.polygon];
+      const first = ring[0];
+      const last = ring[ring.length - 1];
+      if (first[0] !== last[0] || first[1] !== last[1]) {
+        ring.push([first[0], first[1]]);
+      }
+      const mult = deltas[d.ageb_cvegeo]?.height_multiplier ?? 1.0;
+      const renderHeight = Number((d.height_m * extrusionScale * mult).toFixed(2));
+      const fillColor = rgbToCss(getBuildingColor(d, activeMetric, mult, colorblindSafe));
+      features.push({
+        type: "Feature",
+        geometry: { type: "Polygon", coordinates: [ring] },
+        properties: {
+          pk: d.id,
+          building_id: d.building_id,
+          city_name: d.city_name,
+          ageb_cvegeo: d.ageb_cvegeo,
+          height_m: d.height_m,
+          floors: d.floors,
+          gfa_m2: d.gfa_m2,
+          ground_elev_m: d.ground_elev_m,
+          solar_kwp: d.solar_kwp,
+          surge_risk: d.surge_risk,
+          lon: d.lon,
+          lat: d.lat,
+          render_height: renderHeight,
+          fill_color: fillColor,
+        },
+      });
+    }
+    return { type: "FeatureCollection", features };
+  }, [
+    terrain3dEnabled,
+    terrainExaggeration,
+    layers.buildings3d,
+    buildings,
+    zoom,
+    phase,
+    simulation,
+    extrusionScale,
+    activeMetric,
+    colorblindSafe,
+  ]);
+
+  // Sync Native MapLibre Terrain-Seated 3D Buildings Layer & Pointer Interactions
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    const syncBuildings = () => {
+      const showLayer =
+        terrain3dEnabled && terrainExaggeration > 0 && layers.buildings3d && buildings.length > 0 && zoom >= 11.5;
+      const src = map.getSource("bcs-buildings-terrain-src") as maplibregl.GeoJSONSource | undefined;
+      if (src) {
+        src.setData(terrainBuildingsGeoJson);
+      } else {
+        map.addSource("bcs-buildings-terrain-src", {
+          type: "geojson",
+          data: terrainBuildingsGeoJson,
+        });
+      }
+
+      if (!map.getLayer("bcs-buildings-terrain-3d")) {
+        map.addLayer({
+          id: "bcs-buildings-terrain-3d",
+          type: "fill-extrusion",
+          source: "bcs-buildings-terrain-src",
+          minzoom: 11.5,
+          layout: {
+            visibility: showLayer ? "visible" : "none",
+          },
+          paint: {
+            "fill-extrusion-color": ["get", "fill_color"],
+            "fill-extrusion-height": ["get", "render_height"],
+            "fill-extrusion-base": 0,
+            "fill-extrusion-opacity": 0.92,
+            "fill-extrusion-vertical-gradient": true,
+          },
+        });
+      } else {
+        map.setLayoutProperty("bcs-buildings-terrain-3d", "visibility", showLayer ? "visible" : "none");
+      }
+    };
+
+    if (map.isStyleLoaded()) {
+      syncBuildings();
+    } else {
+      map.once("style.load", syncBuildings);
+    }
+  }, [terrainBuildingsGeoJson, terrain3dEnabled, terrainExaggeration, layers.buildings3d, buildings.length, zoom, styleVersion]);
+
+  // Bind hover/click handlers for Terrain-Seated 3D Buildings per style load
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    const onMouseMove = (ev: maplibregl.MapMouseEvent & { features?: maplibregl.MapGeoJSONFeature[] }) => {
+      const feat = ev.features?.[0];
+      if (!feat) return;
+      const p = feat.properties || {};
+      const surgeRisk = Number(p.surge_risk ?? 0);
+      const surgeTxt = isEn
+        ? surgeRisk === 2 ? "HIGH (<6m)" : surgeRisk === 1 ? "MODERATE (<10m)" : "SAFE"
+        : surgeRisk === 2 ? "ALTO (<6m)" : surgeRisk === 1 ? "MODERADO (<10m)" : "SEGURO";
+      map.getCanvas().style.cursor = "pointer";
+      setHoverInfo({
+        x: ev.originalEvent.clientX,
+        y: ev.originalEvent.clientY,
+        title: isEn ? `3D Building · ${p.city_name || "BCS"}` : `Edificio 3D · ${p.city_name || "BCS"}`,
+        lines: isEn
+          ? [
+              `Height: ${p.height_m} m (${p.floors} floors) · GFA ${Math.round(Number(p.gfa_m2 || 0)).toLocaleString()} m²`,
+              `Rooftop Solar: ${p.solar_kwp} kWp | Ground Elev: ${p.ground_elev_m} m ASL (${surgeTxt})`,
+            ]
+          : [
+              `Altura: ${p.height_m} m (${p.floors} niveles) · GFA ${Math.round(Number(p.gfa_m2 || 0)).toLocaleString()} m²`,
+              `Solar Techo: ${p.solar_kwp} kWp | Cota Terreno: ${p.ground_elev_m} msnm (${surgeTxt})`,
+            ],
+      });
+    };
+
+    const onMouseLeave = () => {
+      map.getCanvas().style.cursor = "";
+      setHoverInfo(null);
+    };
+
+    const onBuildingClick = (ev: maplibregl.MapMouseEvent & { features?: maplibregl.MapGeoJSONFeature[] }) => {
+      const feat = ev.features?.[0];
+      if (!feat) return;
+      const p = feat.properties || {};
+      lastInspectHandledAtRef.current = Date.now();
+      const pk = Number(p.pk);
+      const ageb = typeof p.ageb_cvegeo === "string" ? p.ageb_cvegeo : null;
+      const groundElev = Number.isFinite(Number(p.ground_elev_m))
+        ? Number(p.ground_elev_m)
+        : queryRealElevationRef.current(map, ev.lngLat);
+      onInspectLocationRef.current(
+        Number(p.lon ?? ev.lngLat.lng),
+        Number(p.lat ?? ev.lngLat.lat),
+        Number.isFinite(pk) && pk > 0 ? pk : null,
+        ageb,
+        groundElev,
+      );
+    };
+
+    map.on("mousemove", "bcs-buildings-terrain-3d", onMouseMove);
+    map.on("mouseleave", "bcs-buildings-terrain-3d", onMouseLeave);
+    map.on("click", "bcs-buildings-terrain-3d", onBuildingClick);
+    return () => {
+      map.off("mousemove", "bcs-buildings-terrain-3d", onMouseMove);
+      map.off("mouseleave", "bcs-buildings-terrain-3d", onMouseLeave);
+      map.off("click", "bcs-buildings-terrain-3d", onBuildingClick);
+    };
+  }, [isEn, styleVersion]);
 
   // Construct deck.gl layer stack
   const deckLayers = useMemo(() => {
@@ -676,7 +1121,11 @@ export const AnalyticsMap3D: React.FC<Props> = ({
           onClick: ({ coordinate, object }) => {
             if (!coordinate || !object) return;
             const p = object.properties || {};
-            onInspectLocation(coordinate[0], coordinate[1], null, p.cvegeo_ageb);
+            lastInspectHandledAtRef.current = Date.now();
+            const elev = mapRef.current
+              ? queryRealElevationRef.current(mapRef.current, [coordinate[0], coordinate[1]])
+              : null;
+            onInspectLocation(coordinate[0], coordinate[1], null, p.cvegeo_ageb, elev);
           },
         }),
       );
@@ -726,8 +1175,11 @@ export const AnalyticsMap3D: React.FC<Props> = ({
       );
     }
 
-    // 8. REAL 3D BUILDINGS — OGC 3D Tiles 1.1 (.glb streaming from GCS) outside scenarios, or SQLite R-Tree fallback/scenarios
-    const use3DTilesStream = layers.buildings3d && phase !== "scenarios" && Boolean(tileset3dUrl) && !tilesetError;
+    // 8. REAL 3D BUILDINGS — When Flat (3D Terrain OFF), render OGC 3D Tiles 1.1 or SQLite R-Tree deck.gl layer;
+    // when 3D Terrain is ON, native MapLibre `bcs-buildings-terrain-3d` seats buildings directly on DEM hills.
+    const terrainActiveNow = terrain3dEnabled && terrainExaggeration > 0;
+    const use3DTilesStream =
+      !terrainActiveNow && layers.buildings3d && phase !== "scenarios" && Boolean(tileset3dUrl) && !tilesetError;
     if (use3DTilesStream && zoom >= 11.5) {
       list.push(
         new Tile3DLayer({
@@ -764,11 +1216,12 @@ export const AnalyticsMap3D: React.FC<Props> = ({
           },
           onClick: ({ coordinate }) => {
             if (!coordinate) return;
-            onInspectLocation(coordinate[0], coordinate[1], null, null);
+            lastInspectHandledAtRef.current = Date.now();
+            onInspectLocation(coordinate[0], coordinate[1], null, null, null);
           },
         }),
       );
-    } else if (layers.buildings3d && buildings.length > 0) {
+    } else if (!terrainActiveNow && layers.buildings3d && buildings.length > 0) {
       list.push(
         new PolygonLayer<BuildingRecord>({
           id: "buildings-3d-real",
@@ -820,7 +1273,8 @@ export const AnalyticsMap3D: React.FC<Props> = ({
           },
           onClick: ({ object }) => {
             if (!object) return;
-            onInspectLocation(object.lon, object.lat, object.id, object.ageb_cvegeo);
+            lastInspectHandledAtRef.current = Date.now();
+            onInspectLocation(object.lon, object.lat, object.id, object.ageb_cvegeo, object.ground_elev_m);
           },
         }),
       );
@@ -1601,7 +2055,11 @@ export const AnalyticsMap3D: React.FC<Props> = ({
           },
           onClick: ({ object }) => {
             if (!object) return;
-            onInspectLocation(object.lon, object.lat, null, null);
+            lastInspectHandledAtRef.current = Date.now();
+            const elev = mapRef.current
+              ? queryRealElevationRef.current(mapRef.current, [object.lon, object.lat])
+              : null;
+            onInspectLocation(object.lon, object.lat, null, null, elev);
           },
         }),
       );
@@ -1645,6 +2103,8 @@ export const AnalyticsMap3D: React.FC<Props> = ({
     phase,
     selectedAgebId,
     simulation,
+    terrain3dEnabled,
+    terrainExaggeration,
     theme,
     tileset3dUrl,
     tilesetError,
@@ -1707,6 +2167,13 @@ export const AnalyticsMap3D: React.FC<Props> = ({
           Z {zoom.toFixed(1)}
         </span>
         <span className="h-3 w-px bg-[var(--hig-divider)]" />
+        <span className="flex items-center gap-1.5 font-mono-num text-[var(--hig-green)]">
+          <Mountain className="h-3.5 w-3.5" />
+          {liveElevationM !== null
+            ? `${liveElevationM.toLocaleString()} ${isEn ? "m ASL" : "msnm"}`
+            : isEn ? "— m ASL" : "— msnm"}
+        </span>
+        <span className="h-3 w-px bg-[var(--hig-divider)]" />
         {activeTourId ? (
           <div className="flex items-center gap-2">
             <span className="flex items-center gap-1.5 font-medium text-[#BF5AF2]">
@@ -1722,6 +2189,13 @@ export const AnalyticsMap3D: React.FC<Props> = ({
               <span>{isEn ? "Stop" : "Detener"}</span>
             </button>
           </div>
+        ) : terrain3dEnabled && terrainExaggeration > 0 && layers.buildings3d && zoom >= 11.5 ? (
+          <span className="flex items-center gap-1.5 font-mono-num text-[var(--hig-cyan)]">
+            <Building2 className="h-3.5 w-3.5" />
+            {loadingBuildings
+              ? isEn ? "Loading 3D Terrain Bldgs..." : "Cargando Edif. 3D..."
+              : `${buildings.length.toLocaleString()} ${isEn ? "3D bldgs · Terrain" : "edif. 3D · Terreno"}`}
+          </span>
         ) : zoom >= 11.5 && layers.buildings3d && phase !== "scenarios" && Boolean(tileset3dUrl) && !tilesetError ? (
           <span className="flex items-center gap-1.5 font-mono-num text-[var(--hig-cyan)]">
             <Building2 className="h-3.5 w-3.5" />

@@ -242,6 +242,7 @@ export interface InspectResponse {
   building: Record<string, unknown> | null;
   ageb: Record<string, unknown> | null;
   zoning: Record<string, unknown> | null;
+  terrain_elevation_m?: number | null;
   aquifer: Record<string, unknown> | null;
   tandeo_lapaz: Record<string, unknown> | null;
   poer_uga: Record<string, unknown> | null;
@@ -589,6 +590,7 @@ export interface LayerVisibility {
   coastalEcosystems: boolean;
   culturalHeritage: boolean;
   wasteManagement: boolean;
+  topographyContours: boolean;
 }
 
 export interface CitizenPin {

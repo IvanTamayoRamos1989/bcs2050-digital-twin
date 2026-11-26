@@ -13,13 +13,21 @@ interface Props {
   activeCitySlug: string;
   activeMetric: AgebMetricKey;
   extrusionScale: number;
+  terrain3dEnabled?: boolean;
+  terrainExaggeration?: number;
   agebs3dMode: boolean;
   layers: LayerVisibility;
   colorblindSafe?: boolean;
   language?: "es" | "en";
   googleMapsApiKey?: string;
   cesiumIonToken?: string;
-  onInspectLocation: (lon: number, lat: number, buildingPk?: number | null, agebCvegeo?: string | null) => void;
+  onInspectLocation: (
+    lon: number,
+    lat: number,
+    buildingPk?: number | null,
+    agebCvegeo?: string | null,
+    terrainElevM?: number | null,
+  ) => void;
 }
 
 function buildTilesetStyle(metric: AgebMetricKey, colorblindSafe: boolean): Cesium.Cesium3DTileStyle {
@@ -70,6 +78,8 @@ export const CesiumGlobe3D: React.FC<Props> = ({
   activeCitySlug,
   activeMetric,
   extrusionScale,
+  terrain3dEnabled = true,
+  terrainExaggeration = 1.5,
   agebs3dMode,
   layers,
   colorblindSafe = true,
@@ -229,11 +239,13 @@ export const CesiumGlobe3D: React.FC<Props> = ({
         viewer.camera.pickEllipsoid(click.position, viewer.scene.globe.ellipsoid);
       if (cartesian) {
         const carto = Cesium.Cartographic.fromCartesian(cartesian);
+        const h = Number.isFinite(carto.height) && carto.height > -50 && carto.height < 4000 ? Math.round(carto.height) : null;
         onInspectLocation(
           Cesium.Math.toDegrees(carto.longitude),
           Cesium.Math.toDegrees(carto.latitude),
           buildingPk,
           agebCvegeo,
+          h,
         );
       }
     }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
@@ -301,6 +313,15 @@ export const CesiumGlobe3D: React.FC<Props> = ({
       cancelled = true;
     };
   }, [cesiumToken]);
+
+  // Apply interactive vertical terrain exaggeration on Cesium Scene
+  useEffect(() => {
+    const viewer = viewerRef.current;
+    if (!viewer || viewer.isDestroyed()) return;
+    if ("verticalExaggeration" in viewer.scene) {
+      viewer.scene.verticalExaggeration = terrain3dEnabled ? Math.max(1.0, terrainExaggeration) : 1.0;
+    }
+  }, [terrain3dEnabled, terrainExaggeration, worldTerrainLoaded]);
 
   // Switch cleanly between Photorealistic 3D Tiles mode and Analytical OGC 3D Tiles mode
   useEffect(() => {

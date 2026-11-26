@@ -8,6 +8,7 @@ from typing import Any
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -72,7 +73,8 @@ app = FastAPI(
     lifespan=_lifespan,
 )
 
-# Register security/rate-limit middleware before CORSMiddleware so CORSMiddleware wraps outermost (401/429 keep CORS headers)
+# Register security/rate-limit and gzip middlewares before CORSMiddleware so CORSMiddleware wraps outermost
+app.add_middleware(GZipMiddleware, minimum_size=1024)
 app.add_middleware(SecurityAndRateLimitMiddleware)
 app.add_middleware(
     CORSMiddleware,
